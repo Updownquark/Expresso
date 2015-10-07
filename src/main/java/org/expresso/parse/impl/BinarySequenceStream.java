@@ -7,7 +7,7 @@ import java.io.InputStream;
 import org.expresso.parse.BranchableStream;
 
 /** A branchable stream of binary data */
-public abstract class BinarySequenceStream extends BranchableStream<Byte, byte [], BinarySequenceStream> {
+public abstract class BinarySequenceStream extends BranchableStream<Byte, byte []> {
 	private final byte [] holder = new byte[1];
 
 	/** @see BranchableStream#BranchableStream(int) */

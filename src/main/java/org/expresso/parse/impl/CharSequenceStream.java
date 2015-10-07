@@ -7,7 +7,7 @@ import java.io.Reader;
 import org.expresso.parse.BranchableStream;
 
 /** A branchable stream of character data */
-public abstract class CharSequenceStream extends BranchableStream<Character, char [], CharSequenceStream> implements CharSequence {
+public abstract class CharSequenceStream extends BranchableStream<Character, char []> implements CharSequence {
 	private final char [] holder = new char[1];
 
 	/** @see BranchableStream#BranchableStream(int) */
@@ -59,7 +59,7 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 				}
 			};
 		} else
-			return branch().advance(start).subSequence(0, end - start);
+			return ((CharSequenceStream) branch().advance(start)).subSequence(0, end - start);
 	}
 
 	@Override

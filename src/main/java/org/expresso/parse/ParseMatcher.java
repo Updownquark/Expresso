@@ -1,7 +1,13 @@
 package org.expresso.parse;
 
-public interface ParseMatcher<S extends BranchableStream<?, ?, S>> {
+import java.util.Set;
+
+public interface ParseMatcher<S extends BranchableStream<?, ?>> {
 	String getName();
 
-	ParseMatch parse(S stream, ExpressoParser<? super S> parser);
+	Set<String> getTags();
+
+	Set<String> getExternalTypeDependencies();
+
+	<SS extends S> ParseMatch<SS> parse(SS stream, ExpressoParser<? super SS> parser);
 }

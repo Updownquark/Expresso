@@ -9,7 +9,7 @@ import java.util.function.BiFunction;
  * @param <C> The type of data chunk that this stream handles
  * @param <S> The sub-type of this stream
  */
-public abstract class BranchableStream<D, C, S extends BranchableStream<D, C, S>> implements Cloneable {
+public abstract class BranchableStream<D, C> implements Cloneable {
 	/** A chunk of streamed data */
 	protected class Chunk {
 		private final int theChunkIndex;
@@ -66,19 +66,16 @@ public abstract class BranchableStream<D, C, S extends BranchableStream<D, C, S>
 		thePosition = 0;
 	}
 
-	/**
-	 * @return A unique identifier for this stream. Other branched streams whose position is the same as this stream will have the same
-	 *         identifier.
-	 */
-	public Object getId() {
+	/** @return The current position in this stream */
+	public int getPosition() {
 		return theChunk.theChunkIndex * theChunkSize + thePosition;
 	}
 
 	/** @return Another stream at the same position as this stream, but independently {@link #advance(int) advanceable} */
-	public S branch() {
-		S ret;
+	public BranchableStream<D, C> branch() {
+		BranchableStream<D, C> ret;
 		try {
-			ret = (S) super.clone();
+			ret = (BranchableStream<D, C>) super.clone();
 		} catch(CloneNotSupportedException e) {
 			throw new IllegalStateException(e);
 		}
@@ -113,13 +110,13 @@ public abstract class BranchableStream<D, C, S extends BranchableStream<D, C, S>
 	 * @param spaces The number of value spaces to advance this stream's position by
 	 * @return This stream
 	 */
-	public S advance(int spaces) {
+	public BranchableStream<D, C> advance(int spaces) {
 		doOn(spaces, (chunk, idx) -> {
 			theChunk = chunk;
 			thePosition = idx;
 			return null;
 		});
-		return (S) this;
+		return this;
 	}
 
 	/**
