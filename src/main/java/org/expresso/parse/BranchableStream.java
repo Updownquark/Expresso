@@ -2,14 +2,15 @@ package org.expresso.parse;
 
 import java.util.function.BiFunction;
 
+import org.qommons.Sealable;
+
 /**
  * Provides stream iteration over some kind of data
  *
  * @param <D> The type of individual data values that this stream provides
  * @param <C> The type of data chunk that this stream handles
- * @param <S> The sub-type of this stream
  */
-public abstract class BranchableStream<D, C> implements Cloneable {
+public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 	/** A chunk of streamed data */
 	protected class Chunk {
 		private final int theChunkIndex;
@@ -57,6 +58,8 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 
 	private int thePosition;
 
+	private boolean isSealed;
+
 	/** @param chunkSize The chunk size for this stream's cache */
 	protected BranchableStream(int chunkSize) {
 		if(chunkSize <= 0)
@@ -64,6 +67,22 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 		theChunkSize = chunkSize;
 		theChunk = new Chunk(0);
 		thePosition = 0;
+	}
+
+	/** Throws an exception if this stream is sealed */
+	protected void assertUnsealed() {
+		if(isSealed)
+			throw new SealedException(this);
+	}
+
+	@Override
+	public boolean isSealed() {
+		return isSealed;
+	}
+
+	@Override
+	public void seal() {
+		isSealed = true;
 	}
 
 	/** @return The current position in this stream */
@@ -79,6 +98,7 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 		} catch(CloneNotSupportedException e) {
 			throw new IllegalStateException(e);
 		}
+		ret.isSealed = false;
 		return ret;
 	}
 
@@ -91,6 +111,39 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 			chunk = chunk.theNextChunk;
 		}
 		length -= thePosition;
+		return length;
+	}
+
+	/**
+	 * Discovers at least a certain portion of this stream. If present in the data source, the stream will discovered its content up to the
+	 * given number of spaces past the current position and <code>length</code>will be returned. If the stream is exhausted before that
+	 * number, then the stream will be fully discovered and the remaining length of the stream will be returned.
+	 *
+	 * @param length The number of places from this position to discover up to
+	 * @return The number of places that have been discovered after this operation, or <code>length</code>, whichever is smaller.
+	 */
+	public int discoverTo(int length) {
+		if(length < 0)
+			throw new IndexOutOfBoundsException("" + length);
+		if(isDiscovered()) {
+			int realLength = getDiscoveredLength();
+			if(realLength > length)
+				realLength = length;
+			return realLength;
+		}
+		Chunk chunk = theChunk;
+		int realLength = -thePosition;
+		while(chunk != null && length >= realLength + chunk.length()) {
+			if(chunk.length() == theChunkSize) {
+				realLength += chunk.length();
+				chunk = chunk.getNext();
+			} else if(isDiscovered())
+				break;
+			else
+				chunk.getMore();
+		}
+		if(chunk == null)
+			return realLength;
 		return length;
 	}
 
@@ -111,6 +164,7 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 	 * @return This stream
 	 */
 	public BranchableStream<D, C> advance(int spaces) {
+		assertUnsealed();
 		doOn(spaces, (chunk, idx) -> {
 			theChunk = chunk;
 			thePosition = idx;
@@ -141,11 +195,6 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 				throw new IndexOutOfBoundsException(index + " of " + (length + chunk.length()));
 			else
 				chunk.getMore();
-		}
-		while(chunk != null && length <= index) {
-			chunk = chunk.getNext();
-			if(chunk != null)
-				length += chunk.length();
 		}
 		if(chunk == null)
 			throw new IndexOutOfBoundsException(index + " of " + length);

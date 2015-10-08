@@ -5,10 +5,7 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import org.expresso.parse.BranchableStream;
-import org.expresso.parse.ExpressoParser;
-import org.expresso.parse.ParseMatch;
-import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.*;
 import org.qommons.ArrayUtils;
 
 /**
@@ -53,13 +50,12 @@ public class ReferenceMatcher<S extends BranchableStream<?, ?>> implements Parse
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> parse(SS stream, ExpressoParser<? super SS> parser) {
+	public <SS extends S> ParseMatch<SS> parse(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
 		SS streamCopy = (SS) stream.branch();
-		int prePosition = stream.getPosition();
-		ParseMatch<SS> refMatch = parser.<SS> parse(stream, theTypes);
-		int postPosition = stream.getPosition();
+		ParseMatch<SS> refMatch = parser.<SS> parse(stream, session, theTypes);
 		if(refMatch == null)
 			return null;
-		return new ParseMatch<>(this, streamCopy, postPosition - prePosition, Arrays.asList(refMatch), null, true);
+		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), Arrays.asList(refMatch), null, true,
+			false);
 	}
 }

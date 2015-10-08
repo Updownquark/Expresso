@@ -16,8 +16,11 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 	private final boolean isComplete;
 	private final boolean isThisComplete;
 
+	private final boolean isWhitespace;
+
 	public ParseMatch(ParseMatcher<? super S> matcher, S stream, int length, List<ParseMatch<S>> children, String error,
-		boolean complete) {
+		boolean complete,
+		boolean whitespace) {
 		theMatcher = matcher;
 		theStream = stream;
 		theLength = length;
@@ -25,6 +28,7 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 		theError = error;
 		isThisComplete = complete;
 		isComplete = getIncompleteMatch() != null;
+		isWhitespace = whitespace;
 	}
 
 	public ParseMatcher<?> getMatcher() {
@@ -54,6 +58,10 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 	public String getError() {
 		ParseMatch<S> errorMatch = getErrorMatch();
 		return errorMatch == null ? null : errorMatch.theError;
+	}
+
+	public boolean isWhitespace() {
+		return isWhitespace;
 	}
 
 	public ParseMatch<S> getErrorMatch() {
@@ -114,13 +122,53 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 			match -> !(match.getMatcher() instanceof org.expresso.parse.impl.ReferenceMatcher));
 	}
 
+	public boolean isBetter(ParseMatch<?> match) {
+		if(match == null)
+			return true;
+		int len1 = nonErrorLength();
+		int len2 = match.nonErrorLength();
+		if(len1 == len2) {
+			if(isComplete() && !match.isComplete())
+				return true;
+			if(!isComplete() && match.isComplete())
+				return false;
+			if(getError() == null && match.getError() != null)
+				return true;
+		}
+		return len2 > len1;
+	}
+
+	public int nonErrorLength() {
+		if(isWhitespace || theError != null)
+			return 0;
+		else if(getError() == null && isComplete)
+			return theLength;
+		else if(theChildren.isEmpty())
+			return 0;
+		else {
+			int ret = 0;
+			for(ParseMatch<?> sub : theChildren) {
+				int nel = sub.nonErrorLength();
+				ret += nel;
+				if(nel < sub.theLength)
+					break;
+			}
+			return ret;
+		}
+	}
+
 	@Override
 	public String toString() {
 		StringBuilder ret = new StringBuilder();
-		ret.append('(');
-		for(ParseMatch<S> match : theChildren)
-			ret.append(match.toString());
-		ret.append(')');
+		if(theChildren.isEmpty()) {
+			for(int i = 0; i < theLength; i++)
+				ret.append(theStream.get(i));
+		} else {
+			ret.append('(');
+			for(ParseMatch<S> match : theChildren)
+				ret.append(match.toString());
+			ret.append(')');
+		}
 		return ret.toString();
 	}
 }

@@ -4,40 +4,37 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import org.expresso.parse.BranchableStream;
-import org.expresso.parse.ExpressoParser;
-import org.expresso.parse.ParseMatch;
-import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.*;
 
+/**
+ * Matches a sequence of other matchers
+ *
+ * @param <S> The type of stream this matcher can parse
+ */
 public class SequenceMatcher<S extends BranchableStream<?, ?>> extends ComposedMatcher<S> {
+	/** @see ComposedMatcher#ComposedMatcher(String, Set) */
 	protected SequenceMatcher(String name, Set<String> tags) {
 		super(name, tags);
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> parse(SS stream, ExpressoParser<? super SS> parser) {
+	public <SS extends S> ParseMatch<SS> parse(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
 		SS streamCopy = (SS) stream.branch();
-		int prePosition = stream.getPosition();
 		List<ParseMatch<SS>> components = new ArrayList<>();
-		ParseMatch<SS> ignorable;
-		do {
-			ignorable = parser.parse(stream, ExpressoParser.IGNORABLE);
-			if(ignorable != null)
-				components.add(ignorable);
-		} while(ignorable != null);
-		boolean complete = true;
+		ParseMatcher<? super S> missingEl = null;
 		for(ParseMatcher<? super S> element : getComposed()) {
-			ParseMatch<SS> component = element.<SS> parse(stream, parser);
+			ParseMatch<SS> component = element.<SS> parse(stream, parser, session);
 			if(component == null) {
-				complete = false;
+				missingEl = element;
 				break;
-			} else if(!component.isComplete())
-				break;
+			}
 			components.add(component);
+			if(!component.isComplete())
+				break;
 		}
 		if(components.isEmpty())
 			return null;
-		int postPosition = stream.getPosition();
-		return new ParseMatch<>(this, streamCopy, postPosition - prePosition, components, null, complete);
+		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), components,
+			missingEl == null ? null : "Expected " + missingEl, missingEl == null, false);
 	}
 }
