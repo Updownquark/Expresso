@@ -17,11 +17,11 @@ public class OneOfMatcher<S extends BranchableStream<?, ?>> extends ComposedMatc
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> parse(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
+	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
 		ParseMatch<SS> match = null;
 		for(ParseMatcher<? super S> element : getComposed()) {
 			SS streamCopy = (SS) stream.branch();
-			ParseMatch<SS> optionMatch = element.parse(streamCopy, parser, session);
+			ParseMatch<SS> optionMatch = parser.parse(streamCopy, session, element);
 			if(optionMatch == null)
 				continue;
 			else if(optionMatch.isComplete() && optionMatch.getError() == null) {
@@ -37,6 +37,6 @@ public class OneOfMatcher<S extends BranchableStream<?, ?>> extends ComposedMatc
 			return null;
 		SS streamCopy = (SS) stream.branch();
 		stream.advance(match.getLength());
-		return new ParseMatch<>(this, streamCopy, match.getLength(), Arrays.asList(match), null, true, false);
+		return new ParseMatch<>(this, streamCopy, match.getLength(), Arrays.asList(match), null, true);
 	}
 }

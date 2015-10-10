@@ -29,7 +29,7 @@ public class TextPatternMatcher<S extends CharSequenceStream> extends SimpleValu
 		Matcher matcher = thePattern.matcher(stream);
 		if(!matcher.lookingAt())
 			return null;
-		return new ParseMatch<>(this, (SS) stream.branch(), matcher.end(), java.util.Collections.EMPTY_LIST, null, true, false);
+		return new ParseMatch<>(this, (SS) stream.branch(), matcher.end(), java.util.Collections.EMPTY_LIST, null, true);
 	}
 
 	@Override

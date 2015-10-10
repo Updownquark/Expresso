@@ -26,5 +26,5 @@ public interface ParseMatcher<S extends BranchableStream<?, ?>> {
 	 * @param session The current parse session
 	 * @return The parsed match, or null if this matcher does not recognize the content at the beginning of the stream
 	 */
-	<SS extends S> ParseMatch<SS> parse(SS stream, ExpressoParser<? super SS> parser, ParseSession session);
+	<SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session);
 }

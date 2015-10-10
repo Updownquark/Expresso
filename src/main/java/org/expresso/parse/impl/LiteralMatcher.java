@@ -36,7 +36,7 @@ public abstract class LiteralMatcher<C, S extends BranchableStream<?, ? super C>
 			return null;
 		if(!startsWithValue(stream))
 			return null;
-		return new ParseMatch<>(this, stream, length, java.util.Collections.EMPTY_LIST, null, true, false);
+		return new ParseMatch<>(this, stream, length, java.util.Collections.EMPTY_LIST, null, true);
 	}
 
 	/** @return The length of this matcher's value */

@@ -28,7 +28,7 @@ public class WhitespacedGroupMatcher implements ParseMatcher<BranchableStream<?,
 	}
 
 	@Override
-	public <SS extends BranchableStream<?, ?>> ParseMatch<SS> parse(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
+	public <SS extends BranchableStream<?, ?>> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
 		throw new IllegalStateException("Group parser does not actually parse.  It cannot be added to a parser");
 	}
 }

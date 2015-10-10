@@ -1,5 +1,6 @@
 package org.expresso.parse.impl;
 
+import java.util.Arrays;
 import java.util.Set;
 
 import org.expresso.parse.*;
@@ -28,11 +29,17 @@ public abstract class UpToMatcher<S extends BranchableStream<?, ?>> extends Base
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> parse(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
+	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
+		SS streamBegin = (SS) stream.branch();
 		SS streamCopy = (SS) stream.branch();
-		while(theMatcher.parse(stream, parser, session) == null && (!stream.isDiscovered() || stream.getDiscoveredLength() > 0))
+		ParseMatch<SS> end = parser.parse(streamCopy, session, theMatcher);
+		while(end == null && (!stream.isDiscovered() || stream.getDiscoveredLength() > 0)) {
 			stream.advance(1);
-		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), java.util.Collections.EMPTY_LIST, null,
-			true, false);
+			streamCopy = (SS) stream.branch();
+			end = parser.parse(streamCopy, session, theMatcher);
+		}
+		stream.advance(end.getLength());
+		return new ParseMatch<>(this, streamBegin, stream.getPosition() - streamCopy.getPosition(), Arrays.asList(end), null,
+ true);
 	}
 }

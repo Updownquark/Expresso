@@ -18,12 +18,12 @@ public class SequenceMatcher<S extends BranchableStream<?, ?>> extends ComposedM
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> parse(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
+	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
 		SS streamCopy = (SS) stream.branch();
 		List<ParseMatch<SS>> components = new ArrayList<>();
 		ParseMatcher<? super S> missingEl = null;
 		for(ParseMatcher<? super S> element : getComposed()) {
-			ParseMatch<SS> component = element.<SS> parse(stream, parser, session);
+			ParseMatch<SS> component = parser.parse(stream, session, element);
 			if(component == null) {
 				missingEl = element;
 				break;
@@ -35,6 +35,6 @@ public class SequenceMatcher<S extends BranchableStream<?, ?>> extends ComposedM
 		if(components.isEmpty())
 			return null;
 		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), components,
-			missingEl == null ? null : "Expected " + missingEl, missingEl == null, false);
+			missingEl == null ? null : "Expected " + missingEl, missingEl == null);
 	}
 }

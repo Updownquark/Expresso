@@ -20,10 +20,10 @@ public class WithoutMatcher<S extends BranchableStream<?, ?>> extends SequenceMa
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> parse(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
+	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
 		ExcludedTypesParser<? super SS> filteredParser = new ExcludedTypesParser<>(parser);
 		filteredParser.excludeTypes(theExcludedTypes.toArray(new String[theExcludedTypes.size()]));
-		return super.parse(stream, filteredParser, session);
+		return super.match(stream, filteredParser, session);
 	}
 
 	/**
@@ -66,11 +66,11 @@ public class WithoutMatcher<S extends BranchableStream<?, ?>> extends SequenceMa
 		}
 
 		@Override
-		public Collection<ParseMatcher<? super S>> getParsersFor(String... types) {
+		public Collection<ParseMatcher<? super S>> getMatchersFor(String... types) {
 			Collection<String> filteredTypes = new ArrayList<>(Arrays.asList(types));
 			filteredTypes.removeAll(theExcludedTypes);
 			Collection<ParseMatcher<? super S>> wrapParsers = theWrapped
-				.getParsersFor(filteredTypes.toArray(new String[filteredTypes.size()]));
+				.getMatchersFor(filteredTypes.toArray(new String[filteredTypes.size()]));
 			return wrapParsers.stream().filter(matcher -> {
 				if(theExcludedTypes.contains(matcher.getName()))
 					return false;
@@ -79,6 +79,12 @@ public class WithoutMatcher<S extends BranchableStream<?, ?>> extends SequenceMa
 						return false;
 				return true;
 			}).collect(Collectors.toList());
+		}
+
+		@Override
+		public <SS extends S> ParseMatch<SS> parse(SS stream, ParseSession session,
+			Collection<? extends ParseMatcher<? super SS>> matchers) {
+			return theWrapped.parse(stream, session, matchers);
 		}
 	}
 }

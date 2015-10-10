@@ -4,6 +4,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
 
+/**
+ * The result of a {@link ParseMatcher} finding at least a partial {@link ParseMatcher#match(BranchableStream, ExpressoParser, ParseSession)
+ * match} against some data
+ *
+ * @param <S> The type of data stream that was matched
+ */
 public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<ParseMatch<S>> {
 	private final ParseMatcher<? super S> theMatcher;
 
@@ -16,11 +22,21 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 	private final boolean isComplete;
 	private final boolean isThisComplete;
 
-	private final boolean isWhitespace;
-
-	public ParseMatch(ParseMatcher<? super S> matcher, S stream, int length, List<ParseMatch<S>> children, String error,
-		boolean complete,
-		boolean whitespace) {
+	/**
+	 * @param matcher The matcher that found the match
+	 * @param stream The stream that the matched data was found in
+	 * @param length The length of content in the stream that the matcher recognized
+	 * @param children The result matches of the matcher's children
+	 * @param error If the matcher recognized at least some content at the beginning of the stream, but could not correctly parse its whole
+	 *            structure, then this will be a human-readable message describing what's wrong with the data, as far as the matcher can
+	 *            tell. If the matcher had no problem understanding the data, this will be null.
+	 * @param complete Whether the matcher was able to parse its complete structure. If this is false, then an error should also be
+	 *            supplied. This may be true even if an error is supplied, though--matchers may report syntax errors in content that they
+	 *            can still recognize.
+	 */
+	public ParseMatch(ParseMatcher<? super S> matcher, S stream, int length, List<ParseMatch<S>> children, String error, boolean complete) {
+		if(!complete && error == null)
+			throw new IllegalArgumentException("Incomplete matches must have an error message");
 		theMatcher = matcher;
 		theStream = stream;
 		theLength = length;
@@ -28,56 +44,80 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 		theError = error;
 		isThisComplete = complete;
 		isComplete = getIncompleteMatch() != null;
-		isWhitespace = whitespace;
 	}
 
+	/** @return The matcher that found this match */
 	public ParseMatcher<?> getMatcher() {
 		return theMatcher;
 	}
 
+	/** @return The data stream that this match was found in */
 	public S getStream() {
 		return theStream;
 	}
 
+	/** @return The lengt of the content in the stream that the matcher recognized */
 	public int getLength() {
 		return theLength;
 	}
 
+	/** @return The result matches of the matcher's children */
 	public List<ParseMatch<S>> getChildren() {
 		return theChildren;
 	}
 
-	public boolean isComplete() {
-		return isComplete;
-	}
-
-	public boolean isThisError() {
-		return theError != null;
-	}
-
+	/**
+	 * @return If the matcher recognized at least some content at the beginning of the stream, but could not correctly parse its whole
+	 *         structure, then this will be a human-readable message describing what's wrong with the data, as far as the matcher can tell.
+	 *         If the matcher had no problem understanding the data, this will be null.
+	 */
 	public String getError() {
 		ParseMatch<S> errorMatch = getErrorMatch();
 		return errorMatch == null ? null : errorMatch.theError;
 	}
 
-	public boolean isWhitespace() {
-		return isWhitespace;
+	/**
+	 * @return Whether the matcher was able to parse its complete structure. If this is false, then an error will also be present. This may
+	 *         be true even if an error is supplied, though--matchers may report syntax errors in content that they can still recognize.
+	 */
+	public boolean isComplete() {
+		return isComplete;
 	}
 
+	/** @return Whether this match is the direct source of its error (as opposed to one of its children) */
+	public boolean isThisError() {
+		return theError != null;
+	}
+
+	/** @return Whether this match represents whitespace in the stream */
+	public boolean isWhitespace() {
+		return theMatcher instanceof org.expresso.parse.impl.WhitespaceMatcher;
+	}
+
+	/** @return The match that directly caused this match's error */
 	public ParseMatch<S> getErrorMatch() {
 		return search(match -> match.isThisError(), false);
 	}
 
+	/** @return The match in this structure that causes its incompleteness */
 	public ParseMatch<S> getIncompleteMatch() {
 		if(isComplete)
 			return null;
 		return search(match -> !match.isThisComplete, false);
 	}
 
+	/**
+	 * @param name The name of the member to get
+	 * @return The first {@link #localMatches() local} match in this structure (depth-first) whose matcher has the given name
+	 */
 	public ParseMatch<S> getMember(String name) {
 		return search(match -> name.equals(match.getMatcher().getName()), true);
 	}
 
+	/**
+	 * @param name The name of the members to get
+	 * @return All {@link #localMatches() local} matches in this structure (depth-first order) whose matchers have the given name
+	 */
 	public List<ParseMatch<S>> getMembers(String name) {
 		return searchAll(match -> name.equals(match.getMatcher().getName()), true);
 	}
@@ -117,11 +157,16 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 		return org.qommons.ArrayUtils.depthFirst(this, ParseMatch::getChildren, null).iterator();
 	}
 
+	/** @return A depth-first iterator over this match's local nodes, i.e. the nodes that this match's matcher parsed directly */
 	public Iterable<ParseMatch<S>> localMatches() {
 		return org.qommons.ArrayUtils.depthFirst(this, ParseMatch::getChildren,
 			match -> !(match.getMatcher() instanceof org.expresso.parse.impl.ReferenceMatcher));
 	}
 
+	/**
+	 * @param match The match to compare against
+	 * @return Whether this match is a better match to the same section of text than the given match
+	 */
 	public boolean isBetter(ParseMatch<?> match) {
 		if(match == null)
 			return true;
@@ -138,8 +183,9 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 		return len2 > len1;
 	}
 
+	/** @return The amount of non-trivial content in this match up to the first error or incompleteness */
 	public int nonErrorLength() {
-		if(isWhitespace || theError != null)
+		if(isWhitespace() || theError != null)
 			return 0;
 		else if(getError() == null && isComplete)
 			return theLength;

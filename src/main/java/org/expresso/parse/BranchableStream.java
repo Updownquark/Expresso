@@ -90,7 +90,10 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 		return theChunk.theChunkIndex * theChunkSize + thePosition;
 	}
 
-	/** @return Another stream at the same position as this stream, but independently {@link #advance(int) advanceable} */
+	/**
+	 * @return Another stream at the same position as this stream, but independently {@link #advance(int) advanceable}. This method uses
+	 *         {@link #clone()}, so the type of the branched stream will be exactly the same as this type.
+	 */
 	public BranchableStream<D, C> branch() {
 		BranchableStream<D, C> ret;
 		try {

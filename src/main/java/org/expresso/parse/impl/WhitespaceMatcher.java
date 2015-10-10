@@ -34,7 +34,7 @@ public class WhitespaceMatcher<S extends CharSequenceStream> implements ParseMat
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> parse(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
+	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
 		if(!isWhitespace(stream.charAt(0)))
 			return null;
 		SS streamCopy = (SS) stream.branch();
@@ -43,8 +43,7 @@ public class WhitespaceMatcher<S extends CharSequenceStream> implements ParseMat
 			ws.append(stream.charAt(0));
 			stream.advance(1);
 		}
-		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), Collections.EMPTY_LIST, null, true,
-			true);
+		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), Collections.EMPTY_LIST, null, true);
 	}
 
 	/**

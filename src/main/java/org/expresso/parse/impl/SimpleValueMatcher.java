@@ -27,7 +27,7 @@ public abstract class SimpleValueMatcher<S extends BranchableStream<?, ?>> exten
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> parse(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
+	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
 		SS streamBegin = (SS) stream.branch();
 		SS streamCopy = (SS) stream.branch();
 		List<ParseMatch<SS>> ignorables = new ArrayList<>();
@@ -46,7 +46,7 @@ public abstract class SimpleValueMatcher<S extends BranchableStream<?, ?>> exten
 			return valueMatch;
 		else {
 			ignorables.add(valueMatch);
-			return new ParseMatch<>(WhitespacedGroupMatcher.MATCHER, streamBegin, groupLength, ignorables, null, true, false);
+			return new ParseMatch<>(WhitespacedGroupMatcher.MATCHER, streamBegin, groupLength, ignorables, null, true);
 		}
 	}
 

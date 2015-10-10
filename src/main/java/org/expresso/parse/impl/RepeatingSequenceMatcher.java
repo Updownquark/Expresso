@@ -31,13 +31,13 @@ public class RepeatingSequenceMatcher<S extends BranchableStream<?, ?>> extends 
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> parse(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
+	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
 		SS streamCopy = (SS) stream.branch();
 		int count = 0;
 		boolean optionsComplete = true;
 		List<ParseMatch<SS>> optionMatches = new ArrayList<>();
 		while(theMaxRepeat < 0 || count < theMaxRepeat) {
-			ParseMatch<SS> match = super.parse(stream, parser, session);
+			ParseMatch<SS> match = super.match(stream, parser, session);
 			if(match == null)
 				break;
 			optionMatches.add(match);
@@ -52,7 +52,6 @@ public class RepeatingSequenceMatcher<S extends BranchableStream<?, ?>> extends 
 		if(optionsComplete && count < theMinRepeat)
 			error = "At least " + theMinRepeat + " repetition" + (theMinRepeat > 1 ? "s" : "") + " expected";
 
-		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), optionMatches, error, error == null,
-			false);
+		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), optionMatches, error, error == null);
 	}
 }

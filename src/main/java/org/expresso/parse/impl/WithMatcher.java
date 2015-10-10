@@ -26,10 +26,9 @@ public class WithMatcher<S extends BranchableStream<?, ?>> extends SequenceMatch
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> parse(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
-		ExpressoParser<? super SS> unfilteredParser;
+	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
 		if(!(parser instanceof ExcludedTypesParser))
-			return super.parse(stream, parser, session);
+			return super.match(stream, parser, session);
 		else {
 			ExcludedTypesParser<? super SS> filteredParser = (ExcludedTypesParser<? super SS>) parser;
 			Set<String> toReExclude = new LinkedHashSet<>();
@@ -39,7 +38,7 @@ public class WithMatcher<S extends BranchableStream<?, ?>> extends SequenceMatch
 				else
 					System.out.println("WARNING: " + include + " not excluded from parsing");
 			}
-			ParseMatch<SS> ret = super.parse(stream, parser, session);
+			ParseMatch<SS> ret = super.match(stream, parser, session);
 			filteredParser.getExcludedTypes().addAll(toReExclude);
 			return ret;
 		}
