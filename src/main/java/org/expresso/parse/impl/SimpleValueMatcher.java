@@ -31,10 +31,10 @@ public abstract class SimpleValueMatcher<S extends BranchableStream<?, ?>> exten
 		SS streamBegin = (SS) stream.branch();
 		SS streamCopy = (SS) stream.branch();
 		List<ParseMatch<SS>> ignorables = new ArrayList<>();
-		ParseMatch<SS> ignorable = parser.parse(streamCopy, session, ExpressoParser.IGNORABLE);
+		ParseMatch<SS> ignorable = parser.parseByType(streamCopy, session, ExpressoParser.IGNORABLE);
 		while(ignorable != null) {
 			ignorables.add(ignorable);
-			ignorable = parser.parse(streamCopy, session, ExpressoParser.IGNORABLE);
+			ignorable = parser.parseByType(streamCopy, session, ExpressoParser.IGNORABLE);
 		}
 		int groupLength = streamCopy.getPosition() - stream.getPosition();
 		ParseMatch<SS> valueMatch = parseValue(streamCopy);

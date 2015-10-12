@@ -52,7 +52,7 @@ public class ReferenceMatcher<S extends BranchableStream<?, ?>> implements Parse
 	@Override
 	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
 		SS streamCopy = (SS) stream.branch();
-		ParseMatch<SS> refMatch = parser.<SS> parse(stream, session, theTypes);
+		ParseMatch<SS> refMatch = parser.<SS> parseByType(stream, session, theTypes);
 		if(refMatch == null)
 			return null;
 		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), Arrays.asList(refMatch), null, true);

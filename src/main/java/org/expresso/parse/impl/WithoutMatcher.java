@@ -31,7 +31,7 @@ public class WithoutMatcher<S extends BranchableStream<?, ?>> extends SequenceMa
 	 *
 	 * @param <S> The type of stream this parser can parse
 	 */
-	public static class ExcludedTypesParser<S extends BranchableStream<?, ?>> extends ExpressoParser<S> {
+	public static class ExcludedTypesParser<S extends BranchableStream<?, ?>> extends BaseMatcher<S> implements ExpressoParser<S> {
 		private final ExpressoParser<S> theWrapped;
 
 		private final Set<String> theExcludedTypes;
@@ -63,6 +63,11 @@ public class WithoutMatcher<S extends BranchableStream<?, ?>> extends SequenceMa
 		/** @return The (modifiable) set of types that are excluded from parsing by this parser */
 		public Set<String> getExcludedTypes() {
 			return theExcludedTypes;
+		}
+
+		@Override
+		public ParseSession createSession() {
+			return theWrapped.createSession();
 		}
 
 		@Override

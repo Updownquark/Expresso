@@ -21,7 +21,7 @@ public class OneOfMatcher<S extends BranchableStream<?, ?>> extends ComposedMatc
 		ParseMatch<SS> match = null;
 		for(ParseMatcher<? super S> element : getComposed()) {
 			SS streamCopy = (SS) stream.branch();
-			ParseMatch<SS> optionMatch = parser.parse(streamCopy, session, element);
+			ParseMatch<SS> optionMatch = parser.parseWith(streamCopy, session, element);
 			if(optionMatch == null)
 				continue;
 			else if(optionMatch.isComplete() && optionMatch.getError() == null) {

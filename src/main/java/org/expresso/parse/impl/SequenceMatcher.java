@@ -23,7 +23,7 @@ public class SequenceMatcher<S extends BranchableStream<?, ?>> extends ComposedM
 		List<ParseMatch<SS>> components = new ArrayList<>();
 		ParseMatcher<? super S> missingEl = null;
 		for(ParseMatcher<? super S> element : getComposed()) {
-			ParseMatch<SS> component = parser.parse(stream, session, element);
+			ParseMatch<SS> component = parser.parseWith(stream, session, element);
 			if(component == null) {
 				missingEl = element;
 				break;

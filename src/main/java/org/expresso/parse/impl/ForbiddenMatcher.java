@@ -31,7 +31,7 @@ public class ForbiddenMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 	@Override
 	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
 		SS streamCopy = (SS) stream.branch();
-		ParseMatch<SS> match = parser.parse(stream, session, theContent);
+		ParseMatch<SS> match = parser.parseWith(stream, session, theContent);
 		if(match != null && match.isComplete() && match.getError() == null)
 			return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), Arrays.asList(match),
 				"Forbidden content present", true);
