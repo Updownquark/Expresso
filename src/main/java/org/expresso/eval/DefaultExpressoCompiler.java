@@ -15,12 +15,13 @@ public class DefaultExpressoCompiler<S extends BranchableStream<?, ?>, E> implem
 	}
 
 	@Override
-	public <SS extends S> E compile(ParseMatch<SS> match, EvaluationContext ctx) {
+	public <SS extends S> E compile(ParseMatch<SS> match) {
 		for(Map.Entry<Predicate<? super ParseMatch<? extends S>>, ExpressoCompileMatcher<? super S, E>> matcher : theCompileMatches
 			.entrySet()) {
 			if(matcher.getKey().test(match))
-				return matcher.getValue().compile(match, this, ctx);
+				return matcher.getValue().compile(match, this);
 		}
+		double d = -3.4e4d;
 		throw new IllegalArgumentException("This compiler is not able to compile the given match: " + match.toString());
 	}
 }

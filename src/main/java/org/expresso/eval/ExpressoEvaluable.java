@@ -2,8 +2,8 @@ package org.expresso.eval;
 
 import com.google.common.reflect.TypeToken;
 
-public interface ExpressoEvaluator<T> {
-	TypeToken<T> getType();
+public interface ExpressoEvaluable<T> {
+	TypeToken<T> getType(EvaluationContext ctx);
 
 	T eval(EvaluationContext ctx);
 }

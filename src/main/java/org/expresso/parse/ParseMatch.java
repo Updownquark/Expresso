@@ -123,6 +123,22 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 	}
 
 	/**
+	 * @param tag The tag to search for
+	 * @return The first {@link #localMatches() local} match in this structure (depth-first) whose matcher is tagged with the given tag
+	 */
+	public ParseMatch<S> getTag(String tag) {
+		return search(match -> match.getMatcher().getTags().contains(tag), true);
+	}
+
+	/**
+	 * @param tag The tag to search for
+	 * @return All {@link #localMatches() local} matches in this structure (depth-first order) whose matchers are tagged with the given tag
+	 */
+	public List<ParseMatch<S>> getTags(String tag) {
+		return searchAll(match -> match.getMatcher().getTags().contains(tag), true);
+	}
+
+	/**
 	 * Searches breadth-first for the first match passing the given test
 	 *
 	 * @param test The test to search with
