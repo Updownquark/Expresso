@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<grammar>
+	<sequence name="char" order="1" without="ignorable">
+		<literal>&apos;</literal>
+		<one-of>
+			<literal name="value">&apos;</literal>
+			<pattern name="value">[\x20-~]</pattern>
+			<pattern name="value" tag="escaped">\\[&apos;&quot;tnrbf]</pattern>
+			<pattern name="value" tag="escaped,unicode">\\u[0-9a-fA-F]{4}</pattern>
+		</one-of>
+		<literal>&apos;</literal>
+	</sequence>
+	<sequence name="string" order="1" without="ignorable">
+		<literal>&quot;</literal>
+		<pattern name="value">[^&quot;&#10;]*</pattern>
+		<literal>&quot;</literal>
+	</sequence>
+	<sequence name="number" order="2">
+		<option>
+			<literal name="neg">-</literal>
+		</option>
+		<without types="ignorable">
+			<one-of>
+				<sequence tag="decimal">
+					<pattern name="integer">[1-9][_0-9]*</pattern>
+					<literal>.</literal>
+					<option>
+						<pattern name="fraction">[0-9][_0-9]</pattern>
+					</option>
+				</sequence>
+				<sequence tag="decimal">
+					<literal>.</literal>
+					<pattern name="fraction">[0-9][_0-9]*</pattern>
+				</sequence>
+				<sequence tag="int">
+					<pattern name="integer">[1-9][_0-9]*</pattern>
+				</sequence>
+				<sequence tag="int">
+					<literal name="integer">0</literal>
+				</sequence>
+			</one-of>
+			<option>
+				<pattern>[eE]</pattern>
+				<option>
+					<literal name="expNeg">-</literal>
+				</option>
+				<pattern name="exp">[1-9][_0-9]*</pattern>
+			</option>
+			<option>
+				<pattern name="floatType">[fF]</pattern>
+				<forbid>
+					<pattern>[_a-zA-Z0-9]</pattern>
+				</forbid>
+			</option>
+			<option>
+				<pattern name="doubleType">[dD]</pattern>
+				<forbid>
+					<pattern>[_a-zA-Z0-9]</pattern>
+				</forbid>
+			</option>
+			<option>
+				<pattern name="longType">[lL]</pattern>
+				<forbid>
+					<pattern>[_a-zA-Z0-9]</pattern>
+				</forbid>
+			</option>
+		</without>
+	</sequence>
+	<sequence name="hex int" order="1" without="ignorable">
+		<literal name="hex">0x</literal>
+		<pattern name="value">[_0-9a-fA-F]+</pattern>
+		<option>
+			<pattern name="longType">[lL]</pattern>
+		</option>
+		<forbid>
+			<pattern>[_a-zA-Z0-9]</pattern>
+		</forbid>
+	</sequence>
+	<sequence name="octal int" order="1" without="ignorable">
+		<literal name="oct">0</literal>
+		<pattern name="value">[_0-9]+</pattern>
+		<option>
+			<pattern name="longType">[lL]</pattern>
+			<forbid>
+				<pattern>[_a-zA-Z0-9]</pattern>
+			</forbid>
+		</option>
+	</sequence>
+	<sequence name="binary int" order="1" without="ignorable">
+		<literal name="binary">0b</literal>
+		<pattern name="value">[_0-9]*</pattern>
+		<option>
+			<pattern name="longType">[lL]</pattern>
+			<forbid>
+				<pattern>[_a-zA-Z0-9]</pattern>
+			</forbid>
+		</option>
+	</sequence>
+	<one-of name="boolean" order="1">
+		<literal>true</literal>
+		<literal>false</literal>
+	</one-of>
+	<literal name="null" order="1">null</literal>
+
+	<!-- Ignorables -->
+	<sequence name="line comment" order="0" without="ignorable" tag="ignorable">
+		<literal>//</literal>
+		<pattern name="content">[^\x10]*</pattern>
+		<literal>&#10;</literal>
+	</sequence>
+	<sequence name="block comment" ignorable="true" order="0">
+		<literal>/*</literal>
+		<pattern name="content">[^(*/)]*</pattern>
+		<literal>*/</literal>
+	</sequence>
+	
+	<!-- Blocks and block structures -->
+	<sequence name="block" order="1">
+		<literal>{</literal>
+		<repeat>
+			<ref name="content" />
+			<option>
+				<literal>;</literal>
+			</option>
+		</repeat>>
+		<literal>}</literal>
+	</sequence>
+	<sequence name="synchronized block" order="1">
+		<literal>synchronized</literal>
+		<literal>(</literal>
+		<ref name="syncItem" />
+		<literal>)</literal>
+		<ref type="block" name="content" />
+	</sequence>
+	<sequence name="try/catch/finally" order="1">
+		<literal>try</literal>
+		<option>
+			<literal>(</literal>
+			<repeat>
+				<ref name="resource" />
+				<literal>;</literal>
+			</repeat>
+			<ref name="resource" />
+			<option>
+				<literal>;</literal>
+			</option>
+			<literal>)</literal>
+		</option>
+		<ref type="block" name="try" />
+		<repeat>
+			<literal>catch</literal>
+			<literal>(</literal>
+			<ref name="catchType" />
+			<literal>)</literal>
+			<ref type="block" name="catch" />
+		</repeat>
+		<option>
+			<literal>finally</literal>
+			<ref type="block" name="finally" />
+		</option>
+	</sequence>
+	<sequence name="while loop" order="1">
+		<literal name="name">while</literal>
+		<literal>(</literal>
+		<ref name="condition" />
+		<literal>)</literal>
+		<one-of>
+			<literal>;</literal>
+			<ref name="content" tag="post-condition" />
+		</one-of>
+	</sequence>
+	<sequence name="do while loop" order="1">
+		<literal name="name">do</literal>
+		<ref type="block" name="content" tag="pre-condition" />
+		<literal>while</literal>
+		<literal>(</literal>
+		<ref name="condition" />
+		<literal>)</literal>
+	</sequence>
+	<sequence name="for loop" order="1">
+		<literal name="name">for</literal>
+		<literal>(</literal>
+		<option>
+			<ref name="init" />
+			<repeat>
+				<literal>,</literal>
+				<ref name="init" />
+			</repeat>
+		</option>
+		<literal>;</literal>
+		<option>
+			<ref name="condition" />
+		</option>
+		<literal>;</literal>
+		<option>
+			<ref name="increment" />
+			<repeat>
+				<literal>,</literal>
+				<ref name="increment" />
+			</repeat>
+		</option>
+		<literal>)</literal>
+		<one-of>
+			<literal name="terminal">;</literal>
+			<ref name="content" tag="post-condition" />
+		</one-of>
+	</sequence>
+	<sequence name="enhanced for loop" order="1">
+		<literal>for</literal>
+		<literal>(</literal>
+		<ref name="variable" />
+		<literal>:</literal>
+		<ref name="iterable" />
+		<literal>)</literal>
+		<one-of>
+			<literal>;</literal>
+			<ref name="content" tag="post-condition"/>
+		</one-of>
+	</sequence>
+	<sequence name="if" order="1">
+		<literal>if</literal>
+		<literal>(</literal>
+		<ref name="condition" />
+		<literal>)</literal>
+		<one-of>
+			<literal>;</literal>
+			<ref name="content" />
+		</one-of>
+		<repeat>
+			<literal>else</literal>
+			<literal>if</literal>
+			<literal>(</literal>
+			<ref name="condition" />
+			<literal>)</literal>
+			<one-of>
+				<literal>;</literal>
+				<ref name="content" />
+			</one-of>
+		</repeat>
+		<option>
+			<literal name="terminal">else</literal>
+			<ref name="content" />
+		</option>
+	</sequence>
+	<sequence name="switch" order="1">
+		<literal>switch</literal>
+		<literal>(</literal>
+		<ref name="variable" />
+		<literal>)</literal>
+		<literal>{</literal>
+		<repeat>
+			<one-of>
+				<option>
+					<literal>case</literal>
+					<ref name="case" />
+				</option>
+				<option>
+					<literal name="default">default</literal>
+				</option>
+			</one-of>
+			<literal>:</literal>
+			<repeat>
+				<forbid>
+					<one-of>
+						<literal>case</literal>
+						<literal>default</literal>
+					</one-of>
+				</forbid>
+				<ref />
+				<literal>;</literal>
+			</repeat>
+		</repeat>
+		<literal>}</literal>
+	</sequence>
+</grammar>
