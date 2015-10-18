@@ -273,4 +273,237 @@
 		</repeat>
 		<literal>}</literal>
 	</sequence>
+	
+	<!-- Types -->
+	<sequence name="identifier" order="1000">
+		<pattern name="name">[_a-zA-Z][_a-zA-Z0-9]*</pattern>
+	</sequence>
+	<sequence name="primitive" order="998" tag="type">
+		<one-of name="name">
+			<literal>void</literal>
+			<literal>null</literal>
+			<literal>boolean</literal>
+			<literal>true</literal>
+			<literal>false</literal>
+			<literal>char</literal>
+			<literal>byte</literal>
+			<literal>short</literal>
+			<literal>int</literal>
+			<literal>long</literal>
+			<literal>float</literal>
+			<literal>double</literal>
+		</one-of>
+	</sequence>
+	<sequence name="basic-type" priority="998" default="false" tag="type">
+		<repeat>
+			<ref type="identifier" name="name" />
+			<literal>.</literal>
+		</repeat>
+		<ref type="identifier" name="name" tag="final-name" />
+	</sequence>
+	<sequence name="array-type" priority="998" default="false" tag="type">
+		<ref type="type" name="component" />
+		<repeat min="1" name="dimension">
+			<literal>[</literal>
+			<literal>]</literal>
+		</repeat>
+	</sequence>
+	<sequence name="type-bound" default="false">
+		<one-of>
+			<literal>extends</literal>
+			<literal>super</literal>
+		</one-of>
+		<ref type="type" name="bound"/>
+	</sequence>
+	<sequence name="wildcard-type" priority="998" default="false" tag="type">
+		<literal name="wild-card">?</literal>
+		<ref type="type-bound" name="bound" />
+	</sequence>
+	<sequence name="bounded-type" priority="998" default="false" tag="type">
+		<ref type="identifier" name="name" />
+		<ref type="type-bound" name="bound" />
+	</sequence>
+	<sequence name="type-parameters" default="false">
+		<literal>&lt;</literal>
+		<repeat>
+			<ref type="type" name="parameter" />
+			<literal>,</literal>
+		</repeat>
+		<ref type="type" name="parameter" />
+		<literal>&gt;</literal>
+	</sequence>
+	<sequence name="generic-type" priority="998" default="false" tag="type">
+		<ref type="type" name="base" />
+		<ref type="type-parameters" name="parameters" />
+	</sequence>
+
+	<!-- Declarations -->
+	<one-of name="qualifier" default="false">
+		<literal>public</literal>
+		<literal>protected</literal>
+		<literal>private</literal>
+		<literal>default</literal>
+		<literal>static</literal>
+		<literal>final</literal>
+		<literal>synchronized</literal>
+	</one-of>
+	<sequence name="variable-declaration" tag="declaration">
+		<repeat>
+			<ref type="qualifier" name="qualifier" />
+		</repeat>
+		<whitespace />
+		<ref type="type" name="type" />
+		<whitespace />
+		<ref type="identifier" name="name" />
+	</sequence>
+	<sequence name="method declaration" tag="declaration">
+		<repeat>
+			<ref type="qualifier" name="qualifier" />
+		</repeat>
+		<one-of>
+			<ref type="type-parameters" name="type-parameters" />
+			<whitespace />
+		</one-of>
+		<ref type="type" name="type" />
+		<whitespace />
+		<ref type="identifier" name="name" />
+		<literal>(</literal>
+		<repeat>
+			<ref type="variable-declaration" name="parameter" />
+			<literal>,</literal>
+		</repeat>
+		<ref type="variable-declaration" name="parameter" />
+		<literal>)</literal>
+		<option>
+			<literal>throws</literal>
+			<repeat>
+				<ref type="type" name="thrown" />
+				<literal>,</literal>
+			</repeat>
+			<ref type="type" name="thrown" />
+		</option>
+		<option>
+			<literal>{</literal>
+			<repeat>
+				<ref name="body-content" />
+			</repeat>
+			<literal>}</literal>
+		</option>
+	</sequence>
+	<sequence name="class declaration" tag="declaration">
+		<repeat>
+			<ref type="qualifier" name="qualifier" />
+		</repeat>
+		<whitespace />
+		<one-of>
+			<literal>class</literal>
+			<literal>interface</literal>
+		</one-of>
+		<whitespace />
+		<ref type="identifier" name="name" />
+		<one-of>
+			<ref type="type-parameters" name="type-parameters" />
+			<whitespace />
+		</one-of>
+		<option>
+			<literal>extends</literal>
+			<repeat>
+				<ref type="type" name="extends" />
+				<literal>,</literal>
+			</repeat>
+			<ref type="type" name="extends" />
+		</option>
+		<option>
+			<literal>implements</literal>
+			<repeat>
+				<ref type="type" name="implements" />
+				<literal>,</literal>
+			</repeat>
+			<ref type="type" name="implements" />
+		</option>
+		<literal>{</literal>
+			<repeat>
+				<ref name="body-content" />
+			</repeat>
+		<literal>}</literal>
+	</sequence>
+	<sequence name="type-import" default="false" tag="import">
+		<literal>import</literal>
+		<whitespace />
+		<ref type="basic-type" name="type" />
+	</sequence>
+	<sequence name="static-import" default="false" tag="import">
+		<literal>import</literal>
+		<whitespace />
+		<literal>static</literal>
+		<whitespace />
+		<option>
+			<ref type="basic-type" name="type" />
+		</option>
+		<literal>.</literal>
+		<ref type="identifier" name="member" />
+	</sequence>
+	<sequence name="java-file" default="false">
+		<repeat>
+			<ref type="import" name="import" />
+		</repeat>
+		<ref type="class-declaration" name="class" />
+	</sequence>
+	
+	<!-- Control statements -->
+	<sequence name="return" order="1">
+		<literal>return</literal>
+		<ref name="value" />
+	</sequence>
+	<sequence name="throw" order="1">
+		<literal>throw</literal>
+		<ref name="value" />
+	</sequence>
+	
+	<!-- Normal operators -->
+	<sequence name="constructor" order="1">
+		<literal>new</literal>
+		<whitespace />
+		<ref type="type" name="type" />
+		<literal>(</literal>
+			<repeat>
+				<ref name="parameter" />
+				<literal>,</literal>
+			</repeat>
+			<ref name="parameter" />
+		<literal>)</literal>
+		<option>
+			<literal name="anonymous">{</literal>
+			<repeat>
+				<ref name="body-content" />
+			</repeat>
+			<literal>}</literal>
+		</option>
+	</sequence>
+	<sequence name="array-initializer" order="1">
+		<literal>new</literal>
+		<whitespace />
+		<ref type="type" name="type" />
+		<repeat min="1">
+			<literal>[</literal>
+			<ref name="size" />
+			<literal>]</literal>
+		</repeat>
+		<option>
+			<literal name="valueSet">{</literal>
+			<option>
+				<repeat>
+					<ref name="element" />
+					<literal>,</literal>
+				</repeat>
+				<ref name="element" />
+			</option>
+			<literal>}</literal>
+		</option>
+	</sequence>
+	<sequence name="assign" order="50" priority="100">
+		<ref name="variable" />
+		<literal name="name">=</literal>
+		<ref name="operand" />
+	</sequence>
 </grammar>
