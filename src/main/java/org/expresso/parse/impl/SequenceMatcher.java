@@ -37,4 +37,41 @@ public class SequenceMatcher<S extends BranchableStream<?, ?>> extends ComposedM
 		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), components,
 			missingEl == null ? null : "Expected " + missingEl, missingEl == null);
 	}
+
+	/**
+	 * @param <S> The type of stream to accommodate
+	 * @param name The name for the new matcher
+	 * @return A builder to create a new sequence matcher
+	 */
+	public static <S extends BranchableStream<?, ?>> Builder<S, SequenceMatcher<S>> buildSequence(String name) {
+		return new Builder<>(name);
+	}
+
+	/**
+	 * Builds {@link SequenceMatcher}s
+	 *
+	 * @param <S> The type of stream to accommodate
+	 * @param <M> The sub-type of sequence matcher to build
+	 */
+	public static class Builder<S extends BranchableStream<?, ?>, M extends SequenceMatcher<S>> extends ComposedMatcher.Builder<S, M> {
+		/** @param name The name for the matcher */
+		protected Builder(String name) {
+			super(name);
+		}
+
+		@Override
+		public Builder<S, M> tag(String... tags) {
+			return (Builder<S, M>) super.tag(tags);
+		}
+
+		@Override
+		public Builder<S, M> addChild(ParseMatcher<? super S> child) {
+			return (Builder<S, M>) super.addChild(child);
+		}
+
+		@Override
+		protected M create(String name, Set<String> tags) {
+			return (M) new SequenceMatcher<>(name, tags);
+		}
+	}
 }

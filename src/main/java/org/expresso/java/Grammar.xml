@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <grammar>
-	<sequence name="char" order="1" without="ignorable">
+	<sequence name="char" without="ignorable">
 		<literal>&apos;</literal>
 		<one-of>
 			<literal name="value">&apos;</literal>
@@ -11,12 +11,17 @@
 		</one-of>
 		<literal>&apos;</literal>
 	</sequence>
-	<sequence name="string" order="1" without="ignorable">
+	<sequence name="string" without="ignorable">
 		<literal>&quot;</literal>
-		<pattern name="value">[^&quot;&#10;]*</pattern>
+		<up-to name="value">
+			<one-of>
+				<literal>&quot;</literal>
+				<literal>&#10;</literal>
+			</one-of>
+		</up-to>
 		<literal>&quot;</literal>
 	</sequence>
-	<sequence name="number" order="2">
+	<sequence name="number">
 		<option>
 			<literal name="neg">-</literal>
 		</option>
@@ -67,7 +72,7 @@
 			</option>
 		</without>
 	</sequence>
-	<sequence name="hex-int" order="1" without="ignorable">
+	<sequence name="hex-int" without="ignorable">
 		<literal name="hex">0x</literal>
 		<pattern name="value">[_0-9a-fA-F]+</pattern>
 		<option>
@@ -77,7 +82,7 @@
 			<pattern>[_a-zA-Z0-9]</pattern>
 		</forbid>
 	</sequence>
-	<sequence name="octal-int" order="1" without="ignorable">
+	<sequence name="octal-int" without="ignorable">
 		<literal name="oct">0</literal>
 		<pattern name="value">[_0-9]+</pattern>
 		<option>
@@ -87,7 +92,7 @@
 			</forbid>
 		</option>
 	</sequence>
-	<sequence name="binary-int" order="1" without="ignorable">
+	<sequence name="binary-int" without="ignorable">
 		<literal name="binary">0b</literal>
 		<pattern name="value">[_0-9]*</pattern>
 		<option>
@@ -97,26 +102,30 @@
 			</forbid>
 		</option>
 	</sequence>
-	<one-of name="boolean" order="1">
+	<one-of name="boolean">
 		<literal>true</literal>
 		<literal>false</literal>
 	</one-of>
-	<literal name="null" order="1">null</literal>
+	<literal name="null">null</literal>
 
 	<!-- Ignorables -->
-	<sequence name="line-comment" order="0" without="ignorable" tag="ignorable">
+	<sequence name="line-comment" without="ignorable" tag="ignorable">
 		<literal>//</literal>
-		<pattern name="content">[^\x10]*</pattern>
+		<up-to name="content">
+			<literal>&#10;</literal>
+		</up-to>
 		<literal>&#10;</literal>
 	</sequence>
-	<sequence name="block-comment" ignorable="true" order="0">
+	<sequence name="block-comment" ignorable="true">
 		<literal>/*</literal>
-		<pattern name="content">[^(*/)]*</pattern>
+		<up-to name="content">
+			<literal>*/</literal>
+		</up-to>
 		<literal>*/</literal>
 	</sequence>
 	
 	<!-- Blocks and block structures -->
-	<sequence name="block" order="1">
+	<sequence name="block">
 		<literal>{</literal>
 		<repeat>
 			<ref name="content" />
@@ -126,14 +135,14 @@
 		</repeat>>
 		<literal>}</literal>
 	</sequence>
-	<sequence name="synchronized-block" order="1">
+	<sequence name="synchronized-block">
 		<literal>synchronized</literal>
 		<literal>(</literal>
 		<ref name="sync-item" />
 		<literal>)</literal>
 		<ref type="block" name="content" />
 	</sequence>
-	<sequence name="try-catch-finally" order="1">
+	<sequence name="try-catch-finally">
 		<literal>try</literal>
 		<option>
 			<literal>(</literal>
@@ -160,7 +169,7 @@
 			<ref type="block" name="finally" />
 		</option>
 	</sequence>
-	<sequence name="while-loop" order="1">
+	<sequence name="while-loop">
 		<literal name="name">while</literal>
 		<literal>(</literal>
 		<ref name="condition" />
@@ -170,7 +179,7 @@
 			<ref name="content" tag="post-condition" />
 		</one-of>
 	</sequence>
-	<sequence name="do-while-loop" order="1">
+	<sequence name="do-while-loop">
 		<literal name="name">do</literal>
 		<ref type="block" name="content" tag="pre-condition" />
 		<literal>while</literal>
@@ -178,7 +187,7 @@
 		<ref name="condition" />
 		<literal>)</literal>
 	</sequence>
-	<sequence name="for-loop" order="1">
+	<sequence name="for-loop">
 		<literal name="name">for</literal>
 		<literal>(</literal>
 		<option>
@@ -206,7 +215,7 @@
 			<ref name="content" tag="post-condition" />
 		</one-of>
 	</sequence>
-	<sequence name="enhanced-for-loop" order="1">
+	<sequence name="enhanced-for-loop">
 		<literal>for</literal>
 		<literal>(</literal>
 		<ref name="variable" />
@@ -218,7 +227,7 @@
 			<ref name="content" tag="post-condition"/>
 		</one-of>
 	</sequence>
-	<sequence name="if" order="1">
+	<sequence name="if">
 		<literal>if</literal>
 		<literal>(</literal>
 		<ref name="condition" />
@@ -243,7 +252,7 @@
 			<ref name="content" />
 		</option>
 	</sequence>
-	<sequence name="switch" order="1">
+	<sequence name="switch">
 		<literal>switch</literal>
 		<literal>(</literal>
 		<ref name="variable" />
@@ -275,10 +284,10 @@
 	</sequence>
 	
 	<!-- Types -->
-	<sequence name="identifier" order="1000">
+	<sequence name="identifier">
 		<pattern name="name">[_a-zA-Z][_a-zA-Z0-9]*</pattern>
 	</sequence>
-	<sequence name="primitive" order="998" tag="type">
+	<sequence name="primitive" tag="type">
 		<one-of name="name">
 			<literal>void</literal>
 			<literal>null</literal>
@@ -347,7 +356,7 @@
 		<literal>final</literal>
 		<literal>synchronized</literal>
 	</one-of>
-	<sequence name="variable-declaration" order="6" tag="declaration">
+	<sequence name="variable-declaration" tag="declaration">
 		<repeat>
 			<ref type="qualifier" name="qualifier" />
 		</repeat>
@@ -356,7 +365,7 @@
 		<whitespace />
 		<ref type="identifier" name="name" />
 	</sequence>
-	<sequence name="method-declaration" order="5" tag="declaration">
+	<sequence name="method-declaration" tag="declaration">
 		<repeat>
 			<ref type="qualifier" name="qualifier" />
 		</repeat>
@@ -390,7 +399,7 @@
 			<literal>}</literal>
 		</option>
 	</sequence>
-	<sequence name="class-declaration" order="5" tag="declaration">
+	<sequence name="class-declaration" tag="declaration">
 		<repeat>
 			<ref type="qualifier" name="qualifier" />
 		</repeat>
@@ -451,17 +460,17 @@
 	</sequence>
 	
 	<!-- Control statements -->
-	<sequence name="return" order="1">
+	<sequence name="return">
 		<literal>return</literal>
 		<ref name="value" />
 	</sequence>
-	<sequence name="throw" order="1">
+	<sequence name="throw">
 		<literal>throw</literal>
 		<ref name="value" />
 	</sequence>
 	
 	<!-- Normal operators -->
-	<sequence name="constructor" order="1">
+	<sequence name="constructor">
 		<literal>new</literal>
 		<whitespace />
 		<ref type="type" name="type" />
@@ -480,7 +489,7 @@
 			<literal>}</literal>
 		</option>
 	</sequence>
-	<sequence name="array-initializer" order="1">
+	<sequence name="array-initializer">
 		<literal>new</literal>
 		<whitespace />
 		<ref type="type" name="type" />
@@ -501,223 +510,223 @@
 			<literal>}</literal>
 		</option>
 	</sequence>
-	<sequence name="assign" order="50.0100" tag="assignment,binary">
+	<sequence name="assign" priority="100" tag="assignment,binary">
 		<ref name="variable" />
 		<literal name="name">=</literal>
 		<ref name="operand" />
 	</sequence>
-	<sequence name="add-assign" order="50.0100" tag="assignment,binary">
+	<sequence name="add-assign" priority="100" tag="assignment,binary">
 		<ref name="variable" />
 		<literal name="name">+=</literal>
 		<ref name="operand" />
 	</sequence>
-	<sequence name="subtract-assign" order="50.0100" tag="assignment,binary">
+	<sequence name="subtract-assign" priority="100" tag="assignment,binary">
 		<ref name="variable" />
 		<literal name="name">-=</literal>
 		<ref name="operand" />
 	</sequence>
-	<sequence name="multiply-assign" order="50.0100" tag="assignment,binary">
+	<sequence name="multiply-assign" priority="100" tag="assignment,binary">
 		<ref name="variable" />
 		<literal name="name">*=</literal>
 		<ref name="operand" />
 	</sequence>
-	<sequence name="divide-assign" order="50.0100" tag="assignment,binary">
+	<sequence name="divide-assign" priority="100" tag="assignment,binary">
 		<ref name="variable" />
 		<literal name="name">/=</literal>
 		<ref name="operand" />
 	</sequence>
-	<sequence name="modulo-assign" order="50.0100" tag="assignment,binary">
+	<sequence name="modulo-assign" priority="100" tag="assignment,binary">
 		<ref name="variable" />
 		<literal name="name">%=</literal>
 		<ref name="operand" />
 	</sequence>
-	<sequence name="or-assign" order="50.0100" tag="assignment,binary">
+	<sequence name="or-assign" priority="100" tag="assignment,binary">
 		<ref name="variable" />
 		<literal name="name">|=</literal>
 		<ref name="operand" />
 	</sequence>
-	<sequence name="and-assign" order="50.0100" tag="assignment,binary">
+	<sequence name="and-assign" priority="100" tag="assignment,binary">
 		<ref name="variable" />
 		<literal name="name">&amp;=</literal>
 		<ref name="operand" />
 	</sequence>
-	<sequence name="xor-assign" order="50.0100" tag="assignment,binary">
+	<sequence name="xor-assign" priority="100" tag="assignment,binary">
 		<ref name="variable" />
 		<literal name="name">^=</literal>
 		<ref name="operand" />
 	</sequence>
-	<sequence name="left-shift-assign" order="50.0100" tag="assignment,binary">
+	<sequence name="left-shift-assign" priority="100" tag="assignment,binary">
 		<ref name="variable" />
 		<literal name="name">&lt;&lt;=</literal>
 		<ref name="operand" />
 	</sequence>
-	<sequence name="right-shift-assign" order="50.0100" tag="assignment,binary">
+	<sequence name="right-shift-assign" priority="100" tag="assignment,binary">
 		<ref name="variable" />
 		<literal name="name">&gt;&gt;=</literal>
 		<ref name="operand" />
 	</sequence>
-	<sequence name="unsigned-right-shift-assign" order="50.0100" tag="assignment,binary">
+	<sequence name="unsigned-right-shift-assign" priority="100" tag="assignment,binary">
 		<ref name="variable" />
 		<literal name="name">&gt;&gt;&gt;=</literal>
 		<ref name="operand" />
 	</sequence>
-	<sequence name="conditional" order="50.0110" tag="ternary">
+	<sequence name="conditional" priority="110" tag="ternary">
 		<ref name="condition" />
 		<literal>?</literal>
 		<ref name="affirmative" />
 		<literal>:</literal>
 		<ref name="negative" />
 	</sequence>
-	<sequence name="or2" order="50.0120" tag="logical,binary">
+	<sequence name="or2" priority="120" tag="logical,binary">
 		<ref name="left" />
 		<literal name="name">||</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="or1" order="50.0140" tag="binary">
-		<ref name="left" />
-		<literal name="name">|</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="and2" order="50.0130" tag="logical,binary">
+	<sequence name="and2" priority="130" tag="logical,binary">
 		<ref name="left" />
 		<literal name="name">&amp;&amp;</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="and1" order="50.0160" tag="binary">
+	<sequence name="or1" priority="140" tag="binary">
 		<ref name="left" />
-		<literal name="name">&amp;</literal>
+		<literal name="name">|</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="xor" order="50.0150" tag="logical,binary">
+	<sequence name="xor" priority="150" tag="logical,binary">
 		<ref name="left" />
 		<literal name="name">^</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="equal" order="50.0170" tag="logical,binary">
+	<sequence name="and1" priority="160" tag="binary">
+		<ref name="left" />
+		<literal name="name">&amp;</literal>
+		<ref name="right" />
+	</sequence>
+	<sequence name="equal" priority="170" tag="logical,binary">
 		<ref name="left" />
 		<literal name="name">==</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="not-equal" order="50.0170" tag="logical,binary">
+	<sequence name="not-equal" priority="170" tag="logical,binary">
 		<ref name="left" />
 		<literal name="name">!=</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="instanceof" order="50.0180" tag="binary">
+	<sequence name="instanceof" priority="180" tag="binary">
 		<ref name="left" />
 		<literal name="name">instanceof</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="less" order="50.0180" tag="binary">
+	<sequence name="less" priority="180" tag="binary">
 		<ref name="left" />
 		<literal name="name">&lt;</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="less-equal" order="50.0180" tag="binary">
+	<sequence name="less-equal" priority="180" tag="binary">
 		<ref name="left" />
 		<literal name="name">&lt;=</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="greater" order="50.0180" tag="binary">
+	<sequence name="greater" priority="180" tag="binary">
 		<ref name="left" />
 		<literal name="name">&gt;</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="greater-equal" order="50.0180" tag="binary">
+	<sequence name="greater-equal" priority="180" tag="binary">
 		<ref name="left" />
 		<literal name="name">&gt;=</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="left-shift" order="50.0190" tag="binary">
+	<sequence name="left-shift" priority="190" tag="binary">
 		<ref name="left" />
 		<literal name="name">&lt;&lt;</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="right-shift" order="50.0190" tag="binary">
+	<sequence name="right-shift" priority="190" tag="binary">
 		<ref name="left" />
 		<literal name="name">&gt;&gt;</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="unsigned-right-shift" order="50.0190" tag="binary">
+	<sequence name="unsigned-right-shift" priority="190" tag="binary">
 		<ref name="left" />
 		<literal name="name">&gt;&gt;&gt;</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="add" order="50.0200" tag="binary">
+	<sequence name="add" priority="200" tag="binary">
 		<ref name="left" />
 		<literal name="name">+</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="subtract" order="50.0200" tag="binary">
+	<sequence name="subtract" priority="200" tag="binary">
 		<ref name="left" />
 		<literal name="name">-</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="multiply" order="50.0210" tag="binary">
+	<sequence name="multiply" priority="210" tag="binary">
 		<ref name="left" />
 		<literal name="name">*</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="divide" order="50.0210" tag="binary">
+	<sequence name="divide" priority="210" tag="binary">
 		<ref name="left" />
 		<literal name="name">/</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="modulo" order="50.0210" tag="binary">
+	<sequence name="modulo" priority="210" tag="binary">
 		<ref name="left" />
 		<literal name="name">%</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="posit" order="50.0220" tag="unary">
+	<sequence name="posit" priority="220" tag="unary">
 		<literal name="name">+</literal>
 		<ref name="operand" />
 	</sequence>
-	<sequence name="negate" order="50.0220" tag="unary">
+	<sequence name="negate" priority="220" tag="unary">
 		<literal name="name">-</literal>
 		<ref name="operand" />
 	</sequence>
-	<sequence name="not" order="50.0220">
+	<sequence name="not" priority="220" tag="unary">
 		<literal storeAs="name">!</literal>
 		<ref name="operand" />
 	</sequence>
-	<sequence name="bitwise-not" order="50.0220">
+	<sequence name="bitwise-not" priority="220" tag="unary">
 		<literal storeAs="name">~</literal>
 		<ref name="operand" />
 	</sequence>
-	<sequence name="pre-increment" order="50.0220" tag="unary">
+	<sequence name="pre-increment" priority="220" tag="unary">
 		<literal name="name">++</literal>
 		<ref name="operand" />
 	</sequence>
-	<sequence name="pre-decrement" order="50.0220" tag="unary">
+	<sequence name="pre-decrement" priority="220" tag="unary">
 		<literal name="name">--</literal>
 		<ref name="operand" />
 	</sequence>
-	<sequence name="post-increment" order="50.0230" tag="unary">
+	<sequence name="post-increment" priority="230" tag="unary">
 		<ref name="operand" />
 		<literal name="name">++</literal>
 	</sequence>
-	<sequence name="post-decrement" order="50.0230" tag="unary">
+	<sequence name="post-decrement" priority="230" tag="unary">
 		<ref name="operand" />
 		<literal name="name">--</literal>
 	</sequence>
-	<sequence name="cast" order="50.0220">
+	<sequence name="cast" priority="220" tag="binary">
 		<literal>(</literal>
 		<ref name="type" type="type" />
 		<literal>)</literal>
 		<ref name="value" />
 	</sequence>
-	<sequence name="parenthetic" order="50.0250">
+	<sequence name="parenthetic" priority="250">
 		<literal>(</literal>
 		<ref name="content" />
 		<literal>)</literal>
 	</sequence>
-	<sequence name="array index" order="50.0250">
+	<sequence name="array index" priority="250" tag="binary">
 		<ref name="array" />
 		<literal name="open-bracket">[</literal>
 		<ref name="index" />
 		<literal>]</literal>
 	</sequence>
-	<sequence name="member" order="50.0250">
+	<sequence name="member" priority="250">
 		<ref name="context" />
 		<literal name="dot">.</literal>
 		<ref type="identifier" name="name" />

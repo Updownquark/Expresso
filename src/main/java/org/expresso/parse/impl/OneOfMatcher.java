@@ -39,4 +39,48 @@ public class OneOfMatcher<S extends BranchableStream<?, ?>> extends ComposedMatc
 		stream.advance(match.getLength());
 		return new ParseMatch<>(this, streamCopy, match.getLength(), Arrays.asList(match), null, true);
 	}
+
+	/**
+	 * @param <S> The type of stream to accommodate
+	 * @return A builder to create a new one-of matcher
+	 */
+	public static <S extends BranchableStream<?, ?>> Builder<S> buildOneOf() {
+		return new Builder<>();
+	}
+
+	/** @param <S> The type of stream to accommodate */
+	public static class Builder<S extends BranchableStream<?, ?>> extends ComposedMatcher.Builder<S, OneOfMatcher<S>> {
+		private Set<String> theTypes;
+
+		/** Creates the builder */
+		protected Builder() {
+			super(null);
+			theTypes = new java.util.LinkedHashSet<>();
+		}
+
+		/**
+		 * @param types The types to include from the matcher's children
+		 * @return This builder, for chaining
+		 */
+		public Builder<S> include(String... types) {
+			for(String type : types)
+				theTypes.add(type);
+			return this;
+		}
+
+		@Override
+		public Builder<S> tag(String... tags) {
+			return (Builder<S>) super.tag(tags);
+		}
+
+		@Override
+		public Builder<S> addChild(ParseMatcher<? super S> child) {
+			return (Builder<S>) super.addChild(child);
+		}
+
+		@Override
+		protected OneOfMatcher<S> create(String name, Set<String> tags) {
+			return new OneOfMatcher<>(name, tags);
+		}
+	}
 }

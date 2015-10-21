@@ -10,7 +10,7 @@ import org.expresso.parse.*;
  *
  * @param <S> The type of stream to search
  */
-public abstract class UpToMatcher<S extends BranchableStream<?, ?>> extends BaseMatcher<S> {
+public class UpToMatcher<S extends BranchableStream<?, ?>> extends BaseMatcher<S> {
 	private final ParseMatcher<? super S> theMatcher;
 
 	/**
@@ -29,6 +29,11 @@ public abstract class UpToMatcher<S extends BranchableStream<?, ?>> extends Base
 	}
 
 	@Override
+	public Set<String> getExternalTypeDependencies() {
+		return theMatcher.getExternalTypeDependencies();
+	}
+
+	@Override
 	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
 		SS streamBegin = (SS) stream.branch();
 		SS streamCopy = (SS) stream.branch();
@@ -39,7 +44,6 @@ public abstract class UpToMatcher<S extends BranchableStream<?, ?>> extends Base
 			end = parser.parseWith(streamCopy, session, theMatcher);
 		}
 		stream.advance(end.getLength());
-		return new ParseMatch<>(this, streamBegin, stream.getPosition() - streamCopy.getPosition(), Arrays.asList(end), null,
- true);
+		return new ParseMatch<>(this, streamBegin, stream.getPosition() - streamCopy.getPosition(), Arrays.asList(end), null, true);
 	}
 }

@@ -1,9 +1,6 @@
 package org.expresso.parse.impl;
 
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import org.expresso.parse.BranchableStream;
 import org.expresso.parse.ParseMatcher;
@@ -41,5 +38,78 @@ public abstract class ComposedMatcher<S extends BranchableStream<?, ?>> extends 
 	/** @return The composed matchers making up this matcher */
 	public List<ParseMatcher<? super S>> getComposed() {
 		return java.util.Collections.unmodifiableList(theComposed);
+	}
+
+	/** @param child The child for this composite matcher */
+	protected void addChild(ParseMatcher<? super S> child) {
+		theComposed.add(child);
+	}
+
+	/**
+	 * Builds a composed matcher
+	 *
+	 * @param <S> The type of stream that the matcher will use
+	 * @param <M> The sub-type of composed matcher to build
+	 */
+	protected static abstract class Builder<S extends BranchableStream<?, ?>, M extends ComposedMatcher<S>> {
+		private final String theName;
+		private Set<String> theTags;
+		private List<ParseMatcher<? super S>> theChildren;
+
+		/** @param name The name for the matcher */
+		protected Builder(String name) {
+			theName = name;
+			theTags = new java.util.LinkedHashSet<>();
+			theChildren = new ArrayList<>();
+		}
+
+		/**
+		 * @param tags The tags to apply to the matcher
+		 * @return This builder, for chaining
+		 */
+		public Builder<S, M> tag(String... tags) {
+			for(String tag : tags)
+				theTags.add(tag);
+			return this;
+		}
+
+		/**
+		 * @param child The next child for the composite matcher
+		 * @return This builder, for chaining
+		 */
+		public Builder<S, M> addChild(ParseMatcher<? super S> child) {
+			theChildren.add(child);
+			return this;
+		}
+
+		/**
+		 * Creates a new matcher
+		 *
+		 * @param name The name for the matcher
+		 * @param tags The tags for the matcher
+		 * @return The new matcher to be configured
+		 */
+		protected abstract M create(String name, Set<String> tags);
+
+		/**
+		 * Configures a new matcher before returning it to be used
+		 *
+		 * @param matcher The matcher to configure
+		 */
+		protected void configure(M matcher) {
+			for(ParseMatcher<? super S> child : theChildren)
+				matcher.addChild(child);
+		}
+
+		/**
+		 * Builds the matcher according to this builder's configuration
+		 * 
+		 * @return The new matcher
+		 */
+		public M build() {
+			M ret = create(theName, Collections.unmodifiableSet(theTags));
+			configure(ret);
+			return ret;
+		}
 	}
 }

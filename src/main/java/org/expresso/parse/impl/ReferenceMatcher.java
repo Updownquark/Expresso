@@ -5,7 +5,10 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import org.expresso.parse.*;
+import org.expresso.parse.BranchableStream;
+import org.expresso.parse.ExpressoParser;
+import org.expresso.parse.ParseMatch;
+import org.expresso.parse.ParseSession;
 import org.qommons.ArrayUtils;
 
 /**
@@ -13,17 +16,17 @@ import org.qommons.ArrayUtils;
  *
  * @param <S> The type of stream to parse
  */
-public class ReferenceMatcher<S extends BranchableStream<?, ?>> implements ParseMatcher<S> {
-	private final String theName;
+public class ReferenceMatcher<S extends BranchableStream<?, ?>> extends BaseMatcher<S> {
 	private final Set<String> theTypeSet;
 	private final String [] theTypes;
 
 	/**
 	 * @param name The name for this parser
+	 * @param tags The tags that may be used to reference this matcher in a parser
 	 * @param types The names of the types that this parser will parse, or zero-length to parse anything
 	 */
-	public ReferenceMatcher(String name, String... types) {
-		theName = name;
+	public ReferenceMatcher(String name, Set<String> tags, String... types) {
+		super(name, tags);
 		LinkedHashSet<String> set = new LinkedHashSet<>();
 		boolean duplicate = false;
 		for(String type : types)
@@ -32,16 +35,6 @@ public class ReferenceMatcher<S extends BranchableStream<?, ?>> implements Parse
 			System.err.println("WARNING: Reference has multiple types: " + ArrayUtils.toString(types));
 		theTypeSet = Collections.unmodifiableSet(set);
 		theTypes = set.toArray(new String[set.size()]);
-	}
-
-	@Override
-	public String getName() {
-		return theName;
-	}
-
-	@Override
-	public Set<String> getTags() {
-		return Collections.EMPTY_SET;
 	}
 
 	@Override
