@@ -150,7 +150,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 		 * Adds a matcher to the parser to be built
 		 *
 		 * @param matcher The matcher to add
-		 * @param isDefault Whether to use the matcher by default. See
+		 * @param isDefault Whether to use the matcher by default (i.e. when not referred to explicitly by name or tag). See
 		 *            {@link ExpressoParser#parseWith(BranchableStream, ParseSession, ParseMatcher...)}.
 		 * @return This builder, for chaining
 		 */

@@ -7,20 +7,24 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.impl.DefaultGrammarParser.PrioritizedMatcher;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
 
+/** Contains methods to initialize a {@link DefaultExpressoParser} from XML documents obeying the default grammar schema */
 public class DefaultGrammarParser {
+	/** A structure containing a matcher and metadata needed to insert the matcher into a {@link DefaultExpressoParser} correctly */
 	public static class PrioritizedMatcher implements Comparable<PrioritizedMatcher> {
+		/** The matcher to parse a section of streamed data */
 		public final ParseMatcher<CharSequenceStream> matcher;
 
 		final double priority;
-
+		/** Whether the matcher is to be matched by default (when not referred to explicitly by name or tag) */
 		public final boolean isDefault;
 
-		PrioritizedMatcher(ParseMatcher<CharSequenceStream> matcher, double priority, boolean def) {
-			this.matcher = matcher;
-			this.priority = priority;
+		PrioritizedMatcher(ParseMatcher<CharSequenceStream> match, double pri, boolean def) {
+			matcher = match;
+			priority = pri;
 			isDefault = def;
 		}
 
@@ -36,6 +40,14 @@ public class DefaultGrammarParser {
 		}
 	}
 
+	/**
+	 * Parses a set of matchers from an XML document obeying the default grammar schema
+	 *
+	 * @param xml The XML text stream
+	 * @return The prioritized matchers parsed from XML
+	 * @throws IOException If the XML text cannot be read from the source
+	 * @throws JDOMException If the XML is malformatted
+	 */
 	public static List<PrioritizedMatcher> getMatchers(Reader xml) throws IOException, JDOMException {
 		List<PrioritizedMatcher> ret = new ArrayList<>();
 		org.qommons.io.XmlUtils.parseTopLevelElements(xml, element -> {
@@ -59,11 +71,100 @@ public class DefaultGrammarParser {
 		}
 	}
 
+	/**
+	 * Creates and configures a matcher from XML based on the default grammar schema
+	 *
+	 * @param element The XML element representing the matcher
+	 * @return The configured matcher represented by the XML element
+	 */
 	public static ParseMatcher<CharSequenceStream> getMatcher(Element element) {
 		String name=element.getAttributeValue("name");
 		String tagStr=element.getAttributeValue("tag");
 		Set<String> tags=tagStr==null ? Collections.EMPTY_SET : Collections.unmodifiableSet(Arrays.stream(tagStr.split(",")).collect(Collectors.toSet()));
+		Set<String> attrs = new java.util.LinkedHashSet<>(
+			element.getAttributes().stream().map(a -> a.getName()).collect(Collectors.toSet()));
+		attrs.remove("name");
+		attrs.remove("tag");
+		attrs.remove("default");
+		attrs.remove("priority");
+
+		// Check some constraints
+		switch (element.getName()) {
+		case "literal":
+		case "pattern":
+		case "whitespace":
+		case "ref":
+			if(!element.getChildren().isEmpty())
+				throw new IllegalArgumentException(element.getName() + " does not allow child matchers");
+			break;
+		case "up-to":
+		case "forbid":
+			if(element.getChildren().size() != 1)
+				throw new IllegalArgumentException(element.getName() + " must have exactly one child matcher");
+			break;
+		case "one-of":
+		case "sequence":
+			if(element.getChildren().size() == 1)
+				System.err.println(element.getName()
+					+ " is only useful with more than one child matcher--may be eliminated in the case where there is only one.");
+			//$FALL-THROUGH$
+		default:
+			if(element.getChildren().isEmpty())
+				throw new IllegalArgumentException(element.getName() + " expects child matchers");
+		}
+		switch (element.getName()) {
+		case "whitespace":
+		case "without":
+		case "with":
+			if(name != null)
+				System.err.println(element.getName() + " does not accept a name attribute");
+			if(!tags.isEmpty())
+				System.err.println(element.getName() + " does not accept a tag attribute");
+		}
 		String typeStr = element.getAttributeValue("type");
+		int min = 0;
+		int max = 0;
+		switch (element.getName()) {
+		case "ref":
+		case "without":
+		case "with":
+			if(typeStr == null)
+				throw new IllegalArgumentException(element.getName() + " requires a type attribute");
+			attrs.remove("type");
+			break;
+		case "option":
+			min = 0;
+			max = 1;
+			break;
+		case "repeat":
+			if(attrs.remove("min")) {
+				try {
+					min = Integer.parseInt(element.getAttributeValue("min"));
+				} catch(NumberFormatException e) {
+					throw new IllegalArgumentException("Malformatted min attribute: " + element.getAttributeValue("min"), e);
+				}
+			} else
+				min = 0;
+			if(attrs.remove("max")) {
+				try {
+					max = Integer.parseInt(element.getAttributeValue("max"));
+				} catch(NumberFormatException e) {
+					throw new IllegalArgumentException("Malformatted max attribute: " + element.getAttributeValue("max"), e);
+				}
+			} else
+				max = Integer.MAX_VALUE;
+			break;
+		}
+		if(!attrs.isEmpty())
+			throw new IllegalArgumentException("Unrecognized attributes for matcher " + element.getName() + ": " + attrs);
+
+		// Constraints all passed. Now create the matcher.
+
+		List<ParseMatcher<CharSequenceStream>> children = new ArrayList<>();
+		for(Element child : element.getChildren())
+			children.add(getMatcher(child));
+		children = Collections.unmodifiableList(children);
+
 		switch(element.getName()){
 		case "literal":
 			return new TextLiteralMatcher<>(name, tags, element.getTextTrim());
@@ -73,64 +174,37 @@ public class DefaultGrammarParser {
 			return new WhitespaceMatcher<>();
 		case "ref":
 			return new ReferenceMatcher<>(name, tags, typeStr == null ? new String[0] : typeStr.split(","));
-		}
-		List<ParseMatcher<CharSequenceStream>> children = new ArrayList<>();
-		for(Element child : element.getChildren())
-			children.add(getMatcher(child));
-		children = Collections.unmodifiableList(children);
-
-		if(children.isEmpty())
-			throw new IllegalArgumentException(element.getName() + " expects child matchers");
-		// Check some constraints
-		switch (element.getName()) {
-		case "up-to":
-		case "forbid":
-			if(children.size() != 1)
-				throw new IllegalArgumentException(element.getName() + " must have exactly one child matcher");
-			break;
-		case "without":
-		case "with":
-			if(typeStr == null)
-				throw new IllegalArgumentException(element.getName() + " requires a type attribute");
-			break;
-		case "one-of":
-		case "sequence":
-			if(children.size() == 1)
-				System.err.println(element.getName()
-					+ " is only useful with more than one child matcher--may be eliminated in the case where there is only one.");
-		}
-
-		switch (element.getName()) {
 		case "up-to":
 			return new UpToMatcher<>(name, tags, children.get(0));
 		case "forbid":
 			return new ForbiddenMatcher<>(name, tags, children.get(0));
-		case "sequence": {
-			SequenceMatcher.Builder<CharSequenceStream, SequenceMatcher<CharSequenceStream>> builder = SequenceMatcher.buildSequence(name);
-			builder.tag(tags.toArray(new String[tags.size()]));
-			for(ParseMatcher<CharSequenceStream> child : children)
-				builder.addChild(child);
-			return builder.build();
 		}
-		case "without": {
-			WithoutMatcher.Builder<CharSequenceStream> builder = WithoutMatcher.buildWithout();
-			builder.tag(tags.toArray(new String[tags.size()]));
-			for(ParseMatcher<CharSequenceStream> child : children)
-				builder.addChild(child);
-			return builder.build();
-		}
-		case "with": {
-			WithMatcher.Builder<CharSequenceStream> builder = WithMatcher.buildWith();
-			builder.tag(tags.toArray(new String[tags.size()]));
-			for(ParseMatcher<CharSequenceStream> child : children)
-				builder.addChild(child);
-			return builder.build();
-		}
+
+		final ComposedMatcher.Builder<CharSequenceStream, ? extends ComposedMatcher<CharSequenceStream>> builder;
+		switch (element.getName()) {
+		case "sequence":
+			builder = SequenceMatcher.buildSequence(name);
+			break;
+		case "without":
+			builder = WithoutMatcher.buildWithout();
+			break;
+		case "with":
+			builder = WithMatcher.buildWith();
+			break;
 		case "option":
 		case "repeat":
-		case "one-of":
+			builder = RepeatingSequenceMatcher.<CharSequenceStream> buildRepeat(name).min(min).max(max);
+			break;
+		case "one-of": {
+			builder = OneOfMatcher.buildOneOf(name);
+			break;
+		}
 		default:
 			throw new IllegalArgumentException("Unrecognized matcher name: "+element.getName());
 		}
+		builder.tag(tags.toArray(new String[tags.size()]));
+		for(ParseMatcher<CharSequenceStream> child : children)
+			builder.addChild(child);
+		return builder.build();
 	}
 }

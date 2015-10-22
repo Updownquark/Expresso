@@ -42,19 +42,20 @@ public class OneOfMatcher<S extends BranchableStream<?, ?>> extends ComposedMatc
 
 	/**
 	 * @param <S> The type of stream to accommodate
+	 * @param name The name for the matcher
 	 * @return A builder to create a new one-of matcher
 	 */
-	public static <S extends BranchableStream<?, ?>> Builder<S> buildOneOf() {
-		return new Builder<>();
+	public static <S extends BranchableStream<?, ?>> Builder<S> buildOneOf(String name) {
+		return new Builder<>(name);
 	}
 
 	/** @param <S> The type of stream to accommodate */
 	public static class Builder<S extends BranchableStream<?, ?>> extends ComposedMatcher.Builder<S, OneOfMatcher<S>> {
 		private Set<String> theTypes;
 
-		/** Creates the builder */
-		protected Builder() {
-			super(null);
+		/** @param name The name for the matcher */
+		protected Builder(String name) {
+			super(name);
 			theTypes = new java.util.LinkedHashSet<>();
 		}
 
