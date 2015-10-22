@@ -1,5 +1,6 @@
 package org.expresso.parse.impl;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Set;
 
@@ -29,7 +30,7 @@ public class ForbiddenMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
+	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
 		SS streamCopy = (SS) stream.branch();
 		ParseMatch<SS> match = parser.parseWith(stream, session, theContent);
 		if(match != null && match.isComplete() && match.getError() == null)
@@ -37,5 +38,12 @@ public class ForbiddenMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 				"Forbidden content present", true);
 		else
 			return null;
+	}
+
+	@Override
+	public String toString() {
+		StringBuilder ret = new StringBuilder(super.toString());
+		ret.append("\n\t").append(theContent.toString().replaceAll("\n", "\n\t"));
+		return ret.toString();
 	}
 }

@@ -1,5 +1,6 @@
 package org.expresso.parse.impl;
 
+import java.io.IOException;
 import java.util.*;
 
 import org.expresso.parse.*;
@@ -68,7 +69,8 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> parse(SS stream, ParseSession session, Collection<? extends ParseMatcher<? super SS>> matchers) {
+	public <SS extends S> ParseMatch<SS> parse(SS stream, ParseSession session, Collection<? extends ParseMatcher<? super SS>> matchers)
+		throws IOException {
 		Collection<ParseMatcher<? super SS>> memberMatchers = new ArrayList<>();
 		Collection<ParseMatcher<? super SS>> foreignMatchers = new ArrayList<>();
 		for(ParseMatcher<? super SS> matcher : matchers) {
@@ -216,23 +218,25 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 				theTypeMatching = new HashMap<>();
 			}
 
-			ParseMatch<SS> match(SS stream, ParseMatcher<? super SS> matcher) {
+			ParseMatch<SS> match(SS stream, ParseMatcher<? super SS> matcher) throws IOException {
 				Matching matching = theTypeMatching.get(matcher.getName());
 				if(matching != null)
 					return matching.theMatch;
 				matching = new Matching();
 				theTypeMatching.put(matcher.getName(), matching);
 				while(true) {
-					ParseMatch<SS> match = matcher.match(stream, DefaultExpressoParser.this, ParseSessionImpl.this);
-					if(match != null && match.isBetter(matching.theMatch))
+					ParseMatch<SS> match = matcher.match((SS) stream.branch(), DefaultExpressoParser.this, ParseSessionImpl.this);
+					if(match != null && match.isBetter(matching.theMatch)) {
 						matching.theMatch = match;
-					else
+						if(matcher.getExternalTypeDependencies().isEmpty())
+							break;
+					} else
 						break;
 				}
 				return matching.theMatch;
 			}
 
-			ParseMatch<SS> match(SS stream, Collection<? extends ParseMatcher<? super SS>> matchers) {
+			ParseMatch<SS> match(SS stream, Collection<? extends ParseMatcher<? super SS>> matchers) throws IOException {
 				ParseMatch<SS> match = null;
 				for(ParseMatcher<? super SS> matcher : matchers) {
 					ParseMatch<SS> match_i = match(stream, matcher);
@@ -243,13 +247,29 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 			}
 		}
 
+		private final Set<String> theExcludedTypes;
+
 		private final HashMap<Integer, StreamPositionData> thePositions;
 
 		ParseSessionImpl() {
+			theExcludedTypes = new java.util.LinkedHashSet<>();
 			thePositions = new HashMap<>();
 		}
 
-		ParseMatch<SS> match(SS stream, Collection<? extends ParseMatcher<? super SS>> matchers) {
+		@Override
+		public boolean excludeType(String type) {
+			return theExcludedTypes.add(type);
+		}
+
+		@Override
+		public boolean includeType(String type) {
+			return theExcludedTypes.remove(type);
+		}
+
+		ParseMatch<SS> match(SS stream, Collection<? extends ParseMatcher<? super SS>> matchers) throws IOException {
+			excludeTypes(matchers);
+			if(matchers.isEmpty())
+				return null;
 			int pos = stream.getPosition();
 			StreamPositionData posData = thePositions.get(pos);
 			if(posData == null) {
@@ -257,6 +277,22 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 				thePositions.put(pos, posData);
 			}
 			return posData.match(stream, matchers);
+		}
+
+		private void excludeTypes(Collection<? extends ParseMatcher<? super SS>> matchers) {
+			Iterator<? extends ParseMatcher<? super SS>> matcherIter = matchers.iterator();
+			while(matcherIter.hasNext()) {
+				ParseMatcher<? super SS> matcher = matcherIter.next();
+				if(matcher.getName() != null && theExcludedTypes.contains(matcher.getName())) {
+					matcherIter.remove();
+					continue;
+				}
+				for(String tag : matcher.getTags())
+					if(theExcludedTypes.contains(tag)) {
+						matcherIter.remove();
+						break;
+					}
+			}
 		}
 	}
 }

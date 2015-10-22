@@ -33,4 +33,23 @@ public abstract class BaseMatcher<S extends BranchableStream<?, ?>> implements P
 	public Set<String> getTags() {
 		return theTags;
 	}
+
+	@Override
+	public String toString() {
+		StringBuilder ret = new StringBuilder(getClass().getSimpleName());
+		if(theName != null)
+			ret.append(" name=\"").append(theName).append('"');
+		if(!theTags.isEmpty()) {
+			ret.append(" tag=\"");
+			boolean first = true;
+			for(String tag : theTags) {
+				if(!first)
+					ret.append(',');
+				first = false;
+				ret.append(tag);
+			}
+			ret.append('"');
+		}
+		return ret.toString();
+	}
 }

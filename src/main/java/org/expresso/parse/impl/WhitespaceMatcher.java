@@ -1,5 +1,6 @@
 package org.expresso.parse.impl;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.Set;
 
@@ -14,8 +15,12 @@ import org.expresso.parse.ParseSession;
  * @param <S> The type of stream to search
  */
 public class WhitespaceMatcher<S extends CharSequenceStream> implements ParseMatcher<S> {
+	private final Set<String> theTags;
+
 	/** @see BaseMatcher#BaseMatcher(String, Set) */
 	public WhitespaceMatcher() {
+		theTags = Collections
+			.unmodifiableSet(java.util.Arrays.asList(ExpressoParser.IGNORABLE).stream().collect(java.util.stream.Collectors.toSet()));
 	}
 
 	@Override
@@ -25,7 +30,7 @@ public class WhitespaceMatcher<S extends CharSequenceStream> implements ParseMat
 
 	@Override
 	public Set<String> getTags() {
-		return Collections.EMPTY_SET;
+		return theTags;
 	}
 
 	@Override
@@ -34,16 +39,20 @@ public class WhitespaceMatcher<S extends CharSequenceStream> implements ParseMat
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
-		if(!isWhitespace(stream.charAt(0)))
+	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
+		if(!isNextWS(stream))
 			return null;
 		SS streamCopy = (SS) stream.branch();
-		StringBuilder ws = new StringBuilder();
-		while(stream.getDiscoveredLength() > 0 || !stream.isDiscovered() && isWhitespace(stream.charAt(0))) {
-			ws.append(stream.charAt(0));
+		do {
 			stream.advance(1);
-		}
+		} while(isNextWS(stream));
 		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), Collections.EMPTY_LIST, null, true);
+	}
+
+	private boolean isNextWS(CharSequenceStream stream) {
+		if(stream.getDiscoveredLength() == 0 && stream.isDiscovered())
+			return false;
+		return isWhitespace(stream.charAt(0));
 	}
 
 	/**

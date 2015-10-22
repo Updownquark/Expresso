@@ -1,5 +1,6 @@
 package org.expresso.parse.impl;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -27,7 +28,7 @@ public abstract class SimpleValueMatcher<S extends BranchableStream<?, ?>> exten
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
+	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
 		SS streamBegin = (SS) stream.branch();
 		SS streamCopy = (SS) stream.branch();
 		List<ParseMatch<SS>> ignorables = new ArrayList<>();
@@ -56,6 +57,7 @@ public abstract class SimpleValueMatcher<S extends BranchableStream<?, ?>> exten
 	 * @param <SS> The sub-type of stream to parse
 	 * @param stream The stream to parse
 	 * @return The text match, or null if the match was not present at the beginning of the stream
+	 * @throws IOException If an error occurs retrieving the data to parse
 	 */
-	protected abstract <SS extends S> ParseMatch<SS> parseValue(SS stream);
+	protected abstract <SS extends S> ParseMatch<SS> parseValue(SS stream) throws IOException;
 }

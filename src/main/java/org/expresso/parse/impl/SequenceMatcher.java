@@ -1,5 +1,6 @@
 package org.expresso.parse.impl;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -18,7 +19,7 @@ public class SequenceMatcher<S extends BranchableStream<?, ?>> extends ComposedM
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
+	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
 		SS streamCopy = (SS) stream.branch();
 		List<ParseMatch<SS>> components = new ArrayList<>();
 		ParseMatcher<? super S> missingEl = null;

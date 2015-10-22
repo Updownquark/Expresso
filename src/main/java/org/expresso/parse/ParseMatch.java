@@ -1,5 +1,6 @@
 package org.expresso.parse;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
@@ -43,7 +44,8 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 		theChildren = java.util.Collections.unmodifiableList(children);
 		theError = error;
 		isThisComplete = complete;
-		isComplete = getIncompleteMatch() != null;
+		isComplete = getIncompleteMatch() == null;
+		toString();
 	}
 
 	/** @return The matcher that found this match */
@@ -219,18 +221,36 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 		}
 	}
 
-	@Override
-	public String toString() {
+	/** @return A string representation of the stream data that this match was parsed from */
+	public String flatText() {
 		StringBuilder ret = new StringBuilder();
-		if(theChildren.isEmpty()) {
+		try {
 			for(int i = 0; i < theLength; i++)
 				ret.append(theStream.get(i));
-		} else {
-			ret.append('(');
-			for(ParseMatch<S> match : theChildren)
-				ret.append(match.toString());
-			ret.append(')');
+		} catch(IOException e) {
+			throw new IllegalStateException("Could not re-retrieve data to print the match", e);
 		}
 		return ret.toString();
+	}
+
+	@Override
+	public String toString() {
+		if(theChildren.isEmpty()) {
+			return flatText();
+		} else {
+			StringBuilder ret = new StringBuilder();
+			if(theChildren.size() > 1)
+				ret.append('(');
+			boolean first = true;
+			for(ParseMatch<S> match : theChildren) {
+				if(!first)
+					ret.append(",");
+				first = false;
+				ret.append(match.toString());
+			}
+			if(theChildren.size() > 1)
+				ret.append(')');
+			return ret.toString();
+		}
 	}
 }

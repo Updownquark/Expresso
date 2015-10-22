@@ -1,5 +1,6 @@
 package org.expresso.parse.impl;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Set;
 
@@ -34,7 +35,7 @@ public class UpToMatcher<S extends BranchableStream<?, ?>> extends BaseMatcher<S
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
+	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
 		SS streamBegin = (SS) stream.branch();
 		SS streamCopy = (SS) stream.branch();
 		ParseMatch<SS> end = parser.parseWith(streamCopy, session, theMatcher);
@@ -45,5 +46,12 @@ public class UpToMatcher<S extends BranchableStream<?, ?>> extends BaseMatcher<S
 		}
 		stream.advance(end.getLength());
 		return new ParseMatch<>(this, streamBegin, stream.getPosition() - streamCopy.getPosition(), Arrays.asList(end), null, true);
+	}
+
+	@Override
+	public String toString() {
+		StringBuilder ret = new StringBuilder(super.toString());
+		ret.append("\n\t").append(theMatcher.toString().replaceAll("\n", "\n\t"));
+		return ret.toString();
 	}
 }

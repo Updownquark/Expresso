@@ -1,5 +1,6 @@
 package org.expresso.parse.impl;
 
+import java.io.IOException;
 import java.util.Set;
 
 import org.expresso.parse.BranchableStream;
@@ -30,7 +31,7 @@ public abstract class LiteralMatcher<C, S extends BranchableStream<?, ? super C>
 	}
 
 	@Override
-	protected <SS extends S> ParseMatch<SS> parseValue(SS stream) {
+	protected <SS extends S> ParseMatch<SS> parseValue(SS stream) throws IOException {
 		int length = getLength();
 		if(stream.discoverTo(length) < length)
 			return null;

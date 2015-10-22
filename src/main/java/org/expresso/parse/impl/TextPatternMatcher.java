@@ -34,6 +34,6 @@ public class TextPatternMatcher<S extends CharSequenceStream> extends SimpleValu
 
 	@Override
 	public String toString() {
-		return thePattern.toString();
+		return super.toString() + " pattern=\"" + thePattern.toString() + "\"";
 	}
 }

@@ -45,6 +45,14 @@ public abstract class ComposedMatcher<S extends BranchableStream<?, ?>> extends 
 		theComposed.add(child);
 	}
 
+	@Override
+	public String toString() {
+		StringBuilder ret = new StringBuilder(super.toString());
+		for(ParseMatcher<? super S> composed : theComposed)
+			ret.append("\n\t").append(composed.toString().replaceAll("\n", "\n\t"));
+		return ret.toString();
+	}
+
 	/**
 	 * Builds a composed matcher
 	 *
@@ -103,7 +111,7 @@ public abstract class ComposedMatcher<S extends BranchableStream<?, ?>> extends 
 
 		/**
 		 * Builds the matcher according to this builder's configuration
-		 * 
+		 *
 		 * @return The new matcher
 		 */
 		public M build() {

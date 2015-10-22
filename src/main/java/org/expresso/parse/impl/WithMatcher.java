@@ -1,12 +1,12 @@
 package org.expresso.parse.impl;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
 import org.expresso.parse.*;
-import org.expresso.parse.impl.WithoutMatcher.ExcludedTypesParser;
 
 /**
  * Counters the effect of {@link WithoutMatcher}
@@ -23,22 +23,38 @@ public class WithMatcher<S extends BranchableStream<?, ?>> extends SequenceMatch
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
-		if(!(parser instanceof ExcludedTypesParser))
-			return super.match(stream, parser, session);
-		else {
-			ExcludedTypesParser<? super SS> filteredParser = (ExcludedTypesParser<? super SS>) parser;
-			Set<String> toReExclude = new LinkedHashSet<>();
-			for(String include : theIncludedTypes) {
-				if(filteredParser.getExcludedTypes().remove(include))
-					toReExclude.add(include);
-				else
-					System.out.println("WARNING: " + include + " not excluded from parsing");
-			}
-			ParseMatch<SS> ret = super.match(stream, parser, session);
-			filteredParser.getExcludedTypes().addAll(toReExclude);
-			return ret;
+	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
+		Set<String> toReExclude = new java.util.LinkedHashSet<>();
+		for(String type : theIncludedTypes) {
+			if(session.includeType(type))
+				toReExclude.add(type);
+			else
+				System.err.println("Type " + type + " was not excluded");
 		}
+		ParseMatch<SS> ret = super.match(stream, parser, session);
+		for(String type : toReExclude)
+			session.excludeType(type);
+		return ret;
+	}
+
+	@Override
+	public String toString() {
+		StringBuilder ret = new StringBuilder(super.toString());
+		StringBuilder typeStr = new StringBuilder(" type=\"");
+		boolean first = true;
+		for(String type : theIncludedTypes) {
+			if(!first)
+				typeStr.append(',');
+			first = false;
+			typeStr.append(type);
+		}
+		typeStr.append('"');
+		int newLine = ret.indexOf("\n");
+		if(newLine < 0)
+			ret.append(typeStr);
+		else
+			ret.insert(newLine, typeStr);
+		return ret.toString();
 	}
 
 	/**

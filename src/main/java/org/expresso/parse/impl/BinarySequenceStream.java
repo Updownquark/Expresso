@@ -18,8 +18,9 @@ public abstract class BinarySequenceStream extends BranchableStream<Byte, byte [
 	/**
 	 * @param index The index of the value to get
 	 * @return The byte at the given index
+	 * @throws IOException If the data cannot be retrieved
 	 */
-	public byte getByte(int index) {
+	public byte getByte(int index) throws IOException {
 		doOn(index, (chunk, idx) -> holder[0] = chunk.getData()[idx]);
 		return holder[0];
 	}
@@ -76,13 +77,8 @@ public abstract class BinarySequenceStream extends BranchableStream<Byte, byte [
 			}
 
 			@Override
-			protected int getNextData(byte [] chunk, int start) {
-				int ret;
-				try {
-					ret = input.read(chunk, start, chunk.length - start);
-				} catch(IOException e) {
-					throw new IllegalStateException("Could not read stream data", e);
-				}
+			protected int getNextData(byte [] chunk, int start) throws IOException {
+				int ret = input.read(chunk, start, chunk.length - start);
 				if(ret < 0) {
 					isDone = true;
 					ret = 0;

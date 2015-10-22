@@ -28,4 +28,9 @@ public class TextLiteralMatcher<S extends CharSequenceStream> extends LiteralMat
 		for(; i < getValue().length && getValue()[i] == stream.charAt(i); i++) {}
 		return i == getValue().length;
 	}
+
+	@Override
+	public String toString() {
+		return super.toString() + " value=\"" + new String(getValue()) + "\"";
+	}
 }

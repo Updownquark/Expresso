@@ -1,5 +1,6 @@
 package org.expresso.parse.impl;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -28,19 +29,26 @@ public class RepeatingSequenceMatcher<S extends BranchableStream<?, ?>> extends 
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
+	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
 		SS streamCopy = (SS) stream.branch();
 		int count = 0;
 		boolean optionsComplete = true;
 		List<ParseMatch<SS>> optionMatches = new ArrayList<>();
 		while(theMaxRepeat < 0 || count < theMaxRepeat) {
-			ParseMatch<SS> match = super.match(stream, parser, session);
+			ParseMatch<SS> match = super.match((SS) stream.branch(), parser, session);
 			if(match == null)
 				break;
-			optionMatches.add(match);
-			count++;
-			if(!match.isComplete()) {
-				optionsComplete = true;
+			if(match.isComplete()) {
+				optionMatches.add(match);
+				count++;
+				stream.advance(match.getLength());
+			} else {
+				if(count == 0) {
+					optionMatches.add(match);
+					count++;
+					stream.advance(match.getLength());
+					optionsComplete = false;
+				}
 				break;
 			}
 		}
@@ -50,6 +58,24 @@ public class RepeatingSequenceMatcher<S extends BranchableStream<?, ?>> extends 
 			error = "At least " + theMinRepeat + " repetition" + (theMinRepeat > 1 ? "s" : "") + " expected";
 
 		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), optionMatches, error, error == null);
+	}
+
+	@Override
+	public String toString() {
+		StringBuilder ret = new StringBuilder(super.toString());
+		if(theMinRepeat > 0 || theMaxRepeat < Integer.MAX_VALUE) {
+			StringBuilder countStr = new StringBuilder();
+			if(theMinRepeat > 0)
+				countStr.append(" min=\"").append(theMinRepeat).append('"');
+			if(theMaxRepeat > 0)
+				countStr.append(" max=\"").append(theMaxRepeat).append('"');
+			int newLine = ret.indexOf("\n");
+			if(newLine < 0)
+				ret.append(countStr);
+			else
+				ret.insert(newLine, countStr);
+		}
+		return ret.toString();
 	}
 
 	/**

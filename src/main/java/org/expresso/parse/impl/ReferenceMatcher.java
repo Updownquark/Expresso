@@ -1,5 +1,6 @@
 package org.expresso.parse.impl;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -43,11 +44,28 @@ public class ReferenceMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
+	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
 		SS streamCopy = (SS) stream.branch();
 		ParseMatch<SS> refMatch = parser.<SS> parseByType(stream, session, theTypes);
 		if(refMatch == null)
 			return null;
 		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), Arrays.asList(refMatch), null, true);
+	}
+
+	@Override
+	public String toString() {
+		StringBuilder ret = new StringBuilder(super.toString());
+		if(!theTypeSet.isEmpty()) {
+			ret.append(" type=\"");
+			boolean first = true;
+			for(String type : theTypes) {
+				if(!first)
+					ret.append(',');
+				first = false;
+				ret.append(type);
+			}
+			ret.append('"');
+		}
+		return ret.toString();
 	}
 }

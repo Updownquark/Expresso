@@ -1,5 +1,6 @@
 package org.expresso.parse.impl;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Set;
 
@@ -17,7 +18,7 @@ public class OneOfMatcher<S extends BranchableStream<?, ?>> extends ComposedMatc
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) {
+	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
 		ParseMatch<SS> match = null;
 		for(ParseMatcher<? super S> element : getComposed()) {
 			SS streamCopy = (SS) stream.branch();

@@ -22,7 +22,11 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 
 	@Override
 	public char charAt(int index) {
-		doOn(index, (chunk, idx) -> holder[0] = chunk.getData()[idx]);
+		try {
+			doOn(index, (chunk, idx) -> holder[0] = chunk.getData()[idx]);
+		} catch(IOException e) {
+			throw new IllegalStateException("Could not retrieve data for charAt", e);
+		}
 		return holder[0];
 	}
 
@@ -30,7 +34,11 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 	public CharSequence subSequence(int start, int end) {
 		if(start < 0)
 			throw new IndexOutOfBoundsException("" + start);
-		doOn(end, (chunk, idx) -> null); // Check the end index
+		try {
+			doOn(end, (chunk, idx) -> null);
+		} catch(IOException e) {
+			throw new IllegalStateException("Could not retrieve data for subsequence", e);
+		} // Check the end index
 		if(start==0){
 			if(isDiscovered() && end == length())
 				return this;
@@ -59,7 +67,11 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 				}
 			};
 		} else
-			return ((CharSequenceStream) branch().advance(start)).subSequence(0, end - start);
+			try {
+				return ((CharSequenceStream) branch().advance(start)).subSequence(0, end - start);
+			} catch(IOException e) {
+				throw new IllegalStateException("Could not retrieve data for subsequence", e);
+			}
 	}
 
 	@Override
@@ -127,13 +139,8 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 			}
 
 			@Override
-			protected int getNextData(char [] chunk, int start) {
-				int ret;
-				try {
-					ret = reader.read(chunk, start, chunk.length - start);
-				} catch(IOException e) {
-					throw new IllegalStateException("Could not read stream data", e);
-				}
+			protected int getNextData(char [] chunk, int start) throws IOException {
+				int ret = reader.read(chunk, start, chunk.length - start);
 				if(ret < 0) {
 					isDone = true;
 					ret = 0;

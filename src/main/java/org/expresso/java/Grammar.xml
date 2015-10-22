@@ -1,31 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <grammar>
-	<sequence name="char" without="ignorable">
-		<literal>&apos;</literal>
-		<one-of>
-			<literal name="value">&apos;</literal>
-			<pattern name="value">[\x20-~]</pattern>
-			<pattern name="value" tag="escaped">\\[&apos;&quot;tnrbf]</pattern>
-			<pattern name="value" tag="escaped,unicode">\\u[0-9a-fA-F]{4}</pattern>
-		</one-of>
-		<literal>&apos;</literal>
-	</sequence>
-	<sequence name="string" without="ignorable">
-		<literal>&quot;</literal>
-		<up-to name="value">
+	<sequence name="char">
+		<without type="ignorable">
+			<literal>&apos;</literal>
 			<one-of>
-				<literal>&quot;</literal>
-				<literal>&#10;</literal>
+				<literal name="value">&apos;</literal>
+				<pattern name="value">[\x20-~]</pattern>
+				<pattern name="value" tag="escaped">\\[&apos;&quot;tnrbf]</pattern>
+				<pattern name="value" tag="escaped,unicode">\\u[0-9a-fA-F]{4}</pattern>
 			</one-of>
-		</up-to>
-		<literal>&quot;</literal>
+			<literal>&apos;</literal>
+		</without>
+	</sequence>
+	<sequence name="string">
+		<without type="ignorable">
+			<literal>&quot;</literal>
+			<up-to name="value">
+				<one-of>
+					<literal>&quot;</literal>
+					<literal>&#10;</literal>
+				</one-of>
+			</up-to>
+			<literal>&quot;</literal>
+		</without>
 	</sequence>
 	<sequence name="number">
 		<option>
 			<literal name="neg">-</literal>
 		</option>
-		<without types="ignorable">
+		<without type="ignorable">
 			<one-of>
 				<sequence tag="decimal">
 					<pattern name="integer">[1-9][_0-9]*</pattern>
@@ -38,12 +42,8 @@
 					<literal>.</literal>
 					<pattern name="fraction">[0-9][_0-9]*</pattern>
 				</sequence>
-				<sequence tag="int">
-					<pattern name="integer">[1-9][_0-9]*</pattern>
-				</sequence>
-				<sequence tag="int">
-					<literal name="integer">0</literal>
-				</sequence>
+				<pattern name="integer" tag="int">[1-9][_0-9]*</pattern>
+				<literal name="integer" tag="int">0</literal>
 			</one-of>
 			<option>
 				<pattern>[eE]</pattern>
@@ -72,35 +72,41 @@
 			</option>
 		</without>
 	</sequence>
-	<sequence name="hex-int" without="ignorable">
-		<literal name="hex">0x</literal>
-		<pattern name="value">[_0-9a-fA-F]+</pattern>
-		<option>
-			<pattern name="long-type">[lL]</pattern>
-		</option>
-		<forbid>
-			<pattern>[_a-zA-Z0-9]</pattern>
-		</forbid>
-	</sequence>
-	<sequence name="octal-int" without="ignorable">
-		<literal name="oct">0</literal>
-		<pattern name="value">[_0-9]+</pattern>
-		<option>
-			<pattern name="long-type">[lL]</pattern>
+	<sequence name="hex-int">
+		<without type="ignorable">
+			<literal name="hex">0x</literal>
+			<pattern name="value">[_0-9a-fA-F]+</pattern>
+			<option>
+				<pattern name="long-type">[lL]</pattern>
+			</option>
 			<forbid>
 				<pattern>[_a-zA-Z0-9]</pattern>
 			</forbid>
-		</option>
+		</without>
 	</sequence>
-	<sequence name="binary-int" without="ignorable">
-		<literal name="binary">0b</literal>
-		<pattern name="value">[_0-9]*</pattern>
-		<option>
-			<pattern name="long-type">[lL]</pattern>
-			<forbid>
-				<pattern>[_a-zA-Z0-9]</pattern>
-			</forbid>
-		</option>
+	<sequence name="octal-int">
+		<without type="ignorable">
+			<literal name="oct">0</literal>
+			<pattern name="value">[_0-9]+</pattern>
+			<option>
+				<pattern name="long-type">[lL]</pattern>
+				<forbid>
+					<pattern>[_a-zA-Z0-9]</pattern>
+				</forbid>
+			</option>
+		</without>
+	</sequence>
+	<sequence name="binary-int">
+		<without type="ignorable">
+			<literal name="binary">0b</literal>
+			<pattern name="value">[_0-9]*</pattern>
+			<option>
+				<pattern name="long-type">[lL]</pattern>
+				<forbid>
+					<pattern>[_a-zA-Z0-9]</pattern>
+				</forbid>
+			</option>
+		</without>
 	</sequence>
 	<one-of name="boolean">
 		<literal>true</literal>
@@ -109,19 +115,23 @@
 	<literal name="null">null</literal>
 
 	<!-- Ignorables -->
-	<sequence name="line-comment" without="ignorable" tag="ignorable">
-		<literal>//</literal>
-		<up-to name="content">
+	<sequence name="line-comment" tag="ignorable">
+		<without type="ignorable">
+			<literal>//</literal>
+			<up-to name="content">
+				<literal>&#10;</literal>
+			</up-to>
 			<literal>&#10;</literal>
-		</up-to>
-		<literal>&#10;</literal>
+		</without>
 	</sequence>
-	<sequence name="block-comment" ignorable="true">
+	<sequence name="block-comment" tag="ignorable">
 		<literal>/*</literal>
-		<up-to name="content">
+		<without type="ignorable">
+			<up-to name="content">
+				<literal>*/</literal>
+			</up-to>
 			<literal>*/</literal>
-		</up-to>
-		<literal>*/</literal>
+		</without>
 	</sequence>
 	
 	<!-- Blocks and block structures -->
@@ -287,22 +297,20 @@
 	<sequence name="identifier">
 		<pattern name="name">[_a-zA-Z][_a-zA-Z0-9]*</pattern>
 	</sequence>
-	<sequence name="primitive" tag="type">
-		<one-of name="name">
-			<literal>void</literal>
-			<literal>null</literal>
-			<literal>boolean</literal>
-			<literal>true</literal>
-			<literal>false</literal>
-			<literal>char</literal>
-			<literal>byte</literal>
-			<literal>short</literal>
-			<literal>int</literal>
-			<literal>long</literal>
-			<literal>float</literal>
-			<literal>double</literal>
-		</one-of>
-	</sequence>
+	<one-of name="primitive" tag="type">
+		<literal>void</literal>
+		<literal>null</literal>
+		<literal>boolean</literal>
+		<literal>true</literal>
+		<literal>false</literal>
+		<literal>char</literal>
+		<literal>byte</literal>
+		<literal>short</literal>
+		<literal>int</literal>
+		<literal>long</literal>
+		<literal>float</literal>
+		<literal>double</literal>
+	</one-of>
 	<sequence name="basic-type" priority="998" default="false" tag="type">
 		<repeat>
 			<ref type="identifier" name="name" />
@@ -440,6 +448,7 @@
 		<literal>import</literal>
 		<whitespace />
 		<ref type="basic-type" name="type" />
+		<literal>;</literal>
 	</sequence>
 	<sequence name="static-import" default="false" tag="import">
 		<literal>import</literal>
@@ -451,8 +460,20 @@
 		</option>
 		<literal>.</literal>
 		<ref type="identifier" name="member" />
+		<literal>;</literal>
 	</sequence>
 	<sequence name="java-file" default="false">
+		<option>
+			<literal>package</literal>
+			<sequence name="package">
+				<repeat>
+					<ref type="identifier" />
+					<literal>.</literal>
+				</repeat>
+					<ref type="identifier" />
+			</sequence>
+			<literal>;</literal>
+		</option>
 		<repeat>
 			<ref type="import" name="import" />
 		</repeat>
@@ -482,12 +503,47 @@
 			<ref name="parameter" />
 		<literal>)</literal>
 		<option>
-			<literal name="anonymous">{</literal>
+			<literal name="anonymous-body">{</literal>
 			<repeat>
 				<ref name="body-content" />
 			</repeat>
 			<literal>}</literal>
 		</option>
+	</sequence>
+	<sequence name="lambda">
+		<literal>(</literal>
+		<option>
+			<one-of>
+				<sequence>
+					<repeat>
+						<ref type="type" name="parameter-type" />
+						<ref type="identifier" name="parameter-name" />
+						<literal>,</literal>
+					</repeat>
+					<ref type="type" name="parameter-type" />
+					<ref type="identifier" name="parameter-name" />
+				</sequence>
+				<sequence>
+					<repeat>
+						<ref type="identifier" name="parameter-name" />
+						<literal>,</literal>
+					</repeat>
+					<ref type="identifier" name="parameter-name" />
+				</sequence>
+			</one-of>
+		</option>
+		<literal>)</literal>
+		<literal>-&gt;</literal>
+		<one-of>
+			<sequence name="body">
+				<literal>{</literal>
+				<repeat>
+					<ref name="body-content" />
+				</repeat>
+				<literal>}</literal>
+			</sequence>
+			<ref name="value" />
+		</one-of>
 	</sequence>
 	<sequence name="array-initializer">
 		<literal>new</literal>
@@ -686,11 +742,11 @@
 		<ref name="operand" />
 	</sequence>
 	<sequence name="not" priority="220" tag="unary">
-		<literal storeAs="name">!</literal>
+		<literal name="name">!</literal>
 		<ref name="operand" />
 	</sequence>
 	<sequence name="bitwise-not" priority="220" tag="unary">
-		<literal storeAs="name">~</literal>
+		<literal name="name">~</literal>
 		<ref name="operand" />
 	</sequence>
 	<sequence name="pre-increment" priority="220" tag="unary">

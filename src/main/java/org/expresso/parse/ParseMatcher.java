@@ -1,5 +1,6 @@
 package org.expresso.parse;
 
+import java.io.IOException;
 import java.util.Set;
 
 /**
@@ -25,6 +26,7 @@ public interface ParseMatcher<S extends BranchableStream<?, ?>> {
 	 * @param parser The parser to use to parse reference types
 	 * @param session The current parse session
 	 * @return The parsed match, or null if this matcher does not recognize the content at the beginning of the stream
+	 * @throws IOException If an error occurs retrieving the data for matching
 	 */
-	<SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session);
+	<SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException;
 }

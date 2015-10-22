@@ -7,7 +7,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.expresso.parse.ParseMatcher;
-import org.expresso.parse.impl.DefaultGrammarParser.PrioritizedMatcher;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
 
@@ -19,6 +18,7 @@ public class DefaultGrammarParser {
 		public final ParseMatcher<CharSequenceStream> matcher;
 
 		final double priority;
+
 		/** Whether the matcher is to be matched by default (when not referred to explicitly by name or tag) */
 		public final boolean isDefault;
 
@@ -78,9 +78,10 @@ public class DefaultGrammarParser {
 	 * @return The configured matcher represented by the XML element
 	 */
 	public static ParseMatcher<CharSequenceStream> getMatcher(Element element) {
-		String name=element.getAttributeValue("name");
-		String tagStr=element.getAttributeValue("tag");
-		Set<String> tags=tagStr==null ? Collections.EMPTY_SET : Collections.unmodifiableSet(Arrays.stream(tagStr.split(",")).collect(Collectors.toSet()));
+		String name = element.getAttributeValue("name");
+		String tagStr = element.getAttributeValue("tag");
+		Set<String> tags = tagStr == null ? Collections.EMPTY_SET
+			: Collections.unmodifiableSet(Arrays.stream(tagStr.split(",")).collect(Collectors.toSet()));
 		Set<String> attrs = new java.util.LinkedHashSet<>(
 			element.getAttributes().stream().map(a -> a.getName()).collect(Collectors.toSet()));
 		attrs.remove("name");
@@ -104,9 +105,9 @@ public class DefaultGrammarParser {
 			break;
 		case "one-of":
 		case "sequence":
-			if(element.getChildren().size() == 1)
-				System.err.println(element.getName()
-					+ " is only useful with more than one child matcher--may be eliminated in the case where there is only one.");
+			// if(element.getChildren().size() == 1)
+			// System.err.println(element.getName()
+			// + " is only useful with more than one child matcher--may be eliminated in the case where there is only one.");
 			//$FALL-THROUGH$
 		default:
 			if(element.getChildren().isEmpty())
@@ -125,11 +126,12 @@ public class DefaultGrammarParser {
 		int min = 0;
 		int max = 0;
 		switch (element.getName()) {
-		case "ref":
 		case "without":
 		case "with":
 			if(typeStr == null)
 				throw new IllegalArgumentException(element.getName() + " requires a type attribute");
+			//$FALL-THROUGH$
+		case "ref": // type attribute is optional for ref
 			attrs.remove("type");
 			break;
 		case "option":
@@ -165,7 +167,7 @@ public class DefaultGrammarParser {
 			children.add(getMatcher(child));
 		children = Collections.unmodifiableList(children);
 
-		switch(element.getName()){
+		switch (element.getName()) {
 		case "literal":
 			return new TextLiteralMatcher<>(name, tags, element.getTextTrim());
 		case "pattern":
@@ -186,10 +188,10 @@ public class DefaultGrammarParser {
 			builder = SequenceMatcher.buildSequence(name);
 			break;
 		case "without":
-			builder = WithoutMatcher.buildWithout();
+			builder = WithoutMatcher.<CharSequenceStream> buildWithout().exclude(typeStr.split(","));
 			break;
 		case "with":
-			builder = WithMatcher.buildWith();
+			builder = WithMatcher.<CharSequenceStream> buildWith().include(typeStr.split(","));
 			break;
 		case "option":
 		case "repeat":
@@ -200,7 +202,7 @@ public class DefaultGrammarParser {
 			break;
 		}
 		default:
-			throw new IllegalArgumentException("Unrecognized matcher name: "+element.getName());
+			throw new IllegalArgumentException("Unrecognized matcher name: " + element.getName());
 		}
 		builder.tag(tags.toArray(new String[tags.size()]));
 		for(ParseMatcher<CharSequenceStream> child : children)

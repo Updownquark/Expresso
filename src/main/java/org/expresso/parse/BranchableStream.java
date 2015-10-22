@@ -1,5 +1,6 @@
 package org.expresso.parse;
 
+import java.io.IOException;
 import java.util.function.BiFunction;
 
 import org.qommons.Sealable;
@@ -26,7 +27,7 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 			theData = createChunk(theChunkSize);
 		}
 
-		void getMore() {
+		void getMore() throws IOException {
 			if(theLength == theChunkSize)
 				throw new IllegalStateException("No more data to get for this chunk");
 			if(isDiscovered())
@@ -124,8 +125,9 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 	 *
 	 * @param length The number of places from this position to discover up to
 	 * @return The number of places that have been discovered after this operation, or <code>length</code>, whichever is smaller.
+	 * @throws IOException If the data cannot be retrieved
 	 */
-	public int discoverTo(int length) {
+	public int discoverTo(int length) throws IOException {
 		if(length < 0)
 			throw new IndexOutOfBoundsException("" + length);
 		if(isDiscovered()) {
@@ -153,10 +155,11 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 	/**
 	 * @param index The index of the value to get
 	 * @return The data value in this stream at the given offset from the stream's position
+	 * @throws IOException If the data cannot be retrieved
 	 */
-	public D get(int index) {
+	public D get(int index) throws IOException {
 		Object [] ret = new Object[1];
-		doOn(index, (chunk, idx) -> ret[0] = get(chunk.getData(), index));
+		doOn(index, (chunk, idx) -> ret[0] = get(chunk.getData(), idx));
 		return (D) ret[0];
 	}
 
@@ -165,8 +168,9 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 	 *
 	 * @param spaces The number of value spaces to advance this stream's position by
 	 * @return This stream
+	 * @throws IOException If the data cannot be retrieved
 	 */
-	public BranchableStream<D, C> advance(int spaces) {
+	public BranchableStream<D, C> advance(int spaces) throws IOException {
 		assertUnsealed();
 		doOn(spaces, (chunk, idx) -> {
 			theChunk = chunk;
@@ -184,8 +188,9 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 	 * @param op The operation to perform. The function takes the chunk containing the data point and the index within the chunk's data
 	 *            corresponding to the given index from this stream position.
 	 * @return The value returned by the operation
+	 * @throws IOException If the data cannot be retrieved
 	 */
-	protected <T> T doOn(int index, BiFunction<Chunk, Integer, T> op) {
+	protected <T> T doOn(int index, BiFunction<Chunk, Integer, T> op) throws IOException {
 		if(index < 0)
 			throw new IndexOutOfBoundsException("" + index);
 		Chunk chunk = theChunk;
@@ -201,7 +206,7 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 		}
 		if(chunk == null)
 			throw new IndexOutOfBoundsException(index + " of " + length);
-		return op.apply(chunk, index - length + chunk.length());
+		return op.apply(chunk, index - length);
 	}
 
 	/** @return Whether this stream has discovered all its available content or not */
@@ -230,8 +235,9 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 	 * @param start The start position of the chunk to fill
 	 *
 	 * @return A collection of data with the given length.
+	 * @throws IOException If the data cannot be retrieved
 	 */
-	protected abstract int getNextData(C chunk, int start);
+	protected abstract int getNextData(C chunk, int start) throws IOException;
 
 	/**
 	 * @param data The chunk of data
