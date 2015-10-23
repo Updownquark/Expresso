@@ -3,6 +3,7 @@ package org.expresso.parse.impl;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.expresso.parse.*;
@@ -26,6 +27,28 @@ public class RepeatingSequenceMatcher<S extends BranchableStream<?, ?>> extends 
 		super(name, tags);
 		theMinRepeat = minRepeat;
 		theMaxRepeat = maxRepeat;
+	}
+
+	@Override
+	public String getTypeName() {
+		if(theMinRepeat == 0 && theMaxRepeat == 1)
+			return "option";
+		else
+			return "repeat";
+	}
+
+	@Override
+	public Map<String, String> getAttributes() {
+		if(theMinRepeat == 0 && theMaxRepeat == 1)
+			return java.util.Collections.EMPTY_MAP;
+		else if(theMinRepeat == 0 && theMaxRepeat == Integer.MAX_VALUE)
+			return java.util.Collections.EMPTY_MAP;
+		java.util.LinkedHashMap<String, String> ret = new java.util.LinkedHashMap<>();
+		if(theMinRepeat > 0)
+			ret.put("min", "" + theMinRepeat);
+		if(theMaxRepeat < Integer.MAX_VALUE)
+			ret.put("max", "" + theMaxRepeat);
+		return ret;
 	}
 
 	@Override

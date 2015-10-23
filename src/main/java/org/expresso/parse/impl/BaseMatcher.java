@@ -36,9 +36,11 @@ public abstract class BaseMatcher<S extends BranchableStream<?, ?>> implements P
 
 	@Override
 	public String toString() {
-		StringBuilder ret = new StringBuilder(getClass().getSimpleName());
+		StringBuilder ret = new StringBuilder(getTypeName());
 		if(theName != null)
 			ret.append(" name=\"").append(theName).append('"');
+		for(java.util.Map.Entry<String, String> attr : getAttributes().entrySet())
+			ret.append(' ').append(attr.getKey()).append("=\"").append(attr.getValue()).append('"');
 		if(!theTags.isEmpty()) {
 			ret.append(" tag=\"");
 			boolean first = true;
@@ -50,6 +52,8 @@ public abstract class BaseMatcher<S extends BranchableStream<?, ?>> implements P
 			}
 			ret.append('"');
 		}
+		for(ParseMatcher<? super S> composed : getComposed())
+			ret.append("\n\t").append(composed.toString().replaceAll("\n", "\n\t"));
 		return ret.toString();
 	}
 }

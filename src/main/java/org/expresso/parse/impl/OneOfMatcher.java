@@ -2,6 +2,7 @@ package org.expresso.parse.impl;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Set;
 
 import org.expresso.parse.*;
@@ -15,6 +16,16 @@ public class OneOfMatcher<S extends BranchableStream<?, ?>> extends ComposedMatc
 	/** @see ComposedMatcher#ComposedMatcher(String, Set) */
 	protected OneOfMatcher(String name, Set<String> tags) {
 		super(name, tags);
+	}
+
+	@Override
+	public String getTypeName() {
+		return "one-of";
+	}
+
+	@Override
+	public Map<String, String> getAttributes() {
+		return java.util.Collections.EMPTY_MAP;
 	}
 
 	@Override

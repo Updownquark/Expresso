@@ -35,6 +35,10 @@ public class JavaTest {
 		for(PrioritizedMatcher matcher : matchers)
 			builder.addMatcher(matcher.matcher, matcher.isDefault);
 		theParser = builder.build();
+		org.expresso.parse.debug.ExpressoParserDebugGUI<CharSequenceStream> debugger;
+		debugger = new org.expresso.parse.debug.ExpressoParserDebugGUI<>();
+		theParser.setDebugger(debugger);
+		org.expresso.parse.debug.ExpressoParserDebugGUI.getDebuggerFrame(debugger);
 	}
 
 	/** Parses all the .java files in this project */

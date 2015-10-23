@@ -1,4 +1,9 @@
-package org.expresso.parse;
+package org.expresso.parse.debug;
+
+import org.expresso.parse.BranchableStream;
+import org.expresso.parse.ExpressoParser;
+import org.expresso.parse.ParseMatch;
+import org.expresso.parse.ParseMatcher;
 
 /**
  * An interface for a debugger to be notified of parsing events
@@ -11,7 +16,7 @@ public interface ExpressoParsingDebugger<S extends BranchableStream<?, ?>> {
 	 *
 	 * @param parser The parser the debugger is being installed in
 	 */
-	void init(ExpressoParser<? super S> parser);
+	void init(ExpressoParser<?> parser);
 
 	/**
 	 * Called at the start of parsing a sequence
@@ -25,16 +30,16 @@ public interface ExpressoParsingDebugger<S extends BranchableStream<?, ?>> {
 	 *
 	 * @param matches The matches parsed from the sequence
 	 */
-	void end(ParseMatch<? extends S> [] matches);
+	void end(ParseMatch<? extends S>... matches);
 
 	/**
 	 * Called when the parsing of a sequence fails
 	 *
 	 * @param stream The stream whose parsing was attempted
-	 * @param matches The matches parsed from the sequence before the failure
+	 * @param match The match parsed from the sequence before the failure
 	 * @param e The exception that is the source of the failure
 	 */
-	void fail(S stream, ParseMatch<? extends S> [] matches);
+	void fail(S stream, ParseMatch<? extends S> match);
 
 	/**
 	 * Called before attempting to parse a subsequence according to a particular parse config
@@ -42,7 +47,7 @@ public interface ExpressoParsingDebugger<S extends BranchableStream<?, ?>> {
 	 * @param stream The stream at the location to parse
 	 * @param matcher The parsing matcher that will attempt to match the beginning of the stream
 	 */
-	void preParse(S stream, ParseMatcher<? super S> matcher);
+	void preParse(S stream, ParseMatcher<?> matcher);
 
 	/**
 	 * Called after attempting to parse a subsequence
@@ -51,18 +56,18 @@ public interface ExpressoParsingDebugger<S extends BranchableStream<?, ?>> {
 	 * @param matcher The matcher that parsing attempted to use
 	 * @param match The match resulting from the parsing, or null if the match could not be made
 	 */
-	void postParse(S stream, ParseMatcher<? super S> matcher, ParseMatch<? extends S> match);
+	void postParse(S stream, ParseMatcher<?> matcher, ParseMatch<? extends S> match);
 
 	/**
 	 * Called when a match is discarded in favor of a better one
-	 * 
+	 *
 	 * @param match The discarded match
 	 */
 	void matchDiscarded(ParseMatch<? extends S> match);
 
 	/**
 	 * Called when a match from the cache is used
-	 * 
+	 *
 	 * @param match The cached match
 	 */
 	void usedCache(ParseMatch<? extends S> match);

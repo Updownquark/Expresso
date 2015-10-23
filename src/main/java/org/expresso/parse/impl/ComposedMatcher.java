@@ -1,6 +1,9 @@
 package org.expresso.parse.impl;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 
 import org.expresso.parse.BranchableStream;
 import org.expresso.parse.ParseMatcher;
@@ -28,14 +31,6 @@ public abstract class ComposedMatcher<S extends BranchableStream<?, ?>> extends 
 	}
 
 	@Override
-	public Set<String> getExternalTypeDependencies() {
-		LinkedHashSet<String> depends = new LinkedHashSet<>();
-		for(ParseMatcher<? super S> element : theComposed)
-			depends.addAll(element.getExternalTypeDependencies());
-		return depends;
-	}
-
-	/** @return The composed matchers making up this matcher */
 	public List<ParseMatcher<? super S>> getComposed() {
 		return java.util.Collections.unmodifiableList(theComposed);
 	}
@@ -43,14 +38,6 @@ public abstract class ComposedMatcher<S extends BranchableStream<?, ?>> extends 
 	/** @param child The child for this composite matcher */
 	protected void addChild(ParseMatcher<? super S> child) {
 		theComposed.add(child);
-	}
-
-	@Override
-	public String toString() {
-		StringBuilder ret = new StringBuilder(super.toString());
-		for(ParseMatcher<? super S> composed : theComposed)
-			ret.append("\n\t").append(composed.toString().replaceAll("\n", "\n\t"));
-		return ret.toString();
 	}
 
 	/**

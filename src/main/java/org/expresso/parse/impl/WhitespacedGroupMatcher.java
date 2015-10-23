@@ -1,5 +1,7 @@
 package org.expresso.parse.impl;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.expresso.parse.*;
@@ -18,13 +20,23 @@ public class WhitespacedGroupMatcher implements ParseMatcher<BranchableStream<?,
 	}
 
 	@Override
+	public String getTypeName() {
+		return "white-spaced";
+	}
+
+	@Override
+	public Map<String, String> getAttributes() {
+		return java.util.Collections.EMPTY_MAP;
+	}
+
+	@Override
 	public Set<String> getTags() {
 		return java.util.Collections.EMPTY_SET;
 	}
 
 	@Override
-	public Set<String> getExternalTypeDependencies() {
-		return java.util.Collections.EMPTY_SET;
+	public List<ParseMatcher<? super BranchableStream<?, ?>>> getComposed() {
+		return java.util.Collections.EMPTY_LIST;
 	}
 
 	@Override

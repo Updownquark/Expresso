@@ -2,6 +2,8 @@ package org.expresso.parse.impl;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.expresso.parse.*;
@@ -25,8 +27,18 @@ public class ForbiddenMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 	}
 
 	@Override
-	public Set<String> getExternalTypeDependencies() {
-		return theContent.getExternalTypeDependencies();
+	public String getTypeName() {
+		return "forbid";
+	}
+
+	@Override
+	public Map<String, String> getAttributes() {
+		return java.util.Collections.EMPTY_MAP;
+	}
+
+	@Override
+	public List<ParseMatcher<? super S>> getComposed() {
+		return java.util.Collections.unmodifiableList(Arrays.asList(theContent));
 	}
 
 	@Override

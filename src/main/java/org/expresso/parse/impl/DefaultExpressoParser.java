@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.*;
 
 import org.expresso.parse.*;
+import org.expresso.parse.debug.ExpressoParsingDebugger;
 
 /**
  * Default implementation of {@link ExpressoParser}
@@ -14,6 +15,8 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 	private final Map<String, ParseMatcher<? super S>> allMatchers;
 	private final Map<String, List<ParseMatcher<? super S>>> theMatchersByTag;
 	private final List<ParseMatcher<? super S>> theDefaultMatchers;
+
+	private ExpressoParsingDebugger<S> theDebugger;
 
 	/**
 	 * Initializes the parser with a name and tags. These are only used if this parser is a sub-domain matcher in another parser.
@@ -27,6 +30,16 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 		allMatchers = new java.util.LinkedHashMap<>();
 		theMatchersByTag = new LinkedHashMap<>();
 		theDefaultMatchers = new ArrayList<>();
+
+		theDebugger = new org.expresso.parse.debug.NullDebugger<>();
+	}
+
+	/** @param debugger The debugger to be notified of this parser's parsing steps */
+	public void setDebugger(ExpressoParsingDebugger<S> debugger) {
+		if(debugger == null)
+			debugger = new org.expresso.parse.debug.NullDebugger<>();
+		theDebugger = debugger;
+		debugger.init(this);
 	}
 
 	private void addMatcher(ParseMatcher<? super S> matcher, boolean isDefault) {
@@ -64,6 +77,11 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 	}
 
 	@Override
+	public List<ParseMatcher<? super S>> getComposed() {
+		return Collections.unmodifiableList(new ArrayList<>(allMatchers.values()));
+	}
+
+	@Override
 	public ParseSession createSession() {
 		return new ParseSessionImpl<>();
 	}
@@ -71,6 +89,12 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 	@Override
 	public <SS extends S> ParseMatch<SS> parse(SS stream, ParseSession session, Collection<? extends ParseMatcher<? super SS>> matchers)
 		throws IOException {
+		boolean finishDebugging = false;
+		if(!((ParseSessionImpl<S>) session).isDebuggingStarted) {
+			theDebugger.start(stream);
+			((ParseSessionImpl<S>) session).isDebuggingStarted = true;
+			finishDebugging = true;
+		}
 		Collection<ParseMatcher<? super SS>> memberMatchers = new ArrayList<>();
 		Collection<ParseMatcher<? super SS>> foreignMatchers = new ArrayList<>();
 		for(ParseMatcher<? super SS> matcher : matchers) {
@@ -83,13 +107,25 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 		if(!memberMatchers.isEmpty())
 			match = ((ParseSessionImpl<SS>) session).match(stream, memberMatchers);
 		for(ParseMatcher<? super SS> matcher : foreignMatchers) {
+			theDebugger.preParse(stream, matcher);
 			ParseMatch<SS> fMatch = matcher.match((SS) stream.branch(), this, session);
-			if(fMatch != null && fMatch.isBetter(match))
+			theDebugger.postParse(stream, matcher, fMatch);
+			if(fMatch != null && fMatch.isBetter(match)) {
+				if(match != null)
+					theDebugger.matchDiscarded(match);
 				match = fMatch;
+			}
 		}
 
 		if(match != null)
 			stream.advance(match.getLength());
+		if(finishDebugging) {
+			if(match == null || match.getError() != null || !match.isComplete())
+				theDebugger.fail(stream, match);
+			else
+				theDebugger.end(match);
+			((ParseSessionImpl<S>) session).isDebuggingStarted = false;
+		}
 		return match;
 	}
 
@@ -220,16 +256,23 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 
 			ParseMatch<SS> match(SS stream, ParseMatcher<? super SS> matcher) throws IOException {
 				Matching matching = theTypeMatching.get(matcher.getName());
-				if(matching != null)
+				if(matching != null) {
+					theDebugger.usedCache(matching.theMatch);
 					return matching.theMatch;
+				}
 				matching = new Matching();
 				theTypeMatching.put(matcher.getName(), matching);
+				SS streamCopy = (SS) stream.branch();
 				while(true) {
-					ParseMatch<SS> match = matcher.match((SS) stream.branch(), DefaultExpressoParser.this, ParseSessionImpl.this);
+					theDebugger.preParse(streamCopy, matcher);
+					ParseMatch<SS> match = matcher.match((SS) streamCopy.branch(), DefaultExpressoParser.this, ParseSessionImpl.this);
+					theDebugger.postParse(streamCopy, matcher, match);
 					if(match != null && match.isBetter(matching.theMatch)) {
+						if(matching.theMatch != null)
+							theDebugger.matchDiscarded(matching.theMatch);
 						matching.theMatch = match;
 						if(matcher.getExternalTypeDependencies().isEmpty())
-							break;
+							break; // Only re-try parsing if the matcher may refer to itself
 					} else
 						break;
 				}
@@ -250,6 +293,8 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 		private final Set<String> theExcludedTypes;
 
 		private final HashMap<Integer, StreamPositionData> thePositions;
+
+		boolean isDebuggingStarted;
 
 		ParseSessionImpl() {
 			theExcludedTypes = new java.util.LinkedHashSet<>();

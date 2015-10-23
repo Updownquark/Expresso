@@ -1,5 +1,6 @@
 package org.expresso.parse.impl;
 
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -25,11 +26,26 @@ public class TextPatternMatcher<S extends CharSequenceStream> extends SimpleValu
 	}
 
 	@Override
+	public String getTypeName() {
+		return "pattern";
+	}
+
+	@Override
+	public Map<String, String> getAttributes() {
+		return java.util.Collections.EMPTY_MAP;
+	}
+
+	@Override
 	public <SS extends S> ParseMatch<SS> parseValue(SS stream) {
 		Matcher matcher = thePattern.matcher(stream);
 		if(!matcher.lookingAt())
 			return null;
 		return new ParseMatch<>(this, (SS) stream.branch(), matcher.end(), java.util.Collections.EMPTY_LIST, null, true);
+	}
+
+	@Override
+	public String getValueString() {
+		return thePattern.toString();
 	}
 
 	@Override

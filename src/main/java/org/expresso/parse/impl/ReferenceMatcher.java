@@ -1,15 +1,9 @@
 package org.expresso.parse.impl;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.*;
 
-import org.expresso.parse.BranchableStream;
-import org.expresso.parse.ExpressoParser;
-import org.expresso.parse.ParseMatch;
-import org.expresso.parse.ParseSession;
+import org.expresso.parse.*;
 import org.qommons.ArrayUtils;
 
 /**
@@ -39,8 +33,29 @@ public class ReferenceMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 	}
 
 	@Override
+	public String getTypeName() {
+		return "ref";
+	}
+
+	@Override
+	public Map<String, String> getAttributes() {
+		if(theTypeSet.isEmpty())
+			return Collections.EMPTY_MAP;
+		LinkedHashMap<String, String> ret = new LinkedHashMap<>();
+		String typeStr = theTypeSet.toString();
+		typeStr = typeStr.substring(1, typeStr.length() - 1);
+		ret.put("type", typeStr);
+		return ret;
+	}
+
+	@Override
 	public Set<String> getExternalTypeDependencies() {
 		return theTypeSet;
+	}
+
+	@Override
+	public List<ParseMatcher<? super S>> getComposed() {
+		return Collections.EMPTY_LIST;
 	}
 
 	@Override

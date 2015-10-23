@@ -69,21 +69,9 @@ public abstract class BinarySequenceStream extends BranchableStream<Byte, byte [
 	 */
 	public static BinarySequenceStream from(InputStream input, int chunkSize) {
 		return new BinarySequenceStream(chunkSize) {
-			boolean isDone;
-
-			@Override
-			public boolean isDiscovered() {
-				return isDone;
-			}
-
 			@Override
 			protected int getNextData(byte [] chunk, int start) throws IOException {
-				int ret = input.read(chunk, start, chunk.length - start);
-				if(ret < 0) {
-					isDone = true;
-					ret = 0;
-				}
-				return ret;
+				return input.read(chunk, start, chunk.length - start);
 			}
 		};
 	}

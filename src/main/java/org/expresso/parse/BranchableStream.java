@@ -22,6 +22,8 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 
 		private Chunk theNextChunk;
 
+		private boolean isLast;
+
 		Chunk(int chunkIndex) {
 			theChunkIndex = chunkIndex;
 			theData = createChunk(theChunkSize);
@@ -30,9 +32,14 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 		void getMore() throws IOException {
 			if(theLength == theChunkSize)
 				throw new IllegalStateException("No more data to get for this chunk");
-			if(isDiscovered())
+			int nextLen = getNextData(theData, theLength);
+			if(nextLen < 0) {
+				isLast = true;
 				return;
-			theLength += getNextData(theData, theLength);
+			} else if(nextLen < theChunkSize - theLength) {
+				isLast = true;
+			}
+			theLength += nextLen;
 			if(theLength == theChunkSize)
 				theNextChunk = new Chunk(theChunkIndex + 1);
 		}
@@ -199,7 +206,7 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 			if(chunk.length() == theChunkSize) {
 				length += chunk.length();
 				chunk = chunk.getNext();
-			} else if(isDiscovered())
+			} else if(chunk.isLast)
 				throw new IndexOutOfBoundsException(index + " of " + (length + chunk.length()));
 			else
 				chunk.getMore();
@@ -210,7 +217,12 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 	}
 
 	/** @return Whether this stream has discovered all its available content or not */
-	public abstract boolean isDiscovered();
+	public boolean isDiscovered() {
+		Chunk c = theChunk;
+		while(!c.isLast && c.theNextChunk != null)
+			c = c.theNextChunk;
+		return c.isLast;
+	}
 
 	/**
 	 * Creates an empty chunk of data for this cache

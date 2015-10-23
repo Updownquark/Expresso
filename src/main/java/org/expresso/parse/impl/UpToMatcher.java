@@ -2,6 +2,8 @@ package org.expresso.parse.impl;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.expresso.parse.*;
@@ -24,14 +26,24 @@ public class UpToMatcher<S extends BranchableStream<?, ?>> extends BaseMatcher<S
 		theMatcher = matcher;
 	}
 
+	@Override
+	public String getTypeName() {
+		return "up-to";
+	}
+
+	@Override
+	public Map<String, String> getAttributes() {
+		return java.util.Collections.EMPTY_MAP;
+	}
+
 	/** @return The matcher that this matcher searches for */
 	public ParseMatcher<? super S> getMatcher() {
 		return theMatcher;
 	}
 
 	@Override
-	public Set<String> getExternalTypeDependencies() {
-		return theMatcher.getExternalTypeDependencies();
+	public List<ParseMatcher<? super S>> getComposed() {
+		return java.util.Collections.unmodifiableList(Arrays.asList(theMatcher));
 	}
 
 	@Override

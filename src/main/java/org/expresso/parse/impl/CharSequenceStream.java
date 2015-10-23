@@ -8,8 +8,6 @@ import org.expresso.parse.BranchableStream;
 
 /** A branchable stream of character data */
 public abstract class CharSequenceStream extends BranchableStream<Character, char []> implements CharSequence {
-	private final char [] holder = new char[1];
-
 	/** @see BranchableStream#BranchableStream(int) */
 	protected CharSequenceStream(int chunkSize) {
 		super(chunkSize);
@@ -22,6 +20,7 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 
 	@Override
 	public char charAt(int index) {
+		char [] holder = new char[1];
 		try {
 			doOn(index, (chunk, idx) -> holder[0] = chunk.getData()[idx]);
 		} catch(IOException e) {
@@ -34,36 +33,46 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 	public CharSequence subSequence(int start, int end) {
 		if(start < 0)
 			throw new IndexOutOfBoundsException("" + start);
-		try {
-			doOn(end, (chunk, idx) -> null);
-		} catch(IOException e) {
-			throw new IllegalStateException("Could not retrieve data for subsequence", e);
-		} // Check the end index
-		if(start==0){
+		if(end>0){
+			try {
+				doOn(end - 1, (chunk, idx) -> null);
+			} catch(IOException e) {
+				throw new IllegalStateException("Could not retrieve data for subsequence", e);
+			} // Check the end index
+		}
+		if(start == 0) {
 			if(isDiscovered() && end == length())
 				return this;
-			return new CharSequence(){
+			return new CharSequence() {
 				@Override
 				public int length() {
-					int ret=CharSequenceStream.this.length();
-					if(ret>end)
-						ret=end;
+					int ret = CharSequenceStream.this.length();
+					if(ret > end)
+						ret = end;
 					return ret;
 				}
 
 				@Override
 				public char charAt(int index) {
-					if(index>=end)
-						throw new IndexOutOfBoundsException(index+" of "+end);
+					if(index >= end)
+						throw new IndexOutOfBoundsException(index + " of " + end);
 					return CharSequenceStream.this.charAt(index);
 				}
 
 				@Override
 				public CharSequence subSequence(int start2, int end2) {
-					if(end2<=end)
+					if(end2 <= end)
 						return this;
 					else
 						return CharSequenceStream.this.subSequence(start2, end2);
+				}
+
+				@Override
+				public String toString() {
+					StringBuilder ret = new StringBuilder();
+					for(int i = 0; i < length(); i++)
+						ret.append(charAt(i));
+					return ret.toString();
 				}
 			};
 		} else
@@ -131,21 +140,9 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 	 */
 	public static CharSequenceStream from(Reader reader, int chunkSize) {
 		return new CharSequenceStream(chunkSize) {
-			boolean isDone;
-
-			@Override
-			public boolean isDiscovered() {
-				return isDone;
-			}
-
 			@Override
 			protected int getNextData(char [] chunk, int start) throws IOException {
-				int ret = reader.read(chunk, start, chunk.length - start);
-				if(ret < 0) {
-					isDone = true;
-					ret = 0;
-				}
-				return ret;
+				return reader.read(chunk, start, chunk.length - start);
 			}
 		};
 	}

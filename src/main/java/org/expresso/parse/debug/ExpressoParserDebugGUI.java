@@ -4,9 +4,12 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.EventObject;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -16,49 +19,74 @@ import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.tree.TreePath;
 
-import org.expresso.parse.ExpressoParser;
-import org.expresso.parse.ParseMatch;
-import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.*;
 import org.expresso.parse.impl.CharSequenceStream;
+import org.expresso.parse.impl.ReferenceMatcher;
+import org.expresso.parse.impl.WhitespaceMatcher;
+import org.qommons.config.MutableConfig;
+import org.qommons.config.QommonsConfig;
 
-/** A graphical debugger for the {@link ExpressoParser} */
-public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse.ExpressoParsingDebugger<CharSequenceStream> {
+/**
+ * A graphical debugger for the {@link ExpressoParser}
+ *
+ * @param <S> The sub-type of stream to parse
+ */
+public class ExpressoParserDebugGUI<S extends CharSequenceStream> extends JPanel
+implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	enum StepTargetType {
 		EXIT, CHILD
 	}
 
 	private static Color SELECTED = new Color(100, 100, 255);
+
 	private static ImageIcon RESUME_ICON = getIcon("play.png", 24, 24);
+
 	private static ImageIcon PAUSE_ICON = getIcon("pause.png", 24, 24);
 
 	private JTextPane theMainText;
+
+	private JScrollPane theMainTextScroll;
+
 	private ParsingExpressionTreeModel theTreeModel;
+
 	private JTree theParseTree;
+
 	private JButton theOverButton;
 	private JButton theIntoButton;
 	private JButton theOutButton;
 	private JButton theResumeButton;
+
+	private JToggleButton theDebugButton;
+
 	private JTable theBreakpointList;
+
 	private JLabel theAddBreakpointLabel;
-	private JList<OpObject> theDebugPane;
+
+	private JList<MatcherObject> theDebugPane;
+
 	private JSplitPane theMainSplit;
 	private JSplitPane theRightSplit;
+
 	private File theConfigFile;
+
 	private List<String> theOpNames;
+
 	private List<ExpressoParserBreakpoint> theBreakpoints;
 
 	private boolean isPopupWhenHit = true;
+
 	private volatile boolean isSuspended;
 	private volatile boolean isHolding;
-
-	private CharSequenceStream theText;
-	private int theIndex;
-
+	private S theStream;
+	private int thePosition;
 	private int inIgnorable;
 	private ParseNode theStepTarget;
 	private StepTargetType theStepTargetType;
+	private boolean isDebugging;
 	private int theLastBreakIndex;
+
 	private java.util.Set<ExpressoParserBreakpoint> theIndexBreakpoints;
+
 	private boolean hasWarnedAwtEventThread;
 
 	/** Creates a debug GUI using the config file in the standard location */
@@ -96,9 +124,10 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 		theIntoButton = new JButton(getIcon("arrow90down.png", 24, 24));
 		theOutButton = new JButton(getIcon("arrow90right.png", 24, 24));
 		theResumeButton = new JButton(RESUME_ICON);
+		theDebugButton = new JToggleButton(getIcon("bug.png", 24, 24));
 		theAddBreakpointLabel = new JLabel(getIcon("bluePlus.png", 16, 16));
-		theDebugPane = new JList<>(new DefaultListModel<OpObject>());
-		theDebugPane.setCellRenderer(new OpObjectRenderer());
+		theDebugPane = new JList<>(new DefaultListModel<MatcherObject>());
+		theDebugPane.setCellRenderer(new MatcherRenderer());
 		theBreakpointList = new JTable(0, 4);
 		theBreakpointList.getTableHeader().setReorderingAllowed(false);
 		theBreakpointList.getColumnModel().getColumn(0).setHeaderValue("");
@@ -129,9 +158,9 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 
 		theBreakpoints = new java.util.concurrent.CopyOnWriteArrayList<>();
 
-		JScrollPane mainTextScroll = new JScrollPane(theMainText);
-		mainTextScroll.setPreferredSize(new Dimension(100, 200));
-		add(mainTextScroll, BorderLayout.NORTH);
+		theMainTextScroll = new JScrollPane(theMainText);
+		theMainTextScroll.setPreferredSize(new Dimension(100, 200));
+		add(theMainTextScroll, BorderLayout.NORTH);
 		add(theMainSplit);
 		JScrollPane treeScroll = new JScrollPane(theParseTree);
 		treeScroll.setPreferredSize(new Dimension(450, 400));
@@ -142,6 +171,7 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 		buttonPanel.add(theIntoButton);
 		buttonPanel.add(theOutButton);
 		buttonPanel.add(theResumeButton);
+		buttonPanel.add(theDebugButton);
 		JPanel rightPanel = new JPanel(new BorderLayout());
 		theMainSplit.setRightComponent(rightPanel);
 		rightPanel.add(buttonPanel, BorderLayout.NORTH);
@@ -159,36 +189,20 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 
 		theOpNames = new ArrayList<>();
 
+		theMainSplit.addPropertyChangeListener(JSplitPane.LAST_DIVIDER_LOCATION_PROPERTY, e -> writeConfig());
+		theRightSplit.addPropertyChangeListener(JSplitPane.LAST_DIVIDER_LOCATION_PROPERTY, e -> writeConfig());
+
 		theAddBreakpointLabel.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mousePressed(MouseEvent e) {
 				addBreakpoint();
 			}
 		});
-		theOverButton.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				stepOver();
-			}
-		});
-		theIntoButton.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				stepInto();
-			}
-		});
-		theOutButton.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				stepOut();
-			}
-		});
-		theResumeButton.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				resume();
-			}
-		});
+		theOverButton.addActionListener(e -> stepOver());
+		theIntoButton.addActionListener(e -> stepInto());
+		theOutButton.addActionListener(e -> stepOut());
+		theResumeButton.addActionListener(e -> resume());
+		theDebugButton.addActionListener(e -> debug());
 
 		theLastBreakIndex = -1;
 		theIndexBreakpoints = new java.util.HashSet<>();
@@ -204,11 +218,24 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 
 	/** @return The parsed config file */
 	protected MutableConfig getConfig() {
-		try {
-			return new MutableConfig(null, PrismsConfig.fromXml(null, theConfigFile.toURI().toString()));
-		} catch(java.io.IOException e) {
-			e.printStackTrace();
-			return new MutableConfig("config");
+		if(theConfigFile.exists()) {
+			try {
+				return new MutableConfig(null, QommonsConfig.fromXml(theConfigFile.toURI().toString()));
+			} catch(java.io.IOException e) {
+				e.printStackTrace();
+				return new MutableConfig("config");
+			}
+		} else {
+			System.out.println("Configuration does not exist yet.  Creating at " + theConfigFile.getAbsolutePath());
+			MutableConfig ret = new MutableConfig("config");
+			try {
+				MutableConfig.writeAsXml(ret, new java.io.FileOutputStream(theConfigFile));
+			} catch(IOException e) {
+				System.err.println("Could not save config file for the debugger");
+				e.printStackTrace();
+				return new MutableConfig("config");
+			}
+			return ret;
 		}
 	}
 
@@ -227,26 +254,50 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 		return new ImageIcon(img);
 	}
 
+	private void readSizeConfig() {
+		MutableConfig config = getConfig();
+		Window window = getWindow();
+		if(window != null) {
+			window.setBounds(config.getInt("x", window.getX()), config.getInt("y", window.getY()), config.getInt("w", window.getWidth()),
+				config.getInt("h", window.getHeight()));
+		}
+		if(getWidth() > 0) {
+			theMainSplit.setDividerLocation(config.getFloat("main-split", .5f));
+			theRightSplit.setDividerLocation(config.getFloat("right-split", .5f));
+		}
+	}
+
 	private void readConfig() {
 		MutableConfig config = getConfig();
 		if(config.subConfig("breakpoints") != null) {
 			for(MutableConfig breakpointConfig : config.subConfig("breakpoints").subConfigs("breakpoint")) {
 				ExpressoParserBreakpoint breakpoint = new ExpressoParserBreakpoint();
-				breakpoint.setPreCursorText(breakpointConfig.get("pre") == null ? null : Pattern.compile(
-					".*" + breakpointConfig.get("pre"), Pattern.DOTALL));
-				breakpoint.setPostCursorText(breakpointConfig.get("post") == null ? null : Pattern.compile(breakpointConfig.get("post")
-					+ ".*", Pattern.DOTALL));
-				breakpoint.setOpName(breakpointConfig.get("operator"));
+				breakpoint.setPreCursorText(
+					breakpointConfig.get("pre") == null ? null : Pattern.compile(".*" + breakpointConfig.get("pre"), Pattern.DOTALL));
+				breakpoint.setPostCursorText(
+					breakpointConfig.get("post") == null ? null : Pattern.compile(breakpointConfig.get("post") + ".*", Pattern.DOTALL));
+				breakpoint.setMatcherName(breakpointConfig.get("operator"));
 				breakpoint.setEnabled(breakpointConfig.is("enabled", true));
 				theBreakpoints.add(breakpoint);
-				((javax.swing.table.DefaultTableModel) theBreakpointList.getModel()).addRow(new Object[] {breakpoint, breakpoint,
-						breakpoint, breakpoint});
+				((javax.swing.table.DefaultTableModel) theBreakpointList.getModel())
+				.addRow(new Object[] {breakpoint, breakpoint, breakpoint, breakpoint});
 			}
 		}
 	}
 
 	private void writeConfig() {
 		MutableConfig config = getConfig();
+		Window window = getWindow();
+		if(window != null) {
+			config.set("x", "" + window.getX());
+			config.set("y", "" + window.getY());
+			config.set("w", "" + window.getWidth());
+			config.set("h", "" + window.getHeight());
+		}
+		if(getWidth() > 0) {
+			config.set("main-split", "" + (theMainSplit.getDividerLocation() * 1.0f / theMainSplit.getWidth()));
+			config.set("right-split", "" + (theRightSplit.getDividerLocation() * 1.0f / theRightSplit.getHeight()));
+		}
 		MutableConfig breakpoints = config.subConfig("breakpoints");
 		if(breakpoints == null) {
 			breakpoints = new MutableConfig("breakpoints");
@@ -257,14 +308,21 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 		for(ExpressoParserBreakpoint bp : theBreakpoints) {
 			MutableConfig bpConfig = breakpoints.addSubConfig(new MutableConfig("breakpoint")
 				.set("pre", bp.getPreCursorText() == null ? null : bp.getPreCursorText().pattern().substring(2))
-				.set(
-					"post",
-					bp.getPostCursorText() == null ? null : bp.getPostCursorText().pattern()
-						.substring(0, bp.getPostCursorText().pattern().length() - 2)).set("enabled", "" + bp.isEnabled()));
-			if(bp.getOpName() != null)
-				bpConfig.set("operator", bp.getOpName());
+				.set("post",
+					bp.getPostCursorText() == null ? null
+						: bp.getPostCursorText().pattern().substring(0, bp.getPostCursorText().pattern().length() - 2))
+				.set("enabled", "" + bp.isEnabled()));
+			if(bp.getMatcherName() != null)
+				bpConfig.set("operator", bp.getMatcherName());
 		}
 		writeConfig(config);
+	}
+
+	private Window getWindow() {
+		Component c = this;
+		while(c != null && !(c instanceof Window))
+			c = c.getParent();
+		return (Window) c;
 	}
 
 	private void breakpointChanged(ExpressoParserBreakpoint breakpoint) {
@@ -286,33 +344,36 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 	private void addBreakpoint() {
 		ExpressoParserBreakpoint breakpoint = new ExpressoParserBreakpoint();
 		theBreakpoints.add(breakpoint);
-		((javax.swing.table.DefaultTableModel) theBreakpointList.getModel()).addRow(new Object[] {breakpoint, breakpoint, breakpoint,
-				breakpoint});
+		((javax.swing.table.DefaultTableModel) theBreakpointList.getModel())
+		.addRow(new Object[] {breakpoint, breakpoint, breakpoint, breakpoint});
 		writeConfig();
 	}
 
 	@Override
-	public void init(ExpressoParser<? super CharSequenceStream> parser) {
+	public void init(ExpressoParser<?> parser) {
 		theOpNames.clear();
-		for(PrismsConfig op : parser.getOperators())
-			theOpNames.add(op.get("name"));
+		for(ParseMatcher<?> op : parser.getComposed())
+			theOpNames.add(op.getName());
 		reset();
 	}
 
 	@Override
-	public void start(CharSequenceStream text) {
+	public void start(S text) {
+		theStream = text;
 	}
 
 	@Override
-	public void end(ParseMatch<? extends CharSequenceStream> [] matches) {
+	public void end(ParseMatch<? extends S>... matches) {
+		theStream = null;
 	}
 
 	@Override
-	public void fail(CharSequenceStream stream, ParseMatch<? extends CharSequenceStream> [] matches) {
+	public void fail(S stream, ParseMatch<? extends S> match) {
+		theStream = null;
 	}
 
 	@Override
-	public void preParse(CharSequenceStream stream, final org.expresso.parse.ParseMatcher<? super CharSequenceStream> matcher) {
+	public void preParse(S stream, final ParseMatcher<?> matcher) {
 		if(EventQueue.isDispatchThread()) {
 			if(!hasWarnedAwtEventThread) {
 				hasWarnedAwtEventThread = true;
@@ -321,11 +382,11 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 			return;
 		} else if(hasWarnedAwtEventThread)
 			hasWarnedAwtEventThread = false;
-		if(theLastBreakIndex != index) {
+		if(theLastBreakIndex != stream.getPosition()) {
 			theLastBreakIndex = -1;
 			theIndexBreakpoints.clear();
 		}
-		if(op.is("ignorable", false)) {
+		if(matcher.getTags().contains(ExpressoParser.IGNORABLE)) {
 			inIgnorable++;
 			return;
 		} else if(inIgnorable > 0)
@@ -334,45 +395,55 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 		if(theStepTarget != null && theStepTargetType == StepTargetType.CHILD && theStepTarget == theTreeModel.getCursor())
 			isOnStepTarget = true;
 
-		theTreeModel.startNew(op);
-		update(text, index, op, null);
+		safe(() -> theTreeModel.startNew(matcher));
+		int position = stream.getPosition();
+		update(position, matcher, null);
 
-		if(isSuspended || isOnStepTarget)
-			suspend(null);
-		else if(theStepTarget == null) {
-			CharSequence pre = text.subSequence(0, index);
-			CharSequence post = text.subSequence(index, text.length());
-			for(ExpressoParserBreakpoint breakpoint : theBreakpoints) {
-				if(!breakpoint.isEnabled() || theIndexBreakpoints.contains(breakpoint))
-					continue;
-				if(breakpoint.getPreCursorText() == null && breakpoint.getPostCursorText() == null && breakpoint.getOpName() == null)
-					continue;
-				if(breakpoint.getPreCursorText() != null && !breakpoint.getPreCursorText().matcher(pre).matches())
-					continue;
-				if(breakpoint.getPostCursorText() != null && !breakpoint.getPostCursorText().matcher(post).matches())
-					continue;
-				if(breakpoint.getOpName() != null && !breakpoint.getOpName().equals(op.get("name")))
-					continue;
-				theLastBreakIndex = index;
-				theIndexBreakpoints.add(breakpoint);
-				suspend(breakpoint);
-				break;
+		if(!isDebugging) {
+			if(isSuspended || isOnStepTarget)
+				suspend(null);
+			else if(theStepTarget == null) {
+				CharSequence pre = theStream.subSequence(0, position);
+				CharSequence post = theStream.subSequence(position, theStream.length());
+				for(ExpressoParserBreakpoint breakpoint : theBreakpoints) {
+					if(!breakpoint.isEnabled() || theIndexBreakpoints.contains(breakpoint))
+						continue;
+					if(breakpoint.getPreCursorText() == null && breakpoint.getPostCursorText() == null
+						&& breakpoint.getMatcherName() == null)
+						continue;
+					if(breakpoint.getPreCursorText() != null && !breakpoint.getPreCursorText().matcher(pre).matches())
+						continue;
+					if(breakpoint.getPostCursorText() != null && !breakpoint.getPostCursorText().matcher(post).matches())
+						continue;
+					if(breakpoint.getMatcherName() != null && !breakpoint.getMatcherName().equals(matcher.getName()))
+						continue;
+					theLastBreakIndex = position;
+					theIndexBreakpoints.add(breakpoint);
+					suspend(breakpoint);
+					break;
+				}
 			}
 		}
 	}
 
+	private void safe(Runnable run) {
+		try {
+			EventQueue.invokeAndWait(run);
+		} catch(InvocationTargetException | InterruptedException e) {
+			throw new IllegalStateException(e);
+		}
+	}
+
 	@Override
-	public void postParse(CharSequenceStream stream, org.expresso.parse.ParseMatcher<? super CharSequenceStream> op,
-		final ParseMatch<? extends CharSequenceStream> match) {
+	public void postParse(S stream, ParseMatcher<?> matcher, final ParseMatch<? extends S> match) {
 		if(EventQueue.isDispatchThread())
 			return;
-		if(op.getTags().contains(ExpressoParser.IGNORABLE)) {
+		if(matcher.getTags().contains(ExpressoParser.IGNORABLE)) {
 			inIgnorable--;
 			return;
-		} else if(inIgnorable > 0) {
+		} else if(inIgnorable > 0)
 			return;
-		}
-		if(op != theTreeModel.getCursor().theMatcher) {
+		if(matcher != theTreeModel.getCursor().theMatcher) {
 			System.out.println("Post-parse for an operator that was not pre-parsed or has already been post-parsed!");
 			return;
 		}
@@ -381,109 +452,106 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 		if(theStepTarget == theTreeModel.getCursor())
 			isOnStepTarget = true;
 
-		theTreeModel.finish(match);
-		update(stream, startIndex, op, match);
+		safe(() -> theTreeModel.finish(match));
+		update(stream.getPosition(), matcher, match);
 
-		if(isOnStepTarget)
+		if(isOnStepTarget && isDebugging)
 			suspend(null);
+		else if(!isSuspended && theStepTarget == null)
+			render();
 	}
 
 	@Override
-	public void matchDiscarded(final ParseMatch match) {
+	public void matchDiscarded(final ParseMatch<? extends S> match) {
 		if(EventQueue.isDispatchThread())
 			return;
-		theTreeModel.matchDiscarded(match);
+		safe(() -> theTreeModel.matchDiscarded(match));
 	}
 
 	@Override
-	public void usedCache(final ParseMatch match) {
+	public void usedCache(final ParseMatch<? extends S> match) {
 		if(match == null)
 			return;
 		if(EventQueue.isDispatchThread())
 			return;
-		theTreeModel.add(match);
+		safe(() -> theTreeModel.add(match));
 	}
 
 	private void reset() {
-		theText = null;
-		theIndex = 0;
+		theStream = null;
+		thePosition = 0;
 	}
 
-	private void update(CharSequenceStream stream, int index, org.expresso.parse.ParseMatcher<? super CharSequenceStream> op,
-		ParseMatch<? extends CharSequenceStream> match) {
-		theText = stream;
-		theIndex = index;
+	private void update(int position, ParseMatcher<?> op, ParseMatch<? extends S> match) {
+		thePosition = position;
 	}
-
-	private boolean firstRender = true;
 
 	private void render() {
-		if(firstRender) {
-			theMainSplit.setDividerLocation(.5);
-			theRightSplit.setDividerLocation(.5);
-			firstRender = false;
-		}
-		if(isPopupWhenHit) {
-			Component parent = getParent();
-			while(parent != null && !(parent instanceof java.awt.Window))
-				parent = parent.getParent();
-			if(parent != null)
-				((java.awt.Window) parent).setVisible(true);
+		theTreeModel.display();
+		if(isPopupWhenHit && isSuspended) {
+			Window window = getWindow();
+			if(window != null)
+				window.setVisible(true);
 		}
 
-		theTreeModel.display();
-		StringBuilder sb = new StringBuilder("<html>");
-		for(int c = 0; c < theIndex; c++) {
-			char ch = theText.charAt(c);
-			if(ch == '<')
-				sb.append("&lt;");
-			else if(ch == '\n')
-				sb.append("<br>");
-			else if(ch == '\r') {
-			} else if(ch == '\t')
-				sb.append("&nbsp;&nbsp;&nbsp;&nbsp;");
-			else
-				sb.append(ch);
-		}
-		sb.append("<b><font color=\"red\" size=\"4\">|</font></b>");
-		for(int c = theIndex; c < theText.length(); c++) {
-			char ch = theText.charAt(c);
-			if(ch == '<')
-				sb.append("&lt;");
-			else if(ch == '\n')
-				sb.append("<br>");
-			else if(ch == '\r') {
-			} else if(ch == '\t')
-				sb.append("&nbsp;&nbsp;&nbsp;&nbsp;");
-			else
-				sb.append(ch);
-		}
-		sb.append("</html>");
-		theMainText.setText(sb.toString());
+		EventQueue.invokeLater(() -> {
+			if(theStream == null)
+				theMainText.setText("");
+			else {
+				StringBuilder sb = new StringBuilder("<html>");
+				for(int c = 0; c < thePosition; c++) {
+					char ch = theStream.charAt(c);
+					if(ch == '<')
+						sb.append("&lt;");
+					else if(ch == '\n')
+						sb.append("<br>");
+					else if(ch == '\r') {} else if(ch == '\t')
+						sb.append("&nbsp;&nbsp;&nbsp;&nbsp;");
+					else
+						sb.append(ch);
+				}
+				sb.append("<b><font color=\"red\" size=\"4\">|</font></b>");
+				for(int c = thePosition; c < theStream.length(); c++) {
+					char ch = theStream.charAt(c);
+					if(ch == '<')
+						sb.append("&lt;");
+					else if(ch == '\n')
+						sb.append("<br>");
+					else if(ch == '\r') {} else if(ch == '\t')
+						sb.append("&nbsp;&nbsp;&nbsp;&nbsp;");
+					else
+						sb.append(ch);
+				}
+				sb.append("</html>");
+				int vScroll = theMainTextScroll.getVerticalScrollBar().getValue();
+				int hScroll = theMainTextScroll.getHorizontalScrollBar().getValue();
+				theMainText.setText(sb.toString());
+				EventQueue.invokeLater(() -> {
+					theMainTextScroll.getVerticalScrollBar().setValue(vScroll);
+					theMainTextScroll.getHorizontalScrollBar().setValue(hScroll);
+				});
+			}
+		});
 	}
 
 	private void setDebugOperator(ParseNode op) {
-		DefaultListModel<OpObject> model = (DefaultListModel<OpObject>) theDebugPane.getModel();
+		DefaultListModel<MatcherObject> model = (DefaultListModel<MatcherObject>) theDebugPane.getModel();
 		model.removeAllElements();
-		while(op != null && !op.theMatcher.getName().equals("operator") && !op.theMatcher.getName().equals("entity")) {
+		while(op != null && op.theParent != null && !(op.theParent.theMatcher instanceof ReferenceMatcher))
 			op = op.theParent;
-		}
-		if(op != null) {
+		if(op != null)
 			addToModel(model, op.theMatcher, 0);
-		}
 	}
 
-	private void addToModel(DefaultListModel<OpObject> model, ParseMatcher<? super CharSequenceStream> op, int indent) {
-		model.addElement(new OpObject(op, indent, false));
+	private void addToModel(DefaultListModel<MatcherObject> model, ParseMatcher<?> op, int indent) {
+		model.addElement(new MatcherObject(op, indent, false));
 		boolean needsEnd = false;
-		for(PrismsConfig sub : op.subConfigs()) {
-			if(!PrismsParser.NON_OP_CONFIGS.contains(sub.getName())) {
-				needsEnd = true;
-				addToModel(model, sub, indent + 1);
-			}
+		for(ParseMatcher<?> sub : op.getComposed()) {
+			needsEnd = true;
+			addToModel(model, sub, indent + 1);
 		}
 		if(needsEnd)
-			model.addElement(new OpObject(op, indent, true));
+			model.addElement(new MatcherObject(op, indent, true));
 	}
 
 	private void suspend(ExpressoParserBreakpoint breakpoint) {
@@ -492,16 +560,15 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 		setGuiEnabled(true);
 		isHolding = true;
 		try {
-			EventQueue.invokeLater(new Runnable() {
-				@Override
-				public void run() {
-					render();
-				}
-			});
+			EventQueue.invokeLater(() -> render());
 			while(isSuspended) {
-				try {
-					Thread.sleep(50);
-				} catch(InterruptedException e) {
+				if(isDebugging) {
+					resume();
+					org.qommons.BreakpointHere.breakpoint();
+				} else {
+					try {
+						Thread.sleep(50);
+					} catch(InterruptedException e) {}
 				}
 			}
 		} finally {
@@ -510,8 +577,8 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 	}
 
 	private void stepOver() {
-		ParseNode target = theParseTree.getSelectionPath() == null ? theTreeModel.getCursor() : (ParseNode) theParseTree.getSelectionPath()
-			.getLastPathComponent();
+		ParseNode target = theParseTree.getSelectionPath() == null ? theTreeModel.getCursor()
+			: (ParseNode) theParseTree.getSelectionPath().getLastPathComponent();
 		if(target == null)
 			throw new IllegalStateException("No selection or cursor!");
 		theStepTarget = target.theParent;
@@ -521,8 +588,8 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 	}
 
 	private void stepInto() {
-		ParseNode target = theParseTree.getSelectionPath() == null ? theTreeModel.getCursor() : (ParseNode) theParseTree.getSelectionPath()
-			.getLastPathComponent();
+		ParseNode target = theParseTree.getSelectionPath() == null ? theTreeModel.getCursor()
+			: (ParseNode) theParseTree.getSelectionPath().getLastPathComponent();
 		if(target == null)
 			throw new IllegalStateException("No selection or cursor!");
 		theStepTarget = target;
@@ -532,8 +599,8 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 	}
 
 	private void stepOut() {
-		ParseNode target = theParseTree.getSelectionPath() == null ? theTreeModel.getCursor() : (ParseNode) theParseTree.getSelectionPath()
-			.getLastPathComponent();
+		ParseNode target = theParseTree.getSelectionPath() == null ? theTreeModel.getCursor()
+			: (ParseNode) theParseTree.getSelectionPath().getLastPathComponent();
 		if(target == null)
 			throw new IllegalStateException("No selection or cursor!");
 		theStepTarget = target;
@@ -555,6 +622,10 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 		}
 	}
 
+	private void debug() {
+		isDebugging = theDebugButton.isSelected();
+	}
+
 	private void setGuiEnabled(boolean enabled) {
 		if(enabled) {
 			ParseNode cursor = theTreeModel.getCursor();
@@ -571,13 +642,10 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 		}
 	}
 
-	private boolean isDescendable(ParseMatcher<? super CharSequenceStream> op) {
-		if(op.getName().equals("op"))
+	private boolean isDescendable(ParseMatcher<?> op) {
+		if(op instanceof ReferenceMatcher)
 			return true;
-		for(PrismsConfig child : op.subConfigs())
-			if(!PrismsParser.NON_OP_CONFIGS.contains(child.getName()))
-				return true;
-		return false;
+		return !op.getComposed().isEmpty();
 	}
 
 	/**
@@ -586,11 +654,23 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 	 * @param debugger The debugger to frame
 	 * @return The frame containing the given debugger
 	 */
-	public static JFrame getDebuggerFrame(final ExpressoParserDebugGUI debugger) {
+	public static JFrame getDebuggerFrame(final ExpressoParserDebugGUI<?> debugger) {
 		JFrame ret = new JFrame("Prisms Parser Debug");
 		ret.setContentPane(debugger);
 		ret.pack();
 		ret.setLocationRelativeTo(null);
+		debugger.readSizeConfig();
+		ret.addComponentListener(new ComponentAdapter() {
+			@Override
+			public void componentResized(ComponentEvent e) {
+				debugger.writeConfig();
+			}
+
+			@Override
+			public void componentMoved(ComponentEvent e) {
+				debugger.writeConfig();
+			}
+		});
 		ret.addWindowListener(new java.awt.event.WindowAdapter() {
 			@Override
 			public void windowClosing(WindowEvent e) {
@@ -614,11 +694,11 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 			System.err.println("Could not install system L&F");
 			e.printStackTrace();
 		}
-		ExpressoParserDebugGUI debugger;
+		ExpressoParserDebugGUI<CharSequenceStream> debugger;
 		if(args.length > 0)
-			debugger = new ExpressoParserDebugGUI(new File(args[0]));
+			debugger = new ExpressoParserDebugGUI<>(new File(args[0]));
 		else
-			debugger = new ExpressoParserDebugGUI();
+			debugger = new ExpressoParserDebugGUI<>();
 		JFrame frame = getDebuggerFrame(debugger);
 		frame.addWindowListener(new java.awt.event.WindowAdapter() {
 			@Override
@@ -626,6 +706,7 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 				System.exit(0);
 			}
 		});
+
 		frame.setVisible(true);
 	}
 
@@ -648,7 +729,7 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 				refresh();
 		}
 
-		void startNew(ParseMatcher<? super CharSequenceStream> op) {
+		void startNew(ParseMatcher<?> op) {
 			ParseNode newNode = new ParseNode(theCursor, op);
 			boolean newRoot = theCursor == null;
 			if(newRoot)
@@ -660,21 +741,20 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 			isDirty = true;
 		}
 
-		void finish(ParseMatch match) {
+		void finish(ParseMatch<? extends S> match) {
 			if(theCursor == null)
 				return;
 			theCursor.theMatch = match;
 			ParseNode changed = theCursor;
 			theCursor = theCursor.theParent;
 			int childIdx = theCursor == null ? 0 : theCursor.theChildren.indexOf(changed);
-			if(match == null && theCursor != null) {
+			if(match == null && theCursor != null)
 				theCursor.theChildren.remove(childIdx);
-			}
 
 			isDirty = true;
 		}
 
-		void matchDiscarded(ParseMatch match) {
+		void matchDiscarded(ParseMatch<? extends S> match) {
 			if(theCursor == null)
 				return;
 			ParseNode removed = null;
@@ -690,7 +770,7 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 			isDirty = true;
 		}
 
-		void add(ParseMatch match) {
+		void add(ParseMatch<? extends S> match) {
 			ParseNode newNode = new ParseNode(theCursor, match);
 			boolean newRoot = theCursor == null;
 			if(newRoot)
@@ -726,7 +806,7 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 		@Override
 		public Object getRoot() {
 			if(theRoot == null)
-				return new ParseNode(null, new MutableConfig("(empty)"));
+				return new ParseNode(null, new EmptyMatcher());
 			return theRoot;
 		}
 
@@ -765,32 +845,65 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 		}
 	}
 
-	private static class ParseNode {
+	private static class EmptyMatcher implements ParseMatcher<BranchableStream<?, ?>> {
+		@Override
+		public String getName() {
+			return "(empty)";
+		}
+
+		@Override
+		public String getTypeName() {
+			return "empty";
+		}
+
+		@Override
+		public Map<String, String> getAttributes() {
+			return java.util.Collections.EMPTY_MAP;
+		}
+
+		@Override
+		public Set<String> getTags() {
+			return java.util.Collections.EMPTY_SET;
+		}
+
+		@Override
+		public List<ParseMatcher<? super BranchableStream<?, ?>>> getComposed() {
+			return java.util.Collections.EMPTY_LIST;
+		}
+
+		@Override
+		public <SS extends BranchableStream<?, ?>> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
+			throws IOException {
+			throw new IllegalStateException("This placeholder does not do any parsing");
+		}
+	}
+
+	private class ParseNode {
 		final ParseNode theParent;
 
-		org.expresso.parse.ParseMatcher<? super CharSequenceStream> theMatcher;
+		ParseMatcher<?> theMatcher;
 
-		ParseMatch<? extends CharSequenceStream> theMatch;
+		ParseMatch<? extends S> theMatch;
 
 		final List<ParseNode> theChildren = new ArrayList<>();
 
 		private final String theString;
 
-		ParseNode(ParseNode parent, org.expresso.parse.ParseMatcher<? super CharSequenceStream> matcher) {
+		ParseNode(ParseNode parent, ParseMatcher<?> matcher) {
 			theParent = parent;
 			theMatcher = matcher;
 			StringBuilder str = new StringBuilder();
-			str.append("<").append(matcher.getName());
-			for(PrismsConfig sub : matcher.subConfigs()) {
-				if(sub.getValue() != null && sub.subConfigs().length == 0)
-					str.append(' ').append(sub.getName()).append("=\"").append(sub.getValue()).append('"');
-			}
+			str.append("<").append(matcher.getTypeName());
+			if(!(matcher instanceof WhitespaceMatcher) && matcher.getName() != null)
+				str.append(" name=\"").append(matcher.getName()).append('"');
+			for(Map.Entry<String, String> attr : matcher.getAttributes().entrySet())
+				str.append(' ').append(attr.getKey()).append("=\"").append(attr.getValue()).append('"');
 			str.append(">");
 			theString = str.toString();
 		}
 
-		ParseNode(ParseNode parent, ParseMatch<? extends CharSequenceStream> match) {
-			this(parent, (ParseMatcher<? super CharSequenceStream>) match.getMatcher());
+		ParseNode(ParseNode parent, ParseMatch<? extends S> match) {
+			this(parent, match.getMatcher());
 			theMatch = match;
 		}
 
@@ -803,14 +916,14 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 		}
 	}
 
-	private static class OpObject {
-		final org.expresso.parse.ParseMatcher<? super CharSequenceStream> theMatcher;
+	private static class MatcherObject {
+		final ParseMatcher<?> theMatcher;
 
 		final int theIndent;
 
 		final boolean isTerminal;
 
-		OpObject(org.expresso.parse.ParseMatcher<? super CharSequenceStream> op, int indent, boolean terminal) {
+		MatcherObject(ParseMatcher<?> op, int indent, boolean terminal) {
 			theMatcher = op;
 			theIndent = indent;
 			isTerminal = terminal;
@@ -819,7 +932,8 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 
 	private static class BreakpointEnabledRenderer extends JCheckBox implements TableCellRenderer {
 		@Override
-		public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+		public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row,
+			int column) {
 			if(value instanceof ExpressoParserBreakpoint)
 				setSelected(((ExpressoParserBreakpoint) value).isEnabled());
 			else if(value instanceof Boolean)
@@ -857,7 +971,8 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 
 	private static class BreakpointTextRenderer extends JLabel implements TableCellRenderer {
 		@Override
-		public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+		public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row,
+			int column) {
 			ExpressoParserBreakpoint breakpoint = (ExpressoParserBreakpoint) value;
 			String pre = breakpoint.getPreCursorText() == null ? null : breakpoint.getPreCursorText().pattern();
 			String post = breakpoint.getPostCursorText() == null ? null : breakpoint.getPostCursorText().pattern();
@@ -1024,16 +1139,18 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 		private final String NONE = "(any)";
 
 		private Color theBG = getBackground();
+
 		private Color theFG = getForeground();
 
 		@Override
-		public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+		public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row,
+			int column) {
 			ExpressoParserBreakpoint breakpoint = (ExpressoParserBreakpoint) value;
 			super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-			if(breakpoint.getOpName() == null)
+			if(breakpoint.getMatcherName() == null)
 				setText(NONE);
 			else
-				setText("<" + breakpoint.getOpName() + ">");
+				setText(breakpoint.getMatcherName());
 			setBackground(theBG);
 			setForeground(theFG);
 			return this;
@@ -1058,8 +1175,8 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 			model.removeAllElements();
 			model.addElement(NONE);
 			for(String opName : theOpNames)
-				model.addElement("<" + opName + ">");
-			model.setSelectedItem(theEditingBreakpoint.getOpName() == null ? NONE : "<" + theEditingBreakpoint.getOpName() + ">");
+				model.addElement(opName);
+			model.setSelectedItem(theEditingBreakpoint.getMatcherName() == null ? NONE : theEditingBreakpoint.getMatcherName());
 			return ret;
 		}
 
@@ -1067,9 +1184,9 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 		public boolean stopCellEditing() {
 			String opName = (String) ((JComboBox<String>) getComponent()).getSelectedItem();
 			if(opName == null || opName.equals(NONE))
-				theEditingBreakpoint.setOpName(null);
+				theEditingBreakpoint.setMatcherName(null);
 			else
-				theEditingBreakpoint.setOpName(opName.substring(1, opName.length() - 1));
+				theEditingBreakpoint.setMatcherName(opName);
 			breakpointChanged(theEditingBreakpoint);
 			return super.stopCellEditing();
 		}
@@ -1092,7 +1209,8 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 		}
 
 		@Override
-		public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+		public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row,
+			int column) {
 			super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
 			setText("");
 			setIcon(ICON);
@@ -1157,41 +1275,38 @@ public class ExpressoParserDebugGUI extends JPanel implements org.expresso.parse
 		}
 	}
 
-	private class OpObjectRenderer extends JPanel implements javax.swing.ListCellRenderer<OpObject> {
+	private class MatcherRenderer extends JPanel implements javax.swing.ListCellRenderer<MatcherObject> {
 		private JLabel theLabel;
 
-		OpObjectRenderer() {
+		MatcherRenderer() {
 			setLayout(new BoxLayout(this, BoxLayout.X_AXIS));
 			theLabel = new JLabel();
 			add(theLabel);
 		}
 
 		@Override
-		public Component getListCellRendererComponent(JList<? extends OpObject> list, OpObject value, int index, boolean isSelected,
-			boolean cellHasFocus) {
+		public Component getListCellRendererComponent(JList<? extends MatcherObject> list, MatcherObject value, int index,
+			boolean isSelected, boolean cellHasFocus) {
 			StringBuilder text = new StringBuilder("<html>");
 			for(int i = 0; i < value.theIndent; i++)
 				text.append("&nbsp;&nbsp;&nbsp;&nbsp;");
 			text.append("<font color=\"blue\">&lt;</font><font color=\"red\">");
 			if(value.isTerminal)
 				text.append('/');
-			text.append(value.theMatcher.getName()).append("</font>");
+			text.append(value.theMatcher.getTypeName()).append("</font>");
 			if(!value.isTerminal) {
-				boolean needsEnding = true;
-				for(PrismsConfig sub : value.theMatcher.subConfigs()) {
-					if(!PrismsParser.NON_OP_CONFIGS.contains(sub.getName())) {
-						needsEnding = false;
-						continue;
-					}
-					text.append(" <font color=\"red\">").append(sub.getName()).append("</font><font color=\"blue\">=\"</font>")
-					.append(sub.getValue()).append("<font color=\"blue\">\"</font>");
-				}
-				if(value.theMatcher.getValue() != null && value.theMatcher.getValue().length() > 0) {
+				if(!(value.theMatcher instanceof WhitespaceMatcher) && value.theMatcher.getName() != null)
+					text.append(" name=\"").append(value.theMatcher.getName()).append('"');
+				for(Map.Entry<String, String> attr : value.theMatcher.getAttributes().entrySet())
+					text.append(' ').append(attr.getKey()).append("=\"").append(attr.getValue()).append('"');
+				boolean needsEnding = value.theMatcher.getComposed().isEmpty();
+				if(value.theMatcher instanceof org.expresso.parse.impl.SimpleValueMatcher) {
 					text.append("<font color=\"blue\">&gt;</font>");
-					text.append(value.theMatcher.getValue().replaceAll("<", "&amp;lt;").replaceAll(">", "&amp;gt;"));
+					text.append(((org.expresso.parse.impl.SimpleValueMatcher<?>) value.theMatcher).getValueString()
+						.replaceAll("<", "&amp;lt;").replaceAll(">", "&amp;gt;"));
 					if(needsEnding) {
 						text.append("<font color=\"blue\">&lt;/</font><font color=\"red\">");
-						text.append(value.theMatcher.getName()).append("</font>");
+						text.append(value.theMatcher.getTypeName()).append("</font>");
 					}
 				} else if(needsEnding)
 					text.append(" <font color=\"blue\">/</font>");

@@ -19,6 +19,16 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	public static final String WHITE_SPACE = "white-space";
 
 	@Override
+	default String getTypeName() {
+		return "parser";
+	}
+
+	@Override
+	default Map<String, String> getAttributes() {
+		return Collections.EMPTY_MAP;
+	}
+
+	@Override
 	default Set<String> getExternalTypeDependencies() {
 		return Collections.EMPTY_SET; // A parser is typically self-contained
 	}

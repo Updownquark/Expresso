@@ -3,6 +3,7 @@ package org.expresso.parse.impl;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.expresso.parse.*;
@@ -16,6 +17,16 @@ public class SequenceMatcher<S extends BranchableStream<?, ?>> extends ComposedM
 	/** @see ComposedMatcher#ComposedMatcher(String, Set) */
 	protected SequenceMatcher(String name, Set<String> tags) {
 		super(name, tags);
+	}
+
+	@Override
+	public String getTypeName() {
+		return "sequence";
+	}
+
+	@Override
+	public Map<String, String> getAttributes() {
+		return java.util.Collections.EMPTY_MAP;
 	}
 
 	@Override

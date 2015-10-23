@@ -1,5 +1,6 @@
 package org.expresso.parse.impl;
 
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -18,6 +19,16 @@ public class TextLiteralMatcher<S extends CharSequenceStream> extends LiteralMat
 	}
 
 	@Override
+	public String getTypeName() {
+		return "literal";
+	}
+
+	@Override
+	public Map<String, String> getAttributes() {
+		return java.util.Collections.EMPTY_MAP;
+	}
+
+	@Override
 	protected int getLength() {
 		return getValue().length;
 	}
@@ -27,6 +38,11 @@ public class TextLiteralMatcher<S extends CharSequenceStream> extends LiteralMat
 		int i = 0;
 		for(; i < getValue().length && getValue()[i] == stream.charAt(i); i++) {}
 		return i == getValue().length;
+	}
+
+	@Override
+	public String getValueString() {
+		return new String(getValue());
 	}
 
 	@Override

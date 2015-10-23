@@ -350,7 +350,7 @@
 		<literal>&gt;</literal>
 	</sequence>
 	<sequence name="generic-type" priority="998" default="false" tag="type">
-		<ref type="type" name="base" />
+		<ref type="basic-type" name="base" />
 		<ref type="type-parameters" name="parameters" />
 	</sequence>
 

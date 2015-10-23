@@ -2,6 +2,8 @@ package org.expresso.parse.impl;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.expresso.parse.ExpressoParser;
@@ -24,6 +26,16 @@ public class WhitespaceMatcher<S extends CharSequenceStream> implements ParseMat
 	}
 
 	@Override
+	public String getTypeName() {
+		return "whitespace";
+	}
+
+	@Override
+	public Map<String, String> getAttributes() {
+		return Collections.EMPTY_MAP;
+	}
+
+	@Override
 	public String getName() {
 		return ExpressoParser.WHITE_SPACE;
 	}
@@ -34,8 +46,8 @@ public class WhitespaceMatcher<S extends CharSequenceStream> implements ParseMat
 	}
 
 	@Override
-	public Set<String> getExternalTypeDependencies() {
-		return Collections.EMPTY_SET;
+	public List<ParseMatcher<? super S>> getComposed() {
+		return Collections.EMPTY_LIST;
 	}
 
 	@Override

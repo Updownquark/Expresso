@@ -1,6 +1,8 @@
 package org.expresso.parse;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -12,11 +14,25 @@ public interface ParseMatcher<S extends BranchableStream<?, ?>> {
 	/** @return The name of this matcher */
 	String getName();
 
+	/** @return A representation of this matcher's type */
+	String getTypeName();
+
+	/** @return Attributes that distinguish this matcher from others of its type */
+	Map<String, String> getAttributes();
+
 	/** @return The set of tags that may be used to refer to this matcher in a parser */
 	Set<String> getTags();
 
 	/** @return The set of type/tag names that this matcher refers to and must be supplied by the parser */
-	Set<String> getExternalTypeDependencies();
+	default Set<String> getExternalTypeDependencies() {
+		Set<String> ret = new java.util.LinkedHashSet<>();
+		for(ParseMatcher<? super S> sub : getComposed())
+			ret.addAll(sub.getExternalTypeDependencies());
+		return java.util.Collections.unmodifiableSet(ret);
+	}
+
+	/** @return The sub-matchers that this matcher uses to parse content */
+	List<ParseMatcher<? super S>> getComposed();
 
 	/**
 	 * Parses this matcher's content from the beginning of stream, advancing the stream past the content

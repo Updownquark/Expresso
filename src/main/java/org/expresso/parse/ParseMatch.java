@@ -198,7 +198,7 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 			if(getError() == null && match.getError() != null)
 				return true;
 		}
-		return len2 > len1;
+		return len1 > len2;
 	}
 
 	/** @return The amount of non-trivial content in this match up to the first error or incompleteness */

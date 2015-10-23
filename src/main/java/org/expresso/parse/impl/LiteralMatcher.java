@@ -48,4 +48,9 @@ public abstract class LiteralMatcher<C, S extends BranchableStream<?, ? super C>
 	 * @return Whether the given stream starts with this matcher's value
 	 */
 	protected abstract boolean startsWithValue(S stream);
+
+	@Override
+	public String getValueString() {
+		return theValue.toString();
+	}
 }

@@ -5,10 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import org.expresso.parse.BranchableStream;
-import org.expresso.parse.ExpressoParser;
-import org.expresso.parse.ParseMatch;
-import org.expresso.parse.ParseSession;
+import org.expresso.parse.*;
 
 /**
  * Parses raw text out of a file. Subclasses of this type are inspecting individual characters and not delegating any of their parsing to
@@ -23,9 +20,12 @@ public abstract class SimpleValueMatcher<S extends BranchableStream<?, ?>> exten
 	}
 
 	@Override
-	public Set<String> getExternalTypeDependencies() {
-		return java.util.Collections.EMPTY_SET;
+	public List<ParseMatcher<? super S>> getComposed() {
+		return java.util.Collections.EMPTY_LIST;
 	}
+
+	/** @return A string representation of the value this matcher is looking for */
+	public abstract String getValueString();
 
 	@Override
 	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {

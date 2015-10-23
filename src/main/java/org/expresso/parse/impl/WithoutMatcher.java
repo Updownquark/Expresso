@@ -1,10 +1,7 @@
 package org.expresso.parse.impl;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.*;
 
 import org.expresso.parse.*;
 
@@ -20,6 +17,20 @@ public class WithoutMatcher<S extends BranchableStream<?, ?>> extends SequenceMa
 	public WithoutMatcher(String... types) {
 		super(null, Collections.EMPTY_SET);
 		theExcludedTypes = Collections.unmodifiableSet(new LinkedHashSet<>(Arrays.asList(types)));
+	}
+
+	@Override
+	public String getTypeName() {
+		return "without";
+	}
+
+	@Override
+	public Map<String, String> getAttributes() {
+		LinkedHashMap<String, String> ret = new LinkedHashMap<>();
+		String typeStr = theExcludedTypes.toString();
+		typeStr = typeStr.substring(1, typeStr.length() - 1);
+		ret.put("type", typeStr);
+		return ret;
 	}
 
 	@Override
