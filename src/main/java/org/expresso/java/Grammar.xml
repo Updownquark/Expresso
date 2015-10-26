@@ -407,7 +407,7 @@
 			<literal>}</literal>
 		</option>
 	</sequence>
-	<sequence name="class-declaration" tag="declaration">
+	<sequence name="class-declaration" default="false" tag="declaration">
 		<repeat>
 			<ref type="qualifier" name="qualifier" />
 		</repeat>
