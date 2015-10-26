@@ -53,7 +53,7 @@ public class DefaultGrammarParser {
 		org.qommons.io.XmlUtils.parseTopLevelElements(xml, element -> {
 			String priStr = element.getAttributeValue("priority");
 			double priority = priStr == null ? 0 : Double.parseDouble(priStr);
-			PrioritizedMatcher matcher = new PrioritizedMatcher(getMatcher(element), priority,
+			PrioritizedMatcher matcher = new PrioritizedMatcher(getMatcher(element, true), priority,
 				!"false".equalsIgnoreCase(element.getAttributeValue("default")));
 			insert(matcher, ret);
 		});
@@ -75,9 +75,10 @@ public class DefaultGrammarParser {
 	 * Creates and configures a matcher from XML based on the default grammar schema
 	 *
 	 * @param element The XML element representing the matcher
+	 * @param topLevel Whether the element represents a matcher to be added directly to a parser
 	 * @return The configured matcher represented by the XML element
 	 */
-	public static ParseMatcher<CharSequenceStream> getMatcher(Element element) {
+	public static ParseMatcher<CharSequenceStream> getMatcher(Element element, boolean topLevel) {
 		String name = element.getAttributeValue("name");
 		String tagStr = element.getAttributeValue("tag");
 		Set<String> tags = tagStr == null ? Collections.EMPTY_SET
@@ -90,6 +91,20 @@ public class DefaultGrammarParser {
 		attrs.remove("priority");
 
 		// Check some constraints
+		if(topLevel) {
+			switch (element.getName()) {
+			case "whitespace":
+			case "ref":
+			case "forbid":
+			case "option":
+				throw new IllegalArgumentException(element.getName() + " may not be used as a top-level matcher");
+			case "repeat":
+				if(!attrs.contains("min") || Integer.parseInt(element.getAttributeValue("min")) == 0)
+					throw new IllegalArgumentException(
+						element.getName() + " may not be used as a top-level matcher unless a non-zero min attribute is given");
+			}
+		}
+
 		switch (element.getName()) {
 		case "literal":
 		case "pattern":
@@ -155,6 +170,9 @@ public class DefaultGrammarParser {
 				}
 			} else
 				max = Integer.MAX_VALUE;
+			if(max < min)
+				throw new IllegalArgumentException(
+					"Maximum (" + max + ") is less than minimum (" + min + ") for a " + element.getName() + " matcher");
 			break;
 		}
 		if(!attrs.isEmpty())
@@ -164,7 +182,7 @@ public class DefaultGrammarParser {
 
 		List<ParseMatcher<CharSequenceStream>> children = new ArrayList<>();
 		for(Element child : element.getChildren())
-			children.add(getMatcher(child));
+			children.add(getMatcher(child, false));
 		children = Collections.unmodifiableList(children);
 
 		switch (element.getName()) {
@@ -175,7 +193,16 @@ public class DefaultGrammarParser {
 		case "whitespace":
 			return new WhitespaceMatcher<>();
 		case "ref":
-			return new ReferenceMatcher<>(name, tags, typeStr == null ? new String[0] : typeStr.split(","));
+			Set<String> include = new java.util.LinkedHashSet<>();
+			Set<String> exclude = new java.util.LinkedHashSet<>();
+			for(String type : typeStr.split(",")) {
+				type = type.trim();
+				if(type.startsWith("!"))
+					exclude.add(type.substring(1));
+				else
+					include.add(type);
+			}
+			return new ReferenceMatcher<>(name, tags, include, exclude);
 		case "up-to":
 			return new UpToMatcher<>(name, tags, children.get(0));
 		case "forbid":

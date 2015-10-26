@@ -34,7 +34,20 @@ public class WithMatcher<S extends BranchableStream<?, ?>> extends SequenceMatch
 	}
 
 	@Override
+	public Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
+		return doInSession(session, () -> super.getPotentialBeginningTypeReferences(parser, session));
+	}
+
+	@Override
 	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
+		return doInSession(session, () -> super.match(stream, parser, session));
+	}
+
+	private interface ExceptionableAction<T, E extends Throwable> {
+		T run() throws E;
+	}
+
+	private <T, E extends Throwable> T doInSession(ParseSession session, ExceptionableAction<T, E> run) throws E {
 		Set<String> toReExclude = new java.util.LinkedHashSet<>();
 		for(String type : theIncludedTypes) {
 			if(session.includeType(type))
@@ -42,10 +55,12 @@ public class WithMatcher<S extends BranchableStream<?, ?>> extends SequenceMatch
 			else
 				System.err.println("Type " + type + " was not excluded");
 		}
-		ParseMatch<SS> ret = super.match(stream, parser, session);
-		for(String type : toReExclude)
-			session.excludeType(type);
-		return ret;
+		try {
+			return run.run();
+		} finally {
+			for(String type : toReExclude)
+				session.excludeType(type);
+		}
 	}
 
 	@Override

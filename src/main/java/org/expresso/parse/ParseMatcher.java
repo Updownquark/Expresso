@@ -31,6 +31,26 @@ public interface ParseMatcher<S extends BranchableStream<?, ?>> {
 		return java.util.Collections.unmodifiableSet(ret);
 	}
 
+	/**
+	 * @param parser The parser to parse the stream
+	 * @param session The parsing session
+	 * @return The names of all matchers that may match the first deep component of this matcher
+	 */
+	Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session);
+
+	/**
+	 * @param types The types to check
+	 * @return Whether this matcher's name or one of its tags is contained in the given set of type names
+	 */
+	default boolean matchesType(Set<String> types) {
+		if(getName() != null && types.contains(getName()))
+			return true;
+		for(String tag : getTags())
+			if(types.contains(tag))
+				return true;
+		return false;
+	}
+
 	/** @return The sub-matchers that this matcher uses to parse content */
 	List<ParseMatcher<? super S>> getComposed();
 

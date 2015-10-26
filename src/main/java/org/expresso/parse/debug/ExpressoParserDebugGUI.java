@@ -5,11 +5,8 @@ import java.awt.event.*;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.EventObject;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -858,17 +855,22 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 
 		@Override
 		public Map<String, String> getAttributes() {
-			return java.util.Collections.EMPTY_MAP;
+			return Collections.EMPTY_MAP;
 		}
 
 		@Override
 		public Set<String> getTags() {
-			return java.util.Collections.EMPTY_SET;
+			return Collections.EMPTY_SET;
+		}
+
+		@Override
+		public Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
+			return Collections.EMPTY_SET;
 		}
 
 		@Override
 		public List<ParseMatcher<? super BranchableStream<?, ?>>> getComposed() {
-			return java.util.Collections.EMPTY_LIST;
+			return Collections.EMPTY_LIST;
 		}
 
 		@Override

@@ -33,11 +33,17 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 		return Collections.EMPTY_SET; // A parser is typically self-contained
 	}
 
+	@Override
+	default Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
+		return java.util.Collections.EMPTY_SET;
+	}
+
 	/**
+	 * @param session The currently executing session. May be null.
 	 * @param types The matcher names and tags to get matchers for
 	 * @return Matchers in this parser whose name or one of its tags matches one of the given types
 	 */
-	Collection<ParseMatcher<? super S>> getMatchersFor(String... types);
+	Collection<ParseMatcher<? super S>> getMatchersFor(ParseSession session, String... types);
 
 	/** @return A new session valid for parsing a complete set of data in this parser */
 	ParseSession createSession();
@@ -73,7 +79,23 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	default <SS extends S> ParseMatch<SS> parseByType(SS stream, ParseSession session, String... types) throws IOException {
 		if(session == null)
 			session = createSession();
-		return parse(stream, session, getMatchersFor(types));
+		return parse(stream, session, getMatchersFor(session, types));
+	}
+
+	/**
+	 * Parses a match from the stream using one of the given matchers. If zero-length, then all of this parser's default matchers will be
+	 * used.
+	 *
+	 * @param <SS> The type of the stream
+	 * @param stream The stream to parse
+	 * @param session The parsing session
+	 * @param matchers The matchers to use, or emtpy to use all default matchers. These matchers need not be known by this parser.
+	 * @return The match parsed from the stream
+	 * @throws IOException If an error occurs while retrieving the data to parse
+	 */
+	default <SS extends S> ParseMatch<SS> parseWith(SS stream, ParseSession session, Collection<? extends ParseMatcher<? super SS>> matchers)
+		throws IOException{
+		return parseWith(stream, session, matchers.toArray(new ParseMatcher[matchers.size()]));
 	}
 
 	/**
@@ -89,7 +111,7 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 */
 	default <SS extends S> ParseMatch<SS> parseWith(SS stream, ParseSession session, ParseMatcher<? super SS>... matchers)
 		throws IOException {
-		return parse(stream, session, matchers.length > 0 ? Arrays.asList(matchers) : getMatchersFor());
+		return parse(stream, session, matchers.length > 0 ? Arrays.asList(matchers) : getMatchersFor(session));
 	}
 
 	/**
@@ -136,5 +158,29 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 				};
 			}
 		};
+	}
+
+	/**
+	 * Removes matchers from a collection whose name or tag is given in the excluded tags
+	 *
+	 * @param matchers The matcher collection to filter
+	 * @param excludeTypes The types (names or tags) to exclude
+	 */
+	public static void removeTypes(Collection<? extends ParseMatcher<?>> matchers, Set<String> excludeTypes) {
+		if(excludeTypes.isEmpty())
+			return;
+		Iterator<? extends ParseMatcher<?>> iter = matchers.iterator();
+		while(iter.hasNext()) {
+			ParseMatcher<?> matcher = iter.next();
+			if(matcher.getName() != null && excludeTypes.contains(matcher.getName()))
+				iter.remove();
+			else {
+				for(String tag : matcher.getTags())
+					if(excludeTypes.contains(tag)) {
+						iter.remove();
+						break;
+					}
+			}
+		}
 	}
 }

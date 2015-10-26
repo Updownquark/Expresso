@@ -29,6 +29,14 @@ public class OneOfMatcher<S extends BranchableStream<?, ?>> extends ComposedMatc
 	}
 
 	@Override
+	public Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
+		Set<String> ret = new java.util.LinkedHashSet<>();
+		for(ParseMatcher<?> sub : getComposed())
+			ret.addAll(sub.getPotentialBeginningTypeReferences(parser, session));
+		return ret;
+	}
+
+	@Override
 	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
 		ParseMatch<SS> match = null;
 		for(ParseMatcher<? super S> element : getComposed()) {

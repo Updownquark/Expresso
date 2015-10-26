@@ -36,6 +36,11 @@ public class UpToMatcher<S extends BranchableStream<?, ?>> extends BaseMatcher<S
 		return java.util.Collections.EMPTY_MAP;
 	}
 
+	@Override
+	public Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
+		return java.util.Collections.EMPTY_SET;
+	}
+
 	/** @return The matcher that this matcher searches for */
 	public ParseMatcher<? super S> getMatcher() {
 		return theMatcher;

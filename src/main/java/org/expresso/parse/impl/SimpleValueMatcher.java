@@ -24,6 +24,11 @@ public abstract class SimpleValueMatcher<S extends BranchableStream<?, ?>> exten
 		return java.util.Collections.EMPTY_LIST;
 	}
 
+	@Override
+	public Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
+		return java.util.Collections.EMPTY_SET;
+	}
+
 	/** @return A string representation of the value this matcher is looking for */
 	public abstract String getValueString();
 

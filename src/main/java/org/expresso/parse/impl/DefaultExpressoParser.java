@@ -57,7 +57,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 	}
 
 	@Override
-	public Collection<ParseMatcher<? super S>> getMatchersFor(String... types) {
+	public Collection<ParseMatcher<? super S>> getMatchersFor(ParseSession session, String... types) {
 		Collection<ParseMatcher<? super S>> matchers;
 		if(types.length > 0) {
 			matchers = new LinkedHashSet<>();
@@ -72,7 +72,10 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 				}
 			}
 		} else
-			matchers = theDefaultMatchers;
+			matchers = new ArrayList<>(theDefaultMatchers);
+		ParseSessionImpl<?> sessImpl = (ParseSessionImpl<?>) session;
+		if(sessImpl != null && !sessImpl.theExcludedTypes.isEmpty())
+			ExpressoParser.removeTypes(matchers, sessImpl.theExcludedTypes);
 		return Collections.unmodifiableCollection(matchers);
 	}
 
@@ -114,7 +117,8 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 				if(match != null)
 					theDebugger.matchDiscarded(match);
 				match = fMatch;
-			}
+			} else if(fMatch != null)
+				theDebugger.matchDiscarded(fMatch);
 		}
 
 		if(match != null)
@@ -263,7 +267,12 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 				matching = new Matching();
 				theTypeMatching.put(matcher.getName(), matching);
 				SS streamCopy = (SS) stream.branch();
-				while(true) {
+				/* If a match with this parser may also be the first component in a match with this parser, then we need to parse repeatedly
+				 * until it can't create a further composition.  This is the case with operators like addition, where a+b+c needs to be
+				 * ((a+b)+c). */
+				boolean loop = matcher
+					.matchesType(matcher.getPotentialBeginningTypeReferences(DefaultExpressoParser.this, ParseSessionImpl.this));
+				do {
 					theDebugger.preParse(streamCopy, matcher);
 					ParseMatch<SS> match = matcher.match((SS) streamCopy.branch(), DefaultExpressoParser.this, ParseSessionImpl.this);
 					theDebugger.postParse(streamCopy, matcher, match);
@@ -271,11 +280,12 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 						if(matching.theMatch != null)
 							theDebugger.matchDiscarded(matching.theMatch);
 						matching.theMatch = match;
-						if(matcher.getExternalTypeDependencies().isEmpty())
-							break; // Only re-try parsing if the matcher may refer to itself
-					} else
+					} else {
+						if(match != null)
+							theDebugger.matchDiscarded(match);
 						break;
-				}
+					}
+				} while(loop);
 				return matching.theMatch;
 			}
 

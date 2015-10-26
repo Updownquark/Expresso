@@ -46,6 +46,11 @@ public class WhitespaceMatcher<S extends CharSequenceStream> implements ParseMat
 	}
 
 	@Override
+	public Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
+		return java.util.Collections.EMPTY_SET;
+	}
+
+	@Override
 	public List<ParseMatcher<? super S>> getComposed() {
 		return Collections.EMPTY_LIST;
 	}

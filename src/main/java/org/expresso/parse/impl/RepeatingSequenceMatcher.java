@@ -37,6 +37,16 @@ public class RepeatingSequenceMatcher<S extends BranchableStream<?, ?>> extends 
 			return "repeat";
 	}
 
+	/** @return The minimum number of times that this matcher must match in a stream sequentially to be valid */
+	public int getMin() {
+		return theMinRepeat;
+	}
+
+	/** @return The maximum number of times that this matcher will attempt to match its content in a stream sequentially */
+	public int getMax() {
+		return theMaxRepeat;
+	}
+
 	@Override
 	public Map<String, String> getAttributes() {
 		if(theMinRepeat == 0 && theMaxRepeat == 1)

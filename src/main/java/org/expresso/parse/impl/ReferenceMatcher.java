@@ -2,9 +2,9 @@ package org.expresso.parse.impl;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import org.expresso.parse.*;
-import org.qommons.ArrayUtils;
 
 /**
  * A matcher that just delegates to the outer parser
@@ -12,24 +12,28 @@ import org.qommons.ArrayUtils;
  * @param <S> The type of stream to parse
  */
 public class ReferenceMatcher<S extends BranchableStream<?, ?>> extends BaseMatcher<S> {
-	private final Set<String> theTypeSet;
+	private final Set<String> theIncludedTypes;
 	private final String [] theTypes;
+
+	private final Set<String> theExcludedTypes;
 
 	/**
 	 * @param name The name for this parser
 	 * @param tags The tags that may be used to reference this matcher in a parser
-	 * @param types The names of the types that this parser will parse, or zero-length to parse anything
+	 * @param includedTypes The names of the types that this matcher will user to parse parse, or empty to parse anything
+	 * @param excludedTypes The names of the types that this matcher will not use to parse
 	 */
-	public ReferenceMatcher(String name, Set<String> tags, String... types) {
+	public ReferenceMatcher(String name, Set<String> tags, Set<String> includedTypes, Set<String> excludedTypes) {
 		super(name, tags);
-		LinkedHashSet<String> set = new LinkedHashSet<>();
-		boolean duplicate = false;
-		for(String type : types)
-			duplicate |= !set.add(type);
-		if(duplicate)
-			System.err.println("WARNING: Reference has multiple types: " + ArrayUtils.toString(types));
-		theTypeSet = Collections.unmodifiableSet(set);
-		theTypes = set.toArray(new String[set.size()]);
+		if(includedTypes == null || includedTypes.isEmpty())
+			theIncludedTypes = Collections.EMPTY_SET;
+		else
+			theIncludedTypes = Collections.unmodifiableSet(includedTypes);
+		theTypes = includedTypes.toArray(new String[includedTypes.size()]);
+		if(excludedTypes == null || excludedTypes.isEmpty())
+			theExcludedTypes = Collections.EMPTY_SET;
+		else
+			theExcludedTypes = Collections.unmodifiableSet(excludedTypes);
 	}
 
 	@Override
@@ -39,10 +43,10 @@ public class ReferenceMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 
 	@Override
 	public Map<String, String> getAttributes() {
-		if(theTypeSet.isEmpty())
+		if(theIncludedTypes.isEmpty())
 			return Collections.EMPTY_MAP;
 		LinkedHashMap<String, String> ret = new LinkedHashMap<>();
-		String typeStr = theTypeSet.toString();
+		String typeStr = theIncludedTypes.toString();
 		typeStr = typeStr.substring(1, typeStr.length() - 1);
 		ret.put("type", typeStr);
 		return ret;
@@ -50,7 +54,12 @@ public class ReferenceMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 
 	@Override
 	public Set<String> getExternalTypeDependencies() {
-		return theTypeSet;
+		return theIncludedTypes;
+	}
+
+	@Override
+	public Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
+		return getReference(parser, session).stream().map(m -> m.getName()).collect(Collectors.toSet());
 	}
 
 	@Override
@@ -58,10 +67,22 @@ public class ReferenceMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 		return Collections.EMPTY_LIST;
 	}
 
+	/**
+	 * @param <SS> The sub-type of the stream being parsed
+	 * @param parser The parser parsing the stream
+	 * @param session The parsing session
+	 * @return The matchers that may be used to parse matches of this type
+	 */
+	public <SS extends S> Collection<ParseMatcher<? super SS>> getReference(ExpressoParser<? super SS> parser, ParseSession session) {
+		Collection<ParseMatcher<? super SS>> matchers = new ArrayList<>(parser.getMatchersFor(session, theTypes));
+		ExpressoParser.removeTypes(matchers, theExcludedTypes);
+		return matchers;
+	}
+
 	@Override
 	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
 		SS streamCopy = (SS) stream.branch();
-		ParseMatch<SS> refMatch = parser.<SS> parseByType(stream, session, theTypes);
+		ParseMatch<SS> refMatch = parser.<SS> parseWith(stream, session, getReference(parser, session));
 		if(refMatch == null)
 			return null;
 		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), Arrays.asList(refMatch), null, true);
@@ -70,7 +91,7 @@ public class ReferenceMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 	@Override
 	public String toString() {
 		StringBuilder ret = new StringBuilder(super.toString());
-		if(!theTypeSet.isEmpty()) {
+		if(!theIncludedTypes.isEmpty()) {
 			ret.append(" type=\"");
 			boolean first = true;
 			for(String type : theTypes) {
