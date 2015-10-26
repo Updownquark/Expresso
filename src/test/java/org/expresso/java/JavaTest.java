@@ -61,7 +61,9 @@ public class JavaTest {
 			} catch(IOException e) {
 				throw new IllegalStateException("Could not read " + file, e);
 			}
-			if(match.getError() != null)
+			if(match == null)
+				System.err.println("Could not parse " + file);
+			else if(match.getError() != null)
 				System.err.println("Error parsing " + file + ": " + match.getError());
 		}
 		for(File file : dir.listFiles())

@@ -68,7 +68,8 @@ public interface ExpressoParsingDebugger<S extends BranchableStream<?, ?>> {
 	/**
 	 * Called when a match from the cache is used
 	 *
+	 * @param matcher The matcher that the match was cached for
 	 * @param match The cached match
 	 */
-	void usedCache(ParseMatch<? extends S> match);
+	void usedCache(ParseMatcher<?> matcher, ParseMatch<? extends S> match);
 }

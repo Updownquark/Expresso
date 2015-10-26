@@ -39,6 +39,6 @@ public class NullDebugger<S extends org.expresso.parse.BranchableStream<?, ?>> i
 	}
 
 	@Override
-	public void usedCache(ParseMatch<? extends S> match) {
+	public void usedCache(ParseMatcher<?> matcher, ParseMatch<? extends S> match) {
 	}
 }

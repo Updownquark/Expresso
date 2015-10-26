@@ -6,7 +6,7 @@ import java.util.*;
 import org.expresso.parse.*;
 
 /**
- * Counters the effect of {@link WithoutMatcher}
+ * Fully or partially counters the effect of {@link WithoutMatcher}
  *
  * @param <S> The type of stream to parse
  */
@@ -31,6 +31,11 @@ public class WithMatcher<S extends BranchableStream<?, ?>> extends SequenceMatch
 		typeStr = typeStr.substring(1, typeStr.length() - 1);
 		ret.put("type", typeStr);
 		return ret;
+	}
+
+	/** @return The matcher types that may be parsed as children of this matcher */
+	public Set<String> getIncludedTypes() {
+		return theIncludedTypes;
 	}
 
 	@Override

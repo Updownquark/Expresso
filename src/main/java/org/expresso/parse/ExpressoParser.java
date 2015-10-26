@@ -95,7 +95,7 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 */
 	default <SS extends S> ParseMatch<SS> parseWith(SS stream, ParseSession session, Collection<? extends ParseMatcher<? super SS>> matchers)
 		throws IOException{
-		return parseWith(stream, session, matchers.toArray(new ParseMatcher[matchers.size()]));
+		return parse(stream, session, matchers.isEmpty() ? getMatchersFor(session) : matchers);
 	}
 
 	/**

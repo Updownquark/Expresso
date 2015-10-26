@@ -195,12 +195,14 @@ public class DefaultGrammarParser {
 		case "ref":
 			Set<String> include = new java.util.LinkedHashSet<>();
 			Set<String> exclude = new java.util.LinkedHashSet<>();
-			for(String type : typeStr.split(",")) {
-				type = type.trim();
-				if(type.startsWith("!"))
-					exclude.add(type.substring(1));
-				else
-					include.add(type);
+			if(typeStr != null) {
+				for(String type : typeStr.split(",")) {
+					type = type.trim();
+					if(type.startsWith("!"))
+						exclude.add(type.substring(1));
+					else
+						include.add(type);
+				}
 			}
 			return new ReferenceMatcher<>(name, tags, include, exclude);
 		case "up-to":

@@ -76,7 +76,7 @@ public class RepeatingSequenceMatcher<S extends BranchableStream<?, ?>> extends 
 				count++;
 				stream.advance(match.getLength());
 			} else {
-				if(count == 0) {
+				if(count < theMinRepeat) {
 					optionMatches.add(match);
 					count++;
 					stream.advance(match.getLength());

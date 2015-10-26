@@ -33,6 +33,11 @@ public class WithoutMatcher<S extends BranchableStream<?, ?>> extends SequenceMa
 		return ret;
 	}
 
+	/** @return The matcher types that will not be parsed as children of this matcher */
+	public Set<String> getExcludedTypes() {
+		return theExcludedTypes;
+	}
+
 	@Override
 	public Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
 		return doInSession(session, () -> super.getPotentialBeginningTypeReferences(parser, session));

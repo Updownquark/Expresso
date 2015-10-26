@@ -14,12 +14,11 @@ import javax.swing.*;
 import javax.swing.event.*;
 import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
+import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreePath;
 
 import org.expresso.parse.*;
-import org.expresso.parse.impl.CharSequenceStream;
-import org.expresso.parse.impl.ReferenceMatcher;
-import org.expresso.parse.impl.WhitespaceMatcher;
+import org.expresso.parse.impl.*;
 import org.qommons.config.MutableConfig;
 import org.qommons.config.QommonsConfig;
 
@@ -35,41 +34,31 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	}
 
 	private static Color SELECTED = new Color(100, 100, 255);
-
 	private static ImageIcon RESUME_ICON = getIcon("play.png", 24, 24);
-
 	private static ImageIcon PAUSE_ICON = getIcon("pause.png", 24, 24);
 
 	private JTextPane theMainText;
-
 	private JScrollPane theMainTextScroll;
-
 	private ParsingExpressionTreeModel theTreeModel;
-
 	private JTree theParseTree;
+	private JTable theBreakpointList;
+	private JList<MatcherObject> theDebugPane;
 
 	private JButton theOverButton;
 	private JButton theIntoButton;
 	private JButton theOutButton;
 	private JButton theResumeButton;
-
 	private JToggleButton theDebugButton;
-
-	private JTable theBreakpointList;
-
 	private JLabel theAddBreakpointLabel;
-
-	private JList<MatcherObject> theDebugPane;
 
 	private JSplitPane theMainSplit;
 	private JSplitPane theRightSplit;
 
 	private File theConfigFile;
 
+	private ExpressoParser<?> theParser;
 	private List<String> theOpNames;
-
 	private List<ExpressoParserBreakpoint> theBreakpoints;
-
 	private boolean isPopupWhenHit = true;
 
 	private volatile boolean isSuspended;
@@ -117,6 +106,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 				setGuiEnabled(isSuspended);
 			}
 		});
+		theParseTree.setCellRenderer(new ParseNodeCellRenderer());
 		theOverButton = new JButton(getIcon("arrow180.png", 24, 16));
 		theIntoButton = new JButton(getIcon("arrow90down.png", 24, 24));
 		theOutButton = new JButton(getIcon("arrow90right.png", 24, 24));
@@ -198,7 +188,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		theOverButton.addActionListener(e -> stepOver());
 		theIntoButton.addActionListener(e -> stepInto());
 		theOutButton.addActionListener(e -> stepOut());
-		theResumeButton.addActionListener(e -> resume());
+		theResumeButton.addActionListener(e -> suspendOrResume());
 		theDebugButton.addActionListener(e -> debug());
 
 		theLastBreakIndex = -1;
@@ -348,6 +338,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 
 	@Override
 	public void init(ExpressoParser<?> parser) {
+		theParser = parser;
 		theOpNames.clear();
 		for(ParseMatcher<?> op : parser.getComposed())
 			theOpNames.add(op.getName());
@@ -389,8 +380,13 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		} else if(inIgnorable > 0)
 			return;
 		boolean isOnStepTarget = false;
-		if(theStepTarget != null && theStepTargetType == StepTargetType.CHILD && theStepTarget == theTreeModel.getCursor())
+		ParseNode cursor = theTreeModel.getCursor();
+		if(theStepTarget == null || theStepTargetType != StepTargetType.CHILD) {} else if(theStepTarget == cursor)
 			isOnStepTarget = true;
+		else if(cursor.isFinished && cursor.theParent != null && theStepTarget == cursor.theParent) {
+			theTreeModel.ascend();
+			isOnStepTarget = true;
+		}
 
 		safe(() -> theTreeModel.startNew(matcher));
 		int position = stream.getPosition();
@@ -441,8 +437,12 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		} else if(inIgnorable > 0)
 			return;
 		if(matcher != theTreeModel.getCursor().theMatcher) {
-			System.out.println("Post-parse for an operator that was not pre-parsed or has already been post-parsed!");
-			return;
+			if(theTreeModel.getCursor().theParent != null && matcher == theTreeModel.getCursor().theParent.theMatcher)
+				theTreeModel.ascend();
+			else {
+				System.out.println("Post-parse for an operator that was not pre-parsed or has already been post-parsed!");
+				return;
+			}
 		}
 
 		boolean isOnStepTarget = false;
@@ -452,7 +452,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		safe(() -> theTreeModel.finish(match));
 		update(stream.getPosition(), matcher, match);
 
-		if(isOnStepTarget && isDebugging)
+		if(isOnStepTarget && !isDebugging)
 			suspend(null);
 		else if(!isSuspended && theStepTarget == null)
 			render();
@@ -466,12 +466,27 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	}
 
 	@Override
-	public void usedCache(final ParseMatch<? extends S> match) {
-		if(match == null)
-			return;
+	public void usedCache(final ParseMatcher<?> matcher, final ParseMatch<? extends S> match) {
 		if(EventQueue.isDispatchThread())
 			return;
-		safe(() -> theTreeModel.add(match));
+		boolean isOnStepTarget = false;
+		ParseNode cursor = theTreeModel.getCursor();
+		if(theStepTarget == null || theStepTargetType != StepTargetType.CHILD) {} else if(theStepTarget == cursor)
+			isOnStepTarget = true;
+		else if(cursor.isFinished && cursor.theParent != null && theStepTarget == cursor.theParent) {
+			theTreeModel.ascend();
+			isOnStepTarget = true;
+		}
+		if(isOnStepTarget) {
+			safe(() -> {
+				theTreeModel.startNew(matcher);
+				theTreeModel.finish(match);
+			});
+		} else if(match != null)
+			safe(() -> theTreeModel.add(match));
+
+		if(isOnStepTarget)
+			suspend(null);
 	}
 
 	private void reset() {
@@ -534,21 +549,47 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	private void setDebugOperator(ParseNode op) {
 		DefaultListModel<MatcherObject> model = (DefaultListModel<MatcherObject>) theDebugPane.getModel();
 		model.removeAllElements();
-		while(op != null && op.theParent != null && !(op.theParent.theMatcher instanceof ReferenceMatcher))
-			op = op.theParent;
-		if(op != null)
-			addToModel(model, op.theMatcher, 0);
+		if(op == null) {} else if(op.theParent != null && op.theParent.theMatcher instanceof ReferenceMatcher) {
+			addToModel(model, op.theParent.theMatcher, 0, false);
+			for(ParseMatcher<?> matcher : ((ReferenceMatcher<?>) op.theParent.theMatcher).getReference(theParser, null)) {
+				if(!isExcluded(matcher, op.theParent))
+					addToModel(model, matcher, 1, false);
+			}
+			addEndToModel(model, op.theParent.theMatcher, 0);
+		} else {
+			while(op.theParent != null && !(op.theParent.theMatcher instanceof ReferenceMatcher))
+				op = op.theParent;
+			addToModel(model, op.theMatcher, 0, true);
+		}
 	}
 
-	private void addToModel(DefaultListModel<MatcherObject> model, ParseMatcher<?> op, int indent) {
+	private void addToModel(DefaultListModel<MatcherObject> model, ParseMatcher<?> op, int indent, boolean withChildren) {
 		model.addElement(new MatcherObject(op, indent, false));
 		boolean needsEnd = false;
-		for(ParseMatcher<?> sub : op.getComposed()) {
-			needsEnd = true;
-			addToModel(model, sub, indent + 1);
+		if(withChildren) {
+			for(ParseMatcher<?> sub : op.getComposed()) {
+				needsEnd = true;
+				addToModel(model, sub, indent + 1, true);
+			}
 		}
 		if(needsEnd)
-			model.addElement(new MatcherObject(op, indent, true));
+			addEndToModel(model, op, indent);
+	}
+
+	private void addEndToModel(DefaultListModel<MatcherObject> model, ParseMatcher<?> op, int indent) {
+		model.addElement(new MatcherObject(op, indent, true));
+	}
+
+	private boolean isExcluded(ParseMatcher<?> matcher, ParseNode node) {
+		Set<String> included = new java.util.LinkedHashSet<>();
+		if(node.theMatcher instanceof WithoutMatcher) {
+			Set<String> exclude = new java.util.LinkedHashSet<>(((WithoutMatcher<?>) node.theMatcher).getExcludedTypes());
+			exclude.removeAll(included);
+			if(matcher.matchesType(exclude))
+				return true;
+		} else if(node.theMatcher instanceof WithMatcher)
+			included.addAll(((WithMatcher<?>) node.theMatcher).getIncludedTypes());
+		return false;
 	}
 
 	private void suspend(ExpressoParserBreakpoint breakpoint) {
@@ -560,7 +601,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			EventQueue.invokeLater(() -> render());
 			while(isSuspended) {
 				if(isDebugging) {
-					resume();
+					suspendOrResume();
 					org.qommons.BreakpointHere.breakpoint();
 				} else {
 					try {
@@ -569,7 +610,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 				}
 			}
 		} finally {
-			isHolding = false; // Here is where to put a breakpoint in order to start java debugging from a suspended debug session
+			isHolding = false;
 		}
 	}
 
@@ -600,13 +641,13 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			: (ParseNode) theParseTree.getSelectionPath().getLastPathComponent();
 		if(target == null)
 			throw new IllegalStateException("No selection or cursor!");
-		theStepTarget = target;
+		theStepTarget = target.theParent;
 		theStepTargetType = StepTargetType.EXIT;
 		setGuiEnabled(false);
 		isSuspended = false;
 	}
 
-	private void resume() {
+	private void suspendOrResume() {
 		if(isSuspended) {
 			theStepTarget = null;
 			setGuiEnabled(false);
@@ -628,7 +669,8 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			ParseNode cursor = theTreeModel.getCursor();
 			theOverButton.setEnabled(cursor != null && cursor.theParent != null);
 			theIntoButton.setEnabled(cursor != null && theParseTree.getSelectionPath() != null
-				&& theParseTree.getSelectionPath().getLastPathComponent() == theTreeModel.getCursor() && isDescendable(cursor.theMatcher));
+				&& theParseTree.getSelectionPath().getLastPathComponent() == theTreeModel.getCursor() && isDescendable(cursor.theMatcher)
+				&& !cursor.isFinished);
 			theOutButton.setEnabled(cursor != null && cursor.theParent != null);
 			theResumeButton.setIcon(RESUME_ICON);
 		} else {
@@ -672,10 +714,36 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			@Override
 			public void windowClosing(WindowEvent e) {
 				if(debugger.isSuspended)
-					debugger.resume();
+					debugger.suspendOrResume();
 			}
 		});
 		return ret;
+	}
+
+	private StringBuilder htmlIze(ParseMatcher<?> matcher, int spacing) {
+		StringBuilder text = new StringBuilder("<html>");
+		for(int i = 0; i < spacing; i++)
+			text.append("&nbsp;&nbsp;&nbsp;&nbsp;");
+		text.append("<font color=\"blue\">&lt;</font><font color=\"red\">");
+		text.append(matcher.getTypeName()).append("</font>");
+		if(!(matcher instanceof WhitespaceMatcher) && matcher.getName() != null)
+			text.append(" name=\"").append(matcher.getName()).append('"');
+		for(Map.Entry<String, String> attr : matcher.getAttributes().entrySet())
+			text.append(' ').append(attr.getKey()).append("=\"").append(attr.getValue()).append('"');
+		boolean needsEnding = matcher.getComposed().isEmpty();
+		if(matcher instanceof org.expresso.parse.impl.SimpleValueMatcher) {
+			text.append("<font color=\"blue\">&gt;</font>");
+			text.append(((org.expresso.parse.impl.SimpleValueMatcher<?>) matcher).getValueString().replaceAll("<", "&amp;lt;")
+				.replaceAll(">", "&amp;gt;"));
+			if(needsEnding) {
+				text.append("<font color=\"blue\">&lt;/</font><font color=\"red\">");
+				text.append(matcher.getTypeName()).append("</font>");
+			}
+		} else if(needsEnding)
+			text.append(" <font color=\"blue\">/</font>");
+		text.append("<font color=\"blue\">&gt;</font>");
+		text.append("</html>");
+		return text;
 	}
 
 	/**
@@ -720,6 +788,10 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			return theCursor;
 		}
 
+		void ascend() {
+			theCursor = theCursor.theParent;
+		}
+
 		/** NOTE: This is only safe to call when parsing is suspended */
 		void display() {
 			if(isDirty)
@@ -727,26 +799,16 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		}
 
 		void startNew(ParseMatcher<?> op) {
-			ParseNode newNode = new ParseNode(theCursor, op);
-			boolean newRoot = theCursor == null;
-			if(newRoot)
-				theRoot = newNode;
-			else
-				theCursor.theChildren.add(newNode);
-			theCursor = newNode;
-
-			isDirty = true;
+			theCursor = add(op);
 		}
 
 		void finish(ParseMatch<? extends S> match) {
 			if(theCursor == null)
 				return;
+			if(theCursor.isFinished)
+				ascend();
+			theCursor.isFinished = true;
 			theCursor.theMatch = match;
-			ParseNode changed = theCursor;
-			theCursor = theCursor.theParent;
-			int childIdx = theCursor == null ? 0 : theCursor.theChildren.indexOf(changed);
-			if(match == null && theCursor != null)
-				theCursor.theChildren.remove(childIdx);
 
 			isDirty = true;
 		}
@@ -768,6 +830,13 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		}
 
 		void add(ParseMatch<? extends S> match) {
+			ParseNode added = add(match.getMatcher());
+			added.theMatch = match;
+		}
+
+		private ParseNode add(ParseMatcher<?> match) {
+			if(theCursor != null && theCursor.isFinished)
+				ascend();
 			ParseNode newNode = new ParseNode(theCursor, match);
 			boolean newRoot = theCursor == null;
 			if(newRoot)
@@ -776,6 +845,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 				theCursor.theChildren.add(newNode);
 
 			isDirty = true;
+			return newNode;
 		}
 
 		void refresh() {
@@ -887,6 +957,8 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 
 		ParseMatch<? extends S> theMatch;
 
+		boolean isFinished;
+
 		final List<ParseNode> theChildren = new ArrayList<>();
 
 		private final String theString;
@@ -902,11 +974,6 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 				str.append(' ').append(attr.getKey()).append("=\"").append(attr.getValue()).append('"');
 			str.append(">");
 			theString = str.toString();
-		}
-
-		ParseNode(ParseNode parent, ParseMatch<? extends S> match) {
-			this(parent, match.getMatcher());
-			theMatch = match;
 		}
 
 		@Override
@@ -1289,32 +1356,16 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		@Override
 		public Component getListCellRendererComponent(JList<? extends MatcherObject> list, MatcherObject value, int index,
 			boolean isSelected, boolean cellHasFocus) {
-			StringBuilder text = new StringBuilder("<html>");
-			for(int i = 0; i < value.theIndent; i++)
-				text.append("&nbsp;&nbsp;&nbsp;&nbsp;");
-			text.append("<font color=\"blue\">&lt;</font><font color=\"red\">");
-			if(value.isTerminal)
-				text.append('/');
-			text.append(value.theMatcher.getTypeName()).append("</font>");
-			if(!value.isTerminal) {
-				if(!(value.theMatcher instanceof WhitespaceMatcher) && value.theMatcher.getName() != null)
-					text.append(" name=\"").append(value.theMatcher.getName()).append('"');
-				for(Map.Entry<String, String> attr : value.theMatcher.getAttributes().entrySet())
-					text.append(' ').append(attr.getKey()).append("=\"").append(attr.getValue()).append('"');
-				boolean needsEnding = value.theMatcher.getComposed().isEmpty();
-				if(value.theMatcher instanceof org.expresso.parse.impl.SimpleValueMatcher) {
-					text.append("<font color=\"blue\">&gt;</font>");
-					text.append(((org.expresso.parse.impl.SimpleValueMatcher<?>) value.theMatcher).getValueString()
-						.replaceAll("<", "&amp;lt;").replaceAll(">", "&amp;gt;"));
-					if(needsEnding) {
-						text.append("<font color=\"blue\">&lt;/</font><font color=\"red\">");
-						text.append(value.theMatcher.getTypeName()).append("</font>");
-					}
-				} else if(needsEnding)
-					text.append(" <font color=\"blue\">/</font>");
-			}
-			text.append("<font color=\"blue\">&gt;</font>");
-			text.append("</html>");
+			StringBuilder text;
+			if(value.isTerminal) {
+				text = new StringBuilder("<html>");
+				for(int i = 0; i < value.theIndent; i++)
+					text.append("&nbsp;&nbsp;&nbsp;&nbsp;");
+				text.append("<font color=\"blue\">&lt;</font><font color=\"red\">").append('/').append(value.theMatcher.getTypeName());
+				text.append("<font color=\"blue\">&gt;</font>");
+				text.append("</html>");
+			} else
+				text = htmlIze(value.theMatcher, value.theIndent);
 			theLabel.setText(text.toString());
 
 			Color bg = Color.white;
@@ -1330,6 +1381,37 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			else if(selected)
 				bg = SELECTED;
 			setBackground(bg);
+			return this;
+		}
+	}
+
+	private class ParseNodeCellRenderer extends DefaultTreeCellRenderer {
+		@Override
+		public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, boolean expanded, boolean leaf, int row,
+			boolean hasFocus2) {
+			super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus2);
+			setIcon(null);
+			if(!(value instanceof ExpressoParserDebugGUI.ParseNode))
+				return this;
+			ParseNode node=(ParseNode) value;
+			StringBuilder ret = htmlIze(node.theMatcher, 0);
+			if(node.theMatch != null) {
+				ret.delete(ret.length() - 7, ret.length()); // Drop the </html>
+				ret.append(" - ");
+				boolean red = !node.theMatch.isComplete() || node.theMatch.getError() != null;
+				if(red)
+					ret.append("<font color=\"red\">");
+				String flat = node.theMatch.flatText();
+				if(flat.length() > 48)
+					flat = flat.substring(0, 46) + '\u2026'; // ellipsis
+				ret.append(flat.replaceAll("<", "&lt;"));
+				if(red)
+					ret.append("</font");
+				if(node.theMatcher instanceof ReferenceMatcher && !node.theMatch.getChildren().isEmpty())
+					ret.append(" (").append(node.theMatch.getChildren().get(0).getMatcher().getName()).append(")");
+				ret.append("</html>");
+			}
+			setText(ret.toString());
 			return this;
 		}
 	}

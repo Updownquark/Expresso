@@ -334,7 +334,9 @@
 	</sequence>
 	<sequence name="wildcard-type" priority="998" default="false" tag="type">
 		<literal name="wild-card">?</literal>
-		<ref type="type-bound" name="bound" />
+		<option>
+			<ref type="type-bound" name="bound" />
+		</option>
 	</sequence>
 	<sequence name="bounded-type" priority="998" default="false" tag="type">
 		<ref type="identifier" name="name" />

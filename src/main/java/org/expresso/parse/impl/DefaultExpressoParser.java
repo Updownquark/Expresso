@@ -261,7 +261,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 			ParseMatch<SS> match(SS stream, ParseMatcher<? super SS> matcher) throws IOException {
 				Matching matching = theTypeMatching.get(matcher.getName());
 				if(matching != null) {
-					theDebugger.usedCache(matching.theMatch);
+					theDebugger.usedCache(matcher, matching.theMatch);
 					return matching.theMatch;
 				}
 				matching = new Matching();

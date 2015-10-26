@@ -48,6 +48,10 @@ public class ReferenceMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 		LinkedHashMap<String, String> ret = new LinkedHashMap<>();
 		String typeStr = theIncludedTypes.toString();
 		typeStr = typeStr.substring(1, typeStr.length() - 1);
+		for(String type : theExcludedTypes)
+			typeStr += ",!" + type;
+		if(typeStr.startsWith(","))
+			typeStr = typeStr.substring(1);
 		ret.put("type", typeStr);
 		return ret;
 	}
@@ -86,22 +90,5 @@ public class ReferenceMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 		if(refMatch == null)
 			return null;
 		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), Arrays.asList(refMatch), null, true);
-	}
-
-	@Override
-	public String toString() {
-		StringBuilder ret = new StringBuilder(super.toString());
-		if(!theIncludedTypes.isEmpty()) {
-			ret.append(" type=\"");
-			boolean first = true;
-			for(String type : theTypes) {
-				if(!first)
-					ret.append(',');
-				first = false;
-				ret.append(type);
-			}
-			ret.append('"');
-		}
-		return ret.toString();
 	}
 }
