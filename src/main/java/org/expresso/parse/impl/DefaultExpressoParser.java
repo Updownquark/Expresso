@@ -306,6 +306,8 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 
 		boolean isDebuggingStarted;
 
+		boolean warnedOnlyExcludeIgnore;
+
 		ParseSessionImpl() {
 			theExcludedTypes = new java.util.LinkedHashSet<>();
 			thePositions = new HashMap<>();
@@ -338,15 +340,26 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 			Iterator<? extends ParseMatcher<? super SS>> matcherIter = matchers.iterator();
 			while(matcherIter.hasNext()) {
 				ParseMatcher<? super SS> matcher = matcherIter.next();
-				if(matcher.getName() != null && theExcludedTypes.contains(matcher.getName())) {
-					matcherIter.remove();
-					continue;
+				String removeType = null;
+				if(matcher.getName() != null && theExcludedTypes.contains(matcher.getName()))
+					removeType = matcher.getName();
+				if(removeType == null) {
+					for(String tag : matcher.getTags())
+						if(theExcludedTypes.contains(tag)) {
+							removeType = tag;
+							break;
+						}
 				}
-				for(String tag : matcher.getTags())
-					if(theExcludedTypes.contains(tag)) {
+				if(removeType != null) {
+					if(!matcher.getName().equals(IGNORABLE) && !matcher.getTags().contains(IGNORABLE)) {
+						if(!warnedOnlyExcludeIgnore) {
+							System.err.println("Session-excluded type \"" + removeType + "\" would exclude non-ignorable type \""
+								+ matcher.getName() + "\". Only ignorable types may be session-excluded (e.g. via <without>).");
+							warnedOnlyExcludeIgnore = true;
+						}
+					} else
 						matcherIter.remove();
-						break;
-					}
+				}
 			}
 		}
 	}
