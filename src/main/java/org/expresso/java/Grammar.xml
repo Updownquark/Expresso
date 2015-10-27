@@ -377,6 +377,7 @@
 		</option>
 		<whitespace />
 		<ref type="identifier" name="name" />
+		<literal>;</literal>
 	</sequence>
 	<sequence name="method-declaration" tag="declaration">
 		<repeat>
@@ -452,6 +453,9 @@
 				<ref name="body-content" />
 			</repeat>
 		<literal>}</literal>
+		<option>
+			<literal>;</literal>
+		</option>
 	</sequence>
 	<sequence name="type-import" default="false" tag="import">
 		<literal>import</literal>
@@ -486,17 +490,25 @@
 		<repeat>
 			<ref type="import" name="import" />
 		</repeat>
-		<ref type="class-declaration" name="class" />
+		<repeat min="1">
+			<ref type="class-declaration" name="class" />
+		</repeat>
 	</sequence>
 	
 	<!-- Control statements -->
+	<sequence name="statement">
+		<ref name="action" />
+		<literal>;</literal>
+	</sequence>
 	<sequence name="return">
 		<literal>return</literal>
 		<ref name="value" />
+		<literal>;</literal>
 	</sequence>
 	<sequence name="throw">
 		<literal>throw</literal>
 		<ref name="value" />
+		<literal>;</literal>
 	</sequence>
 	
 	<!-- Normal operators -->
