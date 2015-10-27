@@ -372,6 +372,9 @@
 		</repeat>
 		<whitespace />
 		<ref type="type" name="type" />
+		<option>
+			<literal name="var-args">...</literal>
+		</option>
 		<whitespace />
 		<ref type="identifier" name="name" />
 	</sequence>
@@ -383,15 +386,19 @@
 			<ref type="type-parameters" name="type-parameters" />
 			<whitespace />
 		</one-of>
-		<ref type="type" name="type" />
-		<whitespace />
+		<option>
+			<ref type="type" name="type" />
+			<whitespace />
+		</option>
 		<ref type="identifier" name="name" />
 		<literal>(</literal>
-		<repeat>
-			<ref type="variable-declaration" name="parameter" />
-			<literal>,</literal>
-		</repeat>
-		<ref type="variable-declaration" name="parameter" />
+			<option>
+				<repeat>
+					<ref type="variable-declaration" name="parameter" />
+					<literal>,</literal>
+				</repeat>
+				<ref type="variable-declaration" name="parameter" />
+			</option>
 		<literal>)</literal>
 		<option>
 			<literal>throws</literal>
