@@ -5,6 +5,10 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.List;
 
+import javax.swing.UIDefaults;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
+
 import org.expresso.parse.ParseMatch;
 import org.expresso.parse.impl.CharSequenceStream;
 import org.expresso.parse.impl.DefaultExpressoParser;
@@ -22,6 +26,15 @@ public class JavaTest {
 	/** Sets up the java parser */
 	@Before
 	public void setupParser() {
+		try {
+			UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+		} catch(ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {
+			System.err.println("Unable to set system L&F");
+			e.printStackTrace();
+		}
+		UIDefaults uiDefs = UIManager.getDefaults();
+		uiDefs.put("Tree.leftChildIndent", 1);
+
 		List<PrioritizedMatcher> matchers;
 		try {
 			matchers = DefaultGrammarParser.getMatchers(
@@ -31,7 +44,7 @@ public class JavaTest {
 		}
 
 		DefaultExpressoParser.Builder<CharSequenceStream> builder = DefaultExpressoParser.build("Java");
-		builder.addMatcher(new WhitespaceMatcher<>(), true);
+		builder.addMatcher(new WhitespaceMatcher<>(), false);
 		for(PrioritizedMatcher matcher : matchers)
 			builder.addMatcher(matcher.matcher, matcher.isDefault);
 		theParser = builder.build();
@@ -55,6 +68,7 @@ public class JavaTest {
 		for(File file : dir.listFiles()) {
 			if(file.isDirectory())
 				continue;
+			System.out.println("Parsing " + file);
 			ParseMatch<CharSequenceStream> match;
 			try {
 				match = theParser.parseByType(CharSequenceStream.from(file, 4096), null, "java-file");
