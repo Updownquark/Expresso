@@ -21,7 +21,6 @@ public class DefaultExpressoCompiler<S extends BranchableStream<?, ?>, E> implem
 			if(matcher.getKey().test(match))
 				return matcher.getValue().compile(match, this);
 		}
-		double d = -3.4e4d;
 		throw new IllegalArgumentException("This compiler is not able to compile the given match: " + match.toString());
 	}
 }
