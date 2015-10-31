@@ -35,9 +35,13 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		EXIT, CHILD
 	}
 
-	private static Color SELECTED = new Color(100, 100, 255);
-	private static ImageIcon RESUME_ICON = getIcon("play.png", 24, 24);
-	private static ImageIcon PAUSE_ICON = getIcon("pause.png", 24, 24);
+	private static final Color SELECTED = new Color(100, 100, 255);
+
+	private static final ImageIcon RESUME_ICON = getIcon("play.png", 24, 24);
+
+	private static final ImageIcon PAUSE_ICON = getIcon("pause.png", 24, 24);
+
+	private static final long REFRESH_INTERVAL = 1000;
 
 	private JTextPane theMainText;
 	private JScrollPane theMainTextScroll;
@@ -79,6 +83,8 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	private StepTargetType theStepTargetType;
 	private boolean isDebugging;
 	private int theLastBreakIndex;
+
+	private long theLastRefresh;
 
 	private java.util.Set<ExpressoParserBreakpoint> theIndexBreakpoints;
 
@@ -394,33 +400,34 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		int position = stream.getPosition();
 		update(position, matcher, null);
 
-		if(isDebugging)
-			safe(() -> render());
-		else {
-			if(isSuspended || isOnStepTarget)
-				suspend(null);
-			else if(theStepTarget == null) {
-				CharSequence pre = theStream.subSequence(0, position);
-				CharSequence post = theStream.subSequence(position, theStream.length());
-				for(ExpressoParserBreakpoint breakpoint : theBreakpoints) {
-					if(!breakpoint.isEnabled() || theIndexBreakpoints.contains(breakpoint))
-						continue;
-					if(breakpoint.getPreCursorText() == null && breakpoint.getPostCursorText() == null
-						&& breakpoint.getMatcherName() == null)
-						continue;
-					if(breakpoint.getPreCursorText() != null && !breakpoint.getPreCursorText().matcher(pre).matches())
-						continue;
-					if(breakpoint.getPostCursorText() != null && !breakpoint.getPostCursorText().matcher(post).matches())
-						continue;
-					if(breakpoint.getMatcherName() != null && !breakpoint.getMatcherName().equals(matcher.getName()))
-						continue;
-					theLastBreakIndex = position;
-					theIndexBreakpoints.add(breakpoint);
-					suspend(breakpoint);
-					break;
-				}
+		boolean didSuspend = false;
+		// TODO fix this terrible formatting
+		if(isDebugging) {} else if(isSuspended || isOnStepTarget) {
+			suspend(null);
+			didSuspend = true;
+		} else if(theStepTarget == null) {
+			CharSequence pre = theStream.subSequence(0, position);
+			CharSequence post = theStream.subSequence(position, theStream.length());
+			for(ExpressoParserBreakpoint breakpoint : theBreakpoints) {
+				if(!breakpoint.isEnabled() || theIndexBreakpoints.contains(breakpoint))
+					continue;
+				if(breakpoint.getPreCursorText() == null && breakpoint.getPostCursorText() == null && breakpoint.getMatcherName() == null)
+					continue;
+				if(breakpoint.getPreCursorText() != null && !breakpoint.getPreCursorText().matcher(pre).matches())
+					continue;
+				if(breakpoint.getPostCursorText() != null && !breakpoint.getPostCursorText().matcher(post).matches())
+					continue;
+				if(breakpoint.getMatcherName() != null && !breakpoint.getMatcherName().equals(matcher.getName()))
+					continue;
+				theLastBreakIndex = position;
+				theIndexBreakpoints.add(breakpoint);
+				suspend(breakpoint);
+				didSuspend = true;
+				break;
 			}
 		}
+		if(isDebugging || (!didSuspend && System.currentTimeMillis() - theLastRefresh >= REFRESH_INTERVAL))
+			safe(() -> render());
 	}
 
 	private void safe(Runnable run) {
@@ -457,17 +464,18 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		theInternalTreeModel.finish(match);
 		update(stream.getPosition(), matcher, match);
 
-		if(isDebugging)
-			safe(() -> render());
-		else if(isOnStepTarget && !isDebugging)
+		if(isOnStepTarget && !isDebugging)
 			suspend(null);
+		else if(isDebugging || System.currentTimeMillis() - theLastRefresh >= REFRESH_INTERVAL)
+			safe(() -> render());
 	}
 
 	@Override
 	public void matchDiscarded(final ParseMatch<? extends S> match) {
-		if(EventQueue.isDispatchThread())
-			return;
 		theInternalTreeModel.matchDiscarded(match);
+
+		if(isDebugging || System.currentTimeMillis() - theLastRefresh >= REFRESH_INTERVAL)
+			safe(() -> render());
 	}
 
 	@Override
@@ -486,8 +494,10 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		} else if(match != null)
 			theInternalTreeModel.add(match);
 
-		if(isOnStepTarget)
+		if(isOnStepTarget && !isDebugging)
 			suspend(null);
+		else if(isDebugging || System.currentTimeMillis() - theLastRefresh >= REFRESH_INTERVAL)
+			safe(() -> render());
 	}
 
 	private void reset() {
@@ -500,6 +510,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	}
 
 	private void render() {
+		theLastRefresh = System.currentTimeMillis();
 		if(theInternalTreeModel.isDirty) {
 			theInternalTreeModel.sync(theDisplayedTreeModel);
 			theInternalTreeModel.isDirty = false;
@@ -806,10 +817,9 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		for(Map.Entry<String, String> attr : matcher.getAttributes().entrySet())
 			text.append(' ').append(attr.getKey()).append("=\"").append(attr.getValue()).append('"');
 		boolean needsEnding = matcher.getComposed().isEmpty();
-		if(matcher instanceof org.expresso.parse.impl.SimpleValueMatcher) {
+		if(matcher instanceof SimpleValueMatcher) {
 			text.append("<font color=\"blue\">&gt;</font>");
-			text.append(((org.expresso.parse.impl.SimpleValueMatcher<?>) matcher).getValueString().replaceAll("<", "&amp;lt;")
-				.replaceAll(">", "&amp;gt;"));
+			text.append(((SimpleValueMatcher<?>) matcher).getValueString().replaceAll("<", "&amp;lt;").replaceAll(">", "&amp;gt;"));
 			if(needsEnding) {
 				text.append("<font color=\"blue\">&lt;/</font><font color=\"red\">");
 				text.append(matcher.getTypeName()).append("</font>");
