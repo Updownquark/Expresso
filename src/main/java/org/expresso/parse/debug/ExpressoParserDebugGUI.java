@@ -19,7 +19,10 @@ import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreePath;
 
 import org.expresso.parse.*;
-import org.expresso.parse.impl.*;
+import org.expresso.parse.impl.CharSequenceStream;
+import org.expresso.parse.impl.ReferenceMatcher;
+import org.expresso.parse.impl.SimpleValueMatcher;
+import org.expresso.parse.impl.WhitespaceMatcher;
 import org.qommons.ArrayUtils;
 import org.qommons.config.MutableConfig;
 import org.qommons.config.QommonsConfig;
@@ -32,22 +35,18 @@ import org.qommons.config.QommonsConfig;
 public class ExpressoParserDebugGUI<S extends CharSequenceStream> extends JPanel
 implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	enum StepTargetType {
-		EXIT, CHILD
+		EXIT, CHILD, DESCENDANT
 	}
 
 	private static final Color SELECTED = new Color(100, 100, 255);
-
 	private static final ImageIcon RESUME_ICON = getIcon("play.png", 24, 24);
-
 	private static final ImageIcon PAUSE_ICON = getIcon("pause.png", 24, 24);
-
 	private static final long REFRESH_INTERVAL = 1000;
 
 	private JTextPane theMainText;
 	private JScrollPane theMainTextScroll;
 
 	private ParsingExpressionTreeModel theInternalTreeModel;
-
 	private ParsingExpressionTreeModel theDisplayedTreeModel;
 	private JTree theParseTree;
 
@@ -61,6 +60,8 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	private JButton theIntoButton;
 	private JButton theOutButton;
 	private JButton theResumeButton;
+
+	private JButton theRunToButton;
 	private JToggleButton theDebugButton;
 	private JLabel theAddBreakpointLabel;
 
@@ -81,9 +82,10 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	private int inIgnorable;
 	private ParseNode theStepTarget;
 	private StepTargetType theStepTargetType;
+
+	private LinkedList<ParseMatcher<?>> theStepTargetDescendant;
 	private boolean isDebugging;
 	private int theLastBreakIndex;
-
 	private long theLastRefresh;
 
 	private java.util.Set<ExpressoParserBreakpoint> theIndexBreakpoints;
@@ -121,10 +123,12 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			}
 		});
 		theParseTree.setCellRenderer(new ParseNodeCellRenderer());
-		theOverButton = new JButton(getIcon("arrow180.png", 24, 16));
+		theOverButton = new JButton(getIcon("arrow180.png", 24, 24));
 		theIntoButton = new JButton(getIcon("arrow90down.png", 24, 24));
 		theOutButton = new JButton(getIcon("arrow90right.png", 24, 24));
 		theResumeButton = new JButton(RESUME_ICON);
+		// Sprint icon made by freepik from www.flaticon.com
+		theRunToButton = new JButton(getIcon("sprint.png", 24, 24));
 		theDebugButton = new JToggleButton(getIcon("bug.png", 24, 24));
 		theAddBreakpointLabel = new JLabel(getIcon("bluePlus.png", 16, 16));
 		theDebugPane = new JList<>(new DefaultListModel<MatcherObject>());
@@ -172,6 +176,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		buttonPanel.add(theIntoButton);
 		buttonPanel.add(theOutButton);
 		buttonPanel.add(theResumeButton);
+		buttonPanel.add(theRunToButton);
 		buttonPanel.add(theDebugButton);
 		JPanel rightPanel = new JPanel(new BorderLayout());
 		theMainSplit.setRightComponent(rightPanel);
@@ -203,6 +208,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		theIntoButton.addActionListener(e -> stepInto());
 		theOutButton.addActionListener(e -> stepOut());
 		theResumeButton.addActionListener(e -> suspendOrResume());
+		theResumeButton.addActionListener(e -> runTo());
 		theDebugButton.addActionListener(e -> debug());
 
 		theLastBreakIndex = -1;
@@ -377,7 +383,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	}
 
 	@Override
-	public void preParse(S stream, final ParseMatcher<?> matcher) {
+	public void preParse(S stream, final ParseMatcher<?> matcher, ParseSession session) {
 		if(theLastBreakIndex != stream.getPosition()) {
 			theLastBreakIndex = -1;
 			theIndexBreakpoints.clear();
@@ -389,14 +395,28 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			return;
 		boolean isOnStepTarget = false;
 		ParseNode cursor = theInternalTreeModel.getCursor();
-		if(theStepTarget == null || theStepTargetType != StepTargetType.CHILD) {} else if(theStepTarget == cursor)
+		if(theStepTarget == null || theStepTargetType == StepTargetType.EXIT) {}
+		else if(theStepTarget == cursor)
 			isOnStepTarget = true;
-		else if(cursor.isFinished && cursor.theParent != null && theStepTarget == cursor.theParent) {
-			theInternalTreeModel.ascend();
-			isOnStepTarget = true;
+		else {
+			if(cursor.isFinished) {
+				theInternalTreeModel.ascend();
+				cursor = cursor.theParent;
+			}
+			if(cursor == theStepTarget)
+				isOnStepTarget = true;
 		}
 
-		theInternalTreeModel.startNew(matcher);
+		theInternalTreeModel.startNew(matcher, session);
+		cursor = theInternalTreeModel.getCursor();
+		if(isOnStepTarget && theStepTargetType == StepTargetType.DESCENDANT && !theStepTargetDescendant.isEmpty()) {
+			isOnStepTarget = false; //Not on the target yet
+			if(cursor.theMatcher == theStepTargetDescendant.getFirst()) {
+				//We're one level closer to the target
+				theStepTarget = cursor;
+				theStepTargetDescendant.removeFirst();
+			}
+		}
 		int position = stream.getPosition();
 		update(position, matcher, null);
 
@@ -489,7 +509,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			isOnStepTarget = true;
 		}
 		if(isOnStepTarget) {
-			theInternalTreeModel.startNew(matcher);
+			theInternalTreeModel.startNew(matcher, null);
 			theInternalTreeModel.finish(match);
 		} else if(match != null)
 			theInternalTreeModel.add(match);
@@ -608,17 +628,16 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	private void setDebugOperator(ParseNode op) {
 		DefaultListModel<MatcherObject> model = (DefaultListModel<MatcherObject>) theDebugPane.getModel();
 		model.removeAllElements();
-		if(op == null) {} else if(op.theParent != null && op.theParent.theMatcher instanceof ReferenceMatcher) {
-			addToModel(model, op.theParent.theMatcher, 0, false);
-			for(ParseMatcher<?> matcher : ((ReferenceMatcher<?>) op.theParent.theMatcher).getReference(theParser, null)) {
-				if(!isExcluded(matcher, op.theParent))
-					addToModel(model, matcher, 1, false);
-			}
-			addEndToModel(model, op.theParent.theMatcher, 0);
+		if(op == null) {}
+		else if(op.theParent != null && op.theParent.theMatcher instanceof ReferenceMatcher) {
+			MatcherObject refObj = addToModel(model, null, op.theParent.theMatcher, 0, false);
+			for(ParseMatcher<?> matcher : ((ReferenceMatcher<?>) op.theParent.theMatcher).getReference(theParser, op.theParent.theSession))
+				addToModel(model, refObj, matcher, 1, false);
+			addEndToModel(model, null, op.theParent.theMatcher, 0);
 		} else {
 			while(op.theParent != null && !(op.theParent.theMatcher instanceof ReferenceMatcher))
 				op = op.theParent;
-			addToModel(model, op.theMatcher, 0, true);
+			addToModel(model, null, op.theMatcher, 0, true);
 		}
 
 		// Adjust the scroll to ensure the cursor location is visible in the list
@@ -639,37 +658,29 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		}
 	}
 
-	private void addToModel(DefaultListModel<MatcherObject> model, ParseMatcher<?> op, int indent, boolean withChildren) {
-		model.addElement(new MatcherObject(op, indent, false));
+	private MatcherObject addToModel(DefaultListModel<MatcherObject> model, MatcherObject parent, ParseMatcher<?> op, int indent,
+		boolean withChildren) {
+		MatcherObject newObj = new MatcherObject(parent, op, indent, false);
+		model.addElement(newObj);
 		boolean needsEnd = false;
 		if(withChildren) {
 			for(ParseMatcher<?> sub : op.getComposed()) {
 				needsEnd = true;
-				addToModel(model, sub, indent + 1, true);
+				addToModel(model, newObj, sub, indent + 1, true);
 			}
 		}
 		if(needsEnd)
-			addEndToModel(model, op, indent);
+			addEndToModel(model, parent, op, indent);
+		return newObj;
 	}
 
-	private void addEndToModel(DefaultListModel<MatcherObject> model, ParseMatcher<?> op, int indent) {
-		model.addElement(new MatcherObject(op, indent, true));
-	}
-
-	private boolean isExcluded(ParseMatcher<?> matcher, ParseNode node) {
-		Set<String> included = new java.util.LinkedHashSet<>();
-		if(node.theMatcher instanceof WithoutMatcher) {
-			Set<String> exclude = new java.util.LinkedHashSet<>(((WithoutMatcher<?>) node.theMatcher).getExcludedTypes());
-			exclude.removeAll(included);
-			if(matcher.matchesType(exclude))
-				return true;
-		} else if(node.theMatcher instanceof WithMatcher)
-			included.addAll(((WithMatcher<?>) node.theMatcher).getIncludedTypes());
-		return false;
+	private void addEndToModel(DefaultListModel<MatcherObject> model, MatcherObject parent, ParseMatcher<?> op, int indent) {
+		model.addElement(new MatcherObject(parent, op, indent, true));
 	}
 
 	private void suspend(ExpressoParserBreakpoint breakpoint) {
 		theStepTarget = null;
+		theStepTargetDescendant = null;
 		isSuspended = true;
 		setGuiEnabled(true);
 		isHolding = true;
@@ -726,6 +737,9 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		isSuspended = false;
 	}
 
+	private void runTo(){
+	}
+
 	private void suspendOrResume() {
 		if(isSuspended) {
 			theStepTarget = null;
@@ -747,30 +761,58 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		if(enabled) {
 			safe(() -> render());
 			ParseNode cursor = theInternalTreeModel.getCursor();
-			theOverButton.setEnabled(cursor != null && cursor.theParent != null);
-			boolean descendable = cursor != null && isDescendable(cursor.theMatcher) && !cursor.isFinished
-				&& theParseTree.getSelectionPath() != null;
-			if(descendable) {
-				ParseNode selected = (ParseNode) theParseTree.getSelectionPath().getLastPathComponent();
-				ParseNode internalSelected = theInternalTreeModel.navigateTo(selected);
-				if(internalSelected != cursor)
-					descendable = false;
-			}
-			theIntoButton.setEnabled(descendable);
-			theOutButton.setEnabled(cursor != null && cursor.theParent != null);
+			theOverButton.setEnabled(canStepOver(cursor));
+			theIntoButton.setEnabled(canStepInto(cursor));
+			theOutButton.setEnabled(canStepOut(cursor));
+			theRunToButton.setEnabled(canRunTo(cursor));
 			theResumeButton.setIcon(RESUME_ICON);
 		} else {
 			theOverButton.setEnabled(false);
 			theIntoButton.setEnabled(false);
 			theOutButton.setEnabled(false);
 			theResumeButton.setIcon(PAUSE_ICON);
+			theRunToButton.setEnabled(false);
 		}
 	}
 
-	private boolean isDescendable(ParseMatcher<?> op) {
-		if(op instanceof ReferenceMatcher)
-			return true;
-		return !op.getComposed().isEmpty();
+	private boolean canStepOver(ParseNode cursor) {
+		return isSteppable(cursor) && cursor.theParent != null;
+	}
+
+	private boolean canStepOut(ParseNode cursor) {
+		return isSteppable(cursor) && cursor.theParent != null;
+	}
+
+	private boolean canStepInto(ParseNode cursor) {
+		boolean descendable = isSteppable(cursor) && theParseTree.getSelectionPath() != null
+			&& cursor == getInternalSelection();
+		if(descendable) {
+			if(cursor.theMatcher.getComposed().isEmpty() && !(cursor.theMatcher instanceof ReferenceMatcher))
+				descendable = false;
+		}
+		return descendable;
+	}
+
+	private boolean canRunTo(ParseNode cursor) {
+		if(theDebugPane.getSelectedValuesList().size() != 1)
+			return false;
+		ParseNode selection = getInternalSelection();
+		MatcherObject listSelection = theDebugPane.getSelectedValue();
+		return false;
+	}
+
+	private boolean isSteppable(ParseNode cursor) {
+		if(cursor == null)
+			return false;
+		ParseNode selected = getInternalSelection();
+		if(selected.isFinished)
+			return false;
+		return true;
+	}
+
+	private ParseNode getInternalSelection() {
+		ParseNode selected = (ParseNode) theParseTree.getSelectionPath().getLastPathComponent();
+		return theInternalTreeModel.navigateTo(selected);
 	}
 
 	/**
@@ -881,8 +923,8 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			theCursor = theCursor.theParent;
 		}
 
-		void startNew(ParseMatcher<?> op) {
-			theCursor = add(op);
+		void startNew(ParseMatcher<?> op, ParseSession session) {
+			theCursor = add(op, session);
 		}
 
 		void finish(ParseMatch<? extends S> match) {
@@ -913,14 +955,14 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		}
 
 		void add(ParseMatch<? extends S> match) {
-			ParseNode added = add(match.getMatcher());
+			ParseNode added = add(match.getMatcher(), null);
 			added.theMatch = match;
 		}
 
-		private ParseNode add(ParseMatcher<?> match) {
+		private ParseNode add(ParseMatcher<?> match, ParseSession session) {
 			if(theCursor != null && theCursor.isFinished)
 				ascend();
-			ParseNode newNode = new ParseNode(theCursor, match);
+			ParseNode newNode = new ParseNode(theCursor, match, session);
 			boolean newRoot = theCursor == null;
 			if(newRoot)
 				theRoot = newNode;
@@ -934,7 +976,6 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		void syncSelection() {
 			if(theCursor != null) {
 				theParseTree.setSelectionPath(new TreePath(getPath(theCursor)));
-				// TODO Trying to expand the tree to the cursor. Not working yet.
 				if(theCursor.theParent != null)
 					theParseTree.expandPath(new TreePath(getPath(theCursor.theParent)));
 			}
@@ -952,7 +993,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		@Override
 		public Object getRoot() {
 			if(theRoot == null)
-				return new ParseNode(null, new EmptyMatcher());
+				return new ParseNode(null, new EmptyMatcher(), null);
 			return theRoot;
 		}
 
@@ -1044,7 +1085,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		}
 
 		private ParseNode copyNode(ParseNode node, ParseNode parent) {
-			ParseNode ret = new ParseNode(parent, node.theMatcher);
+			ParseNode ret = new ParseNode(parent, node.theMatcher, node.theSession);
 			ret.theMatch = node.theMatch;
 			ret.isFinished = node.isFinished;
 			for(ParseNode child : node.theChildren)
@@ -1197,20 +1238,20 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 
 	private class ParseNode {
 		final ParseNode theParent;
+		final ParseMatcher<?> theMatcher;
 
-		ParseMatcher<?> theMatcher;
+		ParseSession theSession;
+		final List<ParseNode> theChildren = new ArrayList<>();
+		private final String theString;
 
 		ParseMatch<? extends S> theMatch;
 
 		boolean isFinished;
 
-		final List<ParseNode> theChildren = new ArrayList<>();
-
-		private final String theString;
-
-		ParseNode(ParseNode parent, ParseMatcher<?> matcher) {
+		ParseNode(ParseNode parent, ParseMatcher<?> matcher, ParseSession session) {
 			theParent = parent;
 			theMatcher = matcher;
+			theSession = session;
 			StringBuilder str = new StringBuilder();
 			str.append("<").append(matcher.getTypeName());
 			if(!(matcher instanceof WhitespaceMatcher) && matcher.getName() != null)
@@ -1231,13 +1272,15 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	}
 
 	private static class MatcherObject {
+		final MatcherObject theParent;
 		final ParseMatcher<?> theMatcher;
 
 		final int theIndent;
 
 		final boolean isTerminal;
 
-		MatcherObject(ParseMatcher<?> op, int indent, boolean terminal) {
+		MatcherObject(MatcherObject parent, ParseMatcher<?> op, int indent, boolean terminal) {
+			theParent=parent;
 			theMatcher = op;
 			theIndent = indent;
 			isTerminal = terminal;

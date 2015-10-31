@@ -3,6 +3,7 @@ package org.expresso.parse.debug;
 import org.expresso.parse.ExpressoParser;
 import org.expresso.parse.ParseMatch;
 import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.ParseSession;
 
 /**
  * A debugger that doesn't do anything
@@ -27,7 +28,7 @@ public class NullDebugger<S extends org.expresso.parse.BranchableStream<?, ?>> i
 	}
 
 	@Override
-	public void preParse(S stream, ParseMatcher<?> matcher) {
+	public void preParse(S stream, ParseMatcher<?> matcher, ParseSession session) {
 	}
 
 	@Override

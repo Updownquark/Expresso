@@ -111,7 +111,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 		if(!memberMatchers.isEmpty())
 			match = ((ParseSessionImpl<SS>) session).match(stream, memberMatchers);
 		for(ParseMatcher<? super SS> matcher : foreignMatchers) {
-			theDebugger.preParse(stream, matcher);
+			theDebugger.preParse(stream, matcher, session);
 			ParseMatch<SS> fMatch = matcher.match((SS) stream.branch(), this, session);
 			theDebugger.postParse(stream, matcher, fMatch);
 			if(fMatch != null && fMatch.isBetter(match)) {
@@ -303,7 +303,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 						ParseMatcher<? super SS> matcher = iter.next();
 						Matching matching = theTypeMatching.get(matcher.getName());
 
-						theDebugger.preParse(stream, matcher);
+						theDebugger.preParse(stream, matcher, session);
 						ParseMatch<SS> match_i = matcher.match((SS) stream.branch(), DefaultExpressoParser.this, session);
 						theDebugger.postParse(stream, matcher, match_i);
 

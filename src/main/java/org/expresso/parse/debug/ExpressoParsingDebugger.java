@@ -1,9 +1,6 @@
 package org.expresso.parse.debug;
 
-import org.expresso.parse.BranchableStream;
-import org.expresso.parse.ExpressoParser;
-import org.expresso.parse.ParseMatch;
-import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.*;
 
 /**
  * An interface for a debugger to be notified of parsing events
@@ -46,8 +43,9 @@ public interface ExpressoParsingDebugger<S extends BranchableStream<?, ?>> {
 	 *
 	 * @param stream The stream at the location to parse
 	 * @param matcher The parsing matcher that will attempt to match the beginning of the stream
+	 * @param session The session to use to parse next piece of the stream
 	 */
-	void preParse(S stream, ParseMatcher<?> matcher);
+	void preParse(S stream, ParseMatcher<?> matcher, ParseSession session);
 
 	/**
 	 * Called after attempting to parse a subsequence
