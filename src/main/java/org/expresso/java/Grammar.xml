@@ -5,7 +5,7 @@
 		<without type="ignorable">
 			<literal>&apos;</literal>
 			<one-of>
-				<literal name="value">&apos;</literal>
+				<literal name="value">&quot;</literal>
 				<pattern name="value">[\x20-~]</pattern>
 				<pattern name="value" tag="escaped">\\[&apos;&quot;tnrbf]</pattern>
 				<pattern name="value" tag="escaped,unicode">\\u[0-9a-fA-F]{4}</pattern>
@@ -19,7 +19,7 @@
 			<up-to name="value">
 				<one-of>
 					<literal>&quot;</literal>
-					<literal>&#10;</literal>
+					<literal value="&#10;" />
 				</one-of>
 			</up-to>
 			<literal>&quot;</literal>
@@ -112,16 +112,16 @@
 		<literal>true</literal>
 		<literal>false</literal>
 	</one-of>
-	<literal name="null">null</literal>
+	<literal name="null" value="null" />
 
 	<!-- Ignorables -->
 	<sequence name="line-comment" tag="ignorable">
 		<without type="ignorable">
 			<literal>//</literal>
 			<up-to name="content">
-				<literal>&#10;</literal>
+				<literal value="&#10;" />
 			</up-to>
-			<literal>&#10;</literal>
+			<literal value="&#10;" />
 		</without>
 	</sequence>
 	<sequence name="block-comment" tag="ignorable">
@@ -299,7 +299,6 @@
 	</sequence>
 	<one-of name="primitive" tag="type">
 		<literal>void</literal>
-		<literal>null</literal>
 		<literal>boolean</literal>
 		<literal>true</literal>
 		<literal>false</literal>

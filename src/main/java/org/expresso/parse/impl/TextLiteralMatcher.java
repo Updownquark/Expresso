@@ -16,6 +16,8 @@ public class TextLiteralMatcher<S extends CharSequenceStream> extends LiteralMat
 	 */
 	public TextLiteralMatcher(String name, Set<String> tags, String value) {
 		super(name, tags, value.toCharArray());
+		if(value.length() == 0)
+			throw new IllegalArgumentException("Text literals cannot search for empty strings");
 	}
 
 	@Override

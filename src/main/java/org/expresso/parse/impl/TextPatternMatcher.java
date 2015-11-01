@@ -22,6 +22,8 @@ public class TextPatternMatcher<S extends CharSequenceStream> extends SimpleValu
 	 */
 	public TextPatternMatcher(String name, Set<String> tags, Pattern pattern) {
 		super(name, tags);
+		if(pattern.pattern().length() == 0)
+			throw new IllegalArgumentException("Text pattern matchers cannot search for empty strings");
 		thePattern = pattern;
 	}
 

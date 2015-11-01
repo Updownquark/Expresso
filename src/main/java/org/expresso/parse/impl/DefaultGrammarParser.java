@@ -80,6 +80,10 @@ public class DefaultGrammarParser {
 	 */
 	public static ParseMatcher<CharSequenceStream> getMatcher(Element element, boolean topLevel) {
 		String name = element.getAttributeValue("name");
+		if(topLevel && name == null)
+			throw new IllegalArgumentException("Name attribute must be present for top-level matchers");
+		if(name != null && name.length() == 0)
+			throw new IllegalArgumentException("zero-length name attribute illegal");
 		String tagStr = element.getAttributeValue("tag");
 		Set<String> tags = tagStr == null ? Collections.EMPTY_SET
 			: Collections.unmodifiableSet(Arrays.stream(tagStr.split(",")).collect(Collectors.toSet()));
@@ -108,6 +112,8 @@ public class DefaultGrammarParser {
 		switch (element.getName()) {
 		case "literal":
 		case "pattern":
+			attrs.remove("value");
+			//$FALL-THROUGH$
 		case "whitespace":
 		case "ref":
 			if(!element.getChildren().isEmpty())
@@ -187,9 +193,9 @@ public class DefaultGrammarParser {
 
 		switch (element.getName()) {
 		case "literal":
-			return new TextLiteralMatcher<>(name, tags, element.getTextTrim());
+			return new TextLiteralMatcher<>(name, tags, getText(element));
 		case "pattern":
-			return new TextPatternMatcher<>(name, tags, Pattern.compile(element.getTextTrim()));
+			return new TextPatternMatcher<>(name, tags, Pattern.compile(getText(element)));
 		case "whitespace":
 			return new WhitespaceMatcher<>();
 		case "ref":
@@ -237,5 +243,12 @@ public class DefaultGrammarParser {
 		for(ParseMatcher<CharSequenceStream> child : children)
 			builder.addChild(child);
 		return builder.build();
+	}
+
+	private static String getText(Element element) {
+		if(element.getAttribute("value") != null)
+			return element.getAttributeValue("value");
+		else
+			return element.getTextTrim();
 	}
 }

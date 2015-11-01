@@ -88,6 +88,8 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	private int theLastBreakIndex;
 	private long theLastRefresh;
 
+	private boolean theCallbackLock;
+
 	private java.util.Set<ExpressoParserBreakpoint> theIndexBreakpoints;
 
 	/** Creates a debug GUI using the config file in the standard location */
@@ -124,15 +126,32 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		});
 		theParseTree.setCellRenderer(new ParseNodeCellRenderer());
 		theOverButton = new JButton(getIcon("arrow180.png", 24, 24));
+		theOverButton.setToolTipText("Skip to the next matcher at the current level");
 		theIntoButton = new JButton(getIcon("arrow90down.png", 24, 24));
+		theIntoButton.setToolTipText("Descend into the components of the current matcher");
 		theOutButton = new JButton(getIcon("arrow90right.png", 24, 24));
+		theOutButton.setToolTipText("Skip out to the completion of the current matcher's parent");
 		theResumeButton = new JButton(RESUME_ICON);
+		theResumeButton.setToolTipText("Allow parsing to continue until the next breakpoint condition");
 		// Sprint icon made by freepik from www.flaticon.com
 		theRunToButton = new JButton(getIcon("sprint.png", 24, 24));
+		theRunToButton.setToolTipText("Parse until the selected matcher");
 		theDebugButton = new JToggleButton(getIcon("bug.png", 24, 24));
+		theDebugButton.setToolTipText("Enter deep debug mode: catch the breakpoint in the java debugger and ignore all breakpoints");
 		theAddBreakpointLabel = new JLabel(getIcon("bluePlus.png", 16, 16));
+		theAddBreakpointLabel.setToolTipText("Create a new breakpoint to watch for");
 		theDebugPane = new JList<>(new DefaultListModel<MatcherObject>());
+		theDebugPane.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		theDebugPane.setCellRenderer(new MatcherRenderer());
+		theDebugPane.addListSelectionListener(new ListSelectionListener() {
+			@Override
+			public void valueChanged(ListSelectionEvent e) {
+				if(e.getValueIsAdjusting() || theCallbackLock)
+					return;
+				theRunToButton.setEnabled(canRunTo(theInternalTreeModel.getCursor()));
+				theDebugPane.repaint();
+			}
+		});
 		theBreakpointList = new JTable(0, 4);
 		theBreakpointList.getTableHeader().setReorderingAllowed(false);
 		theBreakpointList.getColumnModel().getColumn(0).setHeaderValue("");
@@ -208,11 +227,12 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		theIntoButton.addActionListener(e -> stepInto());
 		theOutButton.addActionListener(e -> stepOut());
 		theResumeButton.addActionListener(e -> suspendOrResume());
-		theResumeButton.addActionListener(e -> runTo());
+		theRunToButton.addActionListener(e -> runTo());
 		theDebugButton.addActionListener(e -> debug());
 
 		theLastBreakIndex = -1;
 		theIndexBreakpoints = new java.util.HashSet<>();
+		theStepTargetDescendant = new LinkedList<>();
 
 		reset();
 		readConfig();
@@ -680,7 +700,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 
 	private void suspend(ExpressoParserBreakpoint breakpoint) {
 		theStepTarget = null;
-		theStepTargetDescendant = null;
+		theStepTargetDescendant.clear();
 		isSuspended = true;
 		setGuiEnabled(true);
 		isHolding = true;
@@ -702,11 +722,9 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	}
 
 	private void stepOver() {
-		ParseNode target = theParseTree.getSelectionPath() == null ? theInternalTreeModel.getCursor()
-			: (ParseNode) theParseTree.getSelectionPath().getLastPathComponent();
+		ParseNode target = getInternalSelection();
 		if(target == null)
 			throw new IllegalStateException("No selection or cursor!");
-		target = theInternalTreeModel.navigateTo(target);
 		theStepTarget = target.theParent;
 		theStepTargetType = StepTargetType.CHILD;
 		setGuiEnabled(false);
@@ -714,11 +732,9 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	}
 
 	private void stepInto() {
-		ParseNode target = theParseTree.getSelectionPath() == null ? theInternalTreeModel.getCursor()
-			: (ParseNode) theParseTree.getSelectionPath().getLastPathComponent();
+		ParseNode target = getInternalSelection();
 		if(target == null)
 			throw new IllegalStateException("No selection or cursor!");
-		target = theInternalTreeModel.navigateTo(target);
 		theStepTarget = target;
 		theStepTargetType = StepTargetType.CHILD;
 		setGuiEnabled(false);
@@ -726,11 +742,9 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	}
 
 	private void stepOut() {
-		ParseNode target = theParseTree.getSelectionPath() == null ? theInternalTreeModel.getCursor()
-			: (ParseNode) theParseTree.getSelectionPath().getLastPathComponent();
+		ParseNode target = getInternalSelection();
 		if(target == null)
 			throw new IllegalStateException("No selection or cursor!");
-		target = theInternalTreeModel.navigateTo(target);
 		theStepTarget = target.theParent;
 		theStepTargetType = StepTargetType.EXIT;
 		setGuiEnabled(false);
@@ -738,6 +752,19 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	}
 
 	private void runTo(){
+		ParseNode target = getInternalSelection();
+		if(target == null)
+			throw new IllegalStateException("No selection or cursor!");
+		theStepTarget = target.theParent;
+		theStepTargetType = StepTargetType.DESCENDANT;
+		theStepTargetDescendant.clear();
+		MatcherObject listSelection = theDebugPane.getSelectedValue();
+		while(listSelection != null && listSelection.theMatcher != target.theParent.theMatcher) {
+			theStepTargetDescendant.addFirst(listSelection.theMatcher);
+			listSelection = listSelection.theParent;
+		}
+		setGuiEnabled(false);
+		isSuspended = false;
 	}
 
 	private void suspendOrResume() {
@@ -755,6 +782,10 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 
 	private void debug() {
 		isDebugging = theDebugButton.isSelected();
+		if(theDebugButton.isSelected())
+			theDebugButton.setToolTipText("Exit deep debug mode: watch for breakpoints");
+		else
+			theDebugButton.setToolTipText("Enter deep debug mode: catch the breakpoint in the java debugger and ignore all breakpoints");
 	}
 
 	private void setGuiEnabled(boolean enabled) {
@@ -766,12 +797,14 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			theOutButton.setEnabled(canStepOut(cursor));
 			theRunToButton.setEnabled(canRunTo(cursor));
 			theResumeButton.setIcon(RESUME_ICON);
+			theResumeButton.setToolTipText("Allow parsing to continue until the next breakpoint condition");
 		} else {
 			theOverButton.setEnabled(false);
 			theIntoButton.setEnabled(false);
 			theOutButton.setEnabled(false);
 			theResumeButton.setIcon(PAUSE_ICON);
 			theRunToButton.setEnabled(false);
+			theResumeButton.setToolTipText("Suspend parsing when the next matcher is started or completed");
 		}
 	}
 
@@ -794,11 +827,27 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	}
 
 	private boolean canRunTo(ParseNode cursor) {
+		// TODO Not at all confident that I captured every use case here
 		if(theDebugPane.getSelectedValuesList().size() != 1)
+			return false;
+		if(!isSteppable(cursor))
 			return false;
 		ParseNode selection = getInternalSelection();
 		MatcherObject listSelection = theDebugPane.getSelectedValue();
-		return false;
+		if(selection.theParent.theMatcher instanceof ReferenceMatcher) {
+			// At the moment, we don't keep track of which reference matchers have already been parsed, and anyway it's possible that it may
+			// need to be re-parsed, so we won't try to screen anything here.
+			return true;
+		} else {
+			while(listSelection.theParent != null)
+				listSelection = listSelection.theParent;
+			int selectIndex = selection.theParent.theMatcher.getComposed().indexOf(listSelection.theMatcher);
+			while(selection.theParent != null && !(selection.theParent.theMatcher instanceof ReferenceMatcher))
+				selection = selection.theParent;
+			if(selection.theParent.theMatcher.getComposed().indexOf(selection.theMatcher) >= selectIndex)
+				return false; // Already passed the selected matcher
+			return true;
+		}
 	}
 
 	private boolean isSteppable(ParseNode cursor) {
@@ -812,7 +861,10 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 
 	private ParseNode getInternalSelection() {
 		ParseNode selected = (ParseNode) theParseTree.getSelectionPath().getLastPathComponent();
-		return theInternalTreeModel.navigateTo(selected);
+		if(selected != null)
+			return theInternalTreeModel.navigateTo(selected);
+		else
+			return theInternalTreeModel.getCursor();
 	}
 
 	/**
@@ -1285,6 +1337,11 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			theIndent = indent;
 			isTerminal = terminal;
 		}
+
+		@Override
+		public String toString() {
+			return theMatcher.toString();
+		}
 	}
 
 	private static class BreakpointEnabledRenderer extends JCheckBox implements TableCellRenderer {
@@ -1643,7 +1700,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 
 		@Override
 		public Component getListCellRendererComponent(JList<? extends MatcherObject> list, MatcherObject value, int index,
-			boolean isSelected, boolean cellHasFocus) {
+			boolean listSelected, boolean cellHasFocus) {
 			StringBuilder text;
 			if(value.isTerminal) {
 				text = new StringBuilder("<html>");
@@ -1668,6 +1725,8 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 				bg = Color.green;
 			else if(selected)
 				bg = SELECTED;
+			else if(listSelected)
+				bg = Color.orange;
 			setBackground(bg);
 			return this;
 		}
