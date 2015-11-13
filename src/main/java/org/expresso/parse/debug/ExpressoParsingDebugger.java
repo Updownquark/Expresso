@@ -59,9 +59,10 @@ public interface ExpressoParsingDebugger<S extends BranchableStream<?, ?>> {
 	/**
 	 * Called when a match is discarded in favor of a better one
 	 *
+	 * @param matcher The matcher that parsing attempted to use
 	 * @param match The discarded match
 	 */
-	void matchDiscarded(ParseMatch<? extends S> match);
+	void matchDiscarded(ParseMatcher<?> matcher, ParseMatch<? extends S> match);
 
 	/**
 	 * Called when a match from the cache is used

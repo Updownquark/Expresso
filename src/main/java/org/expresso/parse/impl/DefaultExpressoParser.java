@@ -116,10 +116,10 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 			theDebugger.postParse(stream, matcher, fMatch);
 			if(fMatch != null && fMatch.isBetter(match)) {
 				if(match != null)
-					theDebugger.matchDiscarded(match);
+					theDebugger.matchDiscarded(match.getMatcher(), match);
 				match = fMatch;
-			} else if(fMatch != null)
-				theDebugger.matchDiscarded(fMatch);
+			} else
+				theDebugger.matchDiscarded(matcher, fMatch);
 		}
 
 		if(match != null)
@@ -262,14 +262,8 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 
 			ParseMatch<SS> match(SS stream, ParseSession session, Collection<? extends ParseMatcher<? super SS>> matchers)
 				throws IOException {
-				Set<ParseMatcher<? super SS>> uncached = new java.util.LinkedHashSet<>();
-				Set<ParseMatcher<? super SS>> cached = new java.util.LinkedHashSet<>();
-				for(ParseMatcher<? super SS> matcher : matchers) {
-					if(theTypeMatching.containsKey(matcher.getName()))
-						cached.add(matcher);
-					else
-						uncached.add(matcher);
-				}
+				Set<ParseMatcher<? super SS>> uncached = matchers.stream().filter(m -> !theTypeMatching.containsKey(m.getName()))
+					.collect(Collectors.toSet());
 				Set<String> uncachedTypeNames = uncached.stream().map(ParseMatcher::getName).collect(Collectors.toSet());
 				boolean loop = false;
 				/* If a match with one any of these parsers may also be the first component in a match with the same or a different one in
@@ -284,46 +278,45 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 				}
 
 				ParseMatch<SS> match = null;
-				// For the cached matchers, just get the best cached match
-				for(ParseMatcher<? super SS> matcher : cached) {
-					ParseMatch<SS> match_i = theTypeMatching.get(matcher.getName()).theMatch;
-					theDebugger.usedCache(matcher, match_i);
-					if(match_i != null && match_i.isBetter(match)) {
-						if(match != null)
-							theDebugger.matchDiscarded(match);
-						match = match_i;
-					}
-				}
-				// See if we can beat the best cached match with the uncached matchers
 				boolean hadBetter;
 				do {
 					hadBetter = false;
-					Iterator<ParseMatcher<? super SS>> iter = uncached.iterator();
+					Iterator<? extends ParseMatcher<? super SS>> iter = matchers.iterator();
 					while(iter.hasNext()) {
 						ParseMatcher<? super SS> matcher = iter.next();
 						Matching matching = theTypeMatching.get(matcher.getName());
+						if(uncachedTypeNames.contains(matcher.getName())) {
+							theDebugger.preParse(stream, matcher, session);
+							ParseMatch<SS> match_i = matcher.match((SS) stream.branch(), DefaultExpressoParser.this, session);
+							theDebugger.postParse(stream, matcher, match_i);
 
-						theDebugger.preParse(stream, matcher, session);
-						ParseMatch<SS> match_i = matcher.match((SS) stream.branch(), DefaultExpressoParser.this, session);
-						theDebugger.postParse(stream, matcher, match_i);
+							// Cache the result
+							if(match_i != null && match_i.isBetter(matching.theMatch)) {
+								if(matching.theMatch != null)
+									theDebugger.matchDiscarded(matcher, matching.theMatch);
+								matching.theMatch = match_i;
 
-						// Cache the result
-						if(match_i != null && match_i.isBetter(matching.theMatch)) {
-							if(matching.theMatch != null)
-								theDebugger.matchDiscarded(matching.theMatch);
-							matching.theMatch = match_i;
-
-							// If we beat the cached match, maybe we'll beat the overall match
-							if(match_i != null && match_i.isBetter(match)) {
-								hadBetter = true;
-								if(match != null)
-									theDebugger.matchDiscarded(match);
-								match = match_i;
+								// If we beat the cached match, maybe we'll beat the overall match
+								if(match_i != null && match_i.isBetter(match)) {
+									hadBetter = true;
+									if(match != null)
+										theDebugger.matchDiscarded(match.getMatcher(), match);
+									match = match_i;
+								} else
+									theDebugger.matchDiscarded(matcher, match_i);
+							} else {
+								theDebugger.matchDiscarded(matcher, match_i);
+								iter.remove();
 							}
 						} else {
-							if(match_i != null)
-								theDebugger.matchDiscarded(match_i);
-							iter.remove();
+							ParseMatch<SS> match_i = matching.theMatch;
+							theDebugger.usedCache(matcher, match_i);
+							if(match_i != null && match_i.isBetter(match)) {
+								if(match != null)
+									theDebugger.matchDiscarded(match.getMatcher(), match);
+								match = match_i;
+							} else
+								theDebugger.matchDiscarded(matcher, match_i);
 						}
 					}
 				} while(loop && hadBetter);

@@ -511,8 +511,12 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	}
 
 	@Override
-	public void matchDiscarded(final ParseMatch<? extends S> match) {
-		theInternalTreeModel.matchDiscarded(match);
+	public void matchDiscarded(ParseMatcher<?> matcher, final ParseMatch<? extends S> match) {
+		if(matcher.getTags().contains(ExpressoParser.IGNORABLE))
+			return;
+		else if(inIgnorable > 0)
+			return;
+		theInternalTreeModel.matchDiscarded(matcher, match);
 
 		if(isDebugging || System.currentTimeMillis() - theLastRefresh >= REFRESH_INTERVAL)
 			safe(() -> render());
@@ -520,6 +524,8 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 
 	@Override
 	public void usedCache(final ParseMatcher<?> matcher, final ParseMatch<? extends S> match) {
+		if(matcher.getTags().contains(ExpressoParser.IGNORABLE) || inIgnorable > 0)
+			return;
 		boolean isOnStepTarget = false;
 		ParseNode cursor = theInternalTreeModel.getCursor();
 		if(theStepTarget == null || theStepTargetType != StepTargetType.CHILD) {} else if(theStepTarget == cursor)
@@ -552,18 +558,22 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	private void render() {
 		theLastRefresh = System.currentTimeMillis();
 		if(theInternalTreeModel.isDirty) {
-			theInternalTreeModel.sync(theDisplayedTreeModel);
 			theInternalTreeModel.isDirty = false;
+			theInternalTreeModel.sync(theDisplayedTreeModel);
 			theDisplayedTreeModel.syncSelection();
 
 			if(theParseTree.getSelectionPath() != null) {
 				Rectangle bounds = theParseTree.getPathBounds(theParseTree.getSelectionPath());
-				JScrollBar vBar = theTreeScroll.getVerticalScrollBar();
-				JScrollBar hBar = theTreeScroll.getHorizontalScrollBar();
-				int vScroll = adjustScroll(vBar.getValue(), vBar.getModel(), bounds.getMinY(), bounds.getMaxY(), theMainText.getHeight());
-				int hScroll = adjustScroll(hBar.getValue(), hBar.getModel(), bounds.getMinX(), bounds.getMaxX(), theMainText.getWidth());
-				vBar.setValue(vScroll);
-				hBar.setValue(hScroll);
+				if(bounds != null) {
+					JScrollBar vBar = theTreeScroll.getVerticalScrollBar();
+					JScrollBar hBar = theTreeScroll.getHorizontalScrollBar();
+					int vScroll = adjustScroll(vBar.getValue(), vBar.getModel(), bounds.getMinY(), bounds.getMaxY(),
+						theMainText.getHeight());
+					int hScroll = adjustScroll(hBar.getValue(), hBar.getModel(), bounds.getMinX(), bounds.getMaxX(),
+						theMainText.getWidth());
+					vBar.setValue(vScroll);
+					hBar.setValue(hScroll);
+				}
 			}
 		}
 		if(isPopupWhenHit && isSuspended) {
@@ -820,8 +830,13 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		boolean descendable = isSteppable(cursor) && theParseTree.getSelectionPath() != null
 			&& cursor == getInternalSelection();
 		if(descendable) {
-			if(cursor.theMatcher.getComposed().isEmpty() && !(cursor.theMatcher instanceof ReferenceMatcher))
+			ParseNode selected = getInternalSelection();
+			if(selected.isFinished)
 				descendable = false;
+			if(descendable) {
+				if(cursor.theMatcher.getComposed().isEmpty() && !(cursor.theMatcher instanceof ReferenceMatcher))
+					descendable = false;
+			}
 		}
 		return descendable;
 	}
@@ -844,19 +859,14 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			int selectIndex = selection.theParent.theMatcher.getComposed().indexOf(listSelection.theMatcher);
 			while(selection.theParent != null && !(selection.theParent.theMatcher instanceof ReferenceMatcher))
 				selection = selection.theParent;
-			if(selection.theParent.theMatcher.getComposed().indexOf(selection.theMatcher) >= selectIndex)
+			if(selection.theParent == null || selection.theParent.theMatcher.getComposed().indexOf(selection.theMatcher) >= selectIndex)
 				return false; // Already passed the selected matcher
 			return true;
 		}
 	}
 
 	private boolean isSteppable(ParseNode cursor) {
-		if(cursor == null)
-			return false;
-		ParseNode selected = getInternalSelection();
-		if(selected.isFinished)
-			return false;
-		return true;
+		return cursor != null;
 	}
 
 	private ParseNode getInternalSelection() {
@@ -875,6 +885,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	 */
 	public static JFrame getDebuggerFrame(final ExpressoParserDebugGUI<?> debugger) {
 		JFrame ret = new JFrame("Prisms Parser Debug");
+		ret.setIconImage(getIcon("bug.png", 16, 16).getImage());
 		ret.setContentPane(debugger);
 		ret.pack();
 		ret.setLocationRelativeTo(null);
@@ -990,20 +1001,33 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			isDirty = true;
 		}
 
-		void matchDiscarded(ParseMatch<? extends S> match) {
+		void matchDiscarded(ParseMatcher<?> matcher, ParseMatch<? extends S> match) {
 			if(theCursor == null)
 				return;
 			ParseNode removed = null;
 			for(ParseNode child : theCursor.theChildren)
-				if(child.theMatch == match) {
+				if(child.theMatcher == matcher && child.theMatch == match) {
 					removed = child;
 					break;
 				}
-			if(removed == null)
-				return;
-			int childIdx = theCursor == null ? 0 : theCursor.theChildren.indexOf(removed);
-			theCursor.theChildren.remove(childIdx);
-			isDirty = true;
+			if(removed != null) {
+				int childIdx = theCursor.theChildren.indexOf(removed);
+				theCursor.theChildren.remove(childIdx);
+			} else if(theCursor.theParent != null) {
+				for(ParseNode child : theCursor.theParent.theChildren)
+					if(child.theMatcher == matcher && child.theMatch == match) {
+						removed = child;
+						break;
+					}
+				if(removed != null) {
+					int childIdx = theCursor.theParent.theChildren.indexOf(removed);
+					theCursor.theParent.theChildren.remove(childIdx);
+					if(removed == theCursor)
+						ascend();
+				}
+			}
+			if(removed != null)
+				isDirty = true;
 		}
 
 		void add(ParseMatch<? extends S> match) {
