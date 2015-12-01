@@ -294,7 +294,7 @@
 	</sequence>
 	
 	<!-- Types -->
-	<sequence name="identifier">
+	<sequence name="identifier" tag="assignable">
 		<pattern name="name">[_a-zA-Z][_a-zA-Z0-9]*</pattern>
 	</sequence>
 	<one-of name="primitive" tag="type">
@@ -365,7 +365,7 @@
 		<literal>final</literal>
 		<literal>synchronized</literal>
 	</one-of>
-	<sequence name="variable-declaration" tag="declaration">
+	<sequence name="variable-declaration" tag="declaration,assignable">
 		<repeat>
 			<ref type="qualifier" name="qualifier" />
 		</repeat>
@@ -587,7 +587,7 @@
 		</option>
 	</sequence>
 	<sequence name="assign" priority="100" tag="assignment,binary">
-		<ref name="variable" />
+		<ref type="assignable" name="variable" />
 		<literal name="name">=</literal>
 		<ref name="operand" />
 	</sequence>
@@ -796,13 +796,13 @@
 		<ref name="content" />
 		<literal>)</literal>
 	</sequence>
-	<sequence name="array index" priority="250" tag="binary">
+	<sequence name="array index" priority="250" tag="binary,assignable">
 		<ref name="array" />
 		<literal name="open-bracket">[</literal>
 		<ref name="index" />
 		<literal>]</literal>
 	</sequence>
-	<sequence name="member" priority="250">
+	<sequence name="member" priority="250" tag="assignable">
 		<ref name="context" />
 		<literal name="dot">.</literal>
 		<ref type="identifier" name="name" />
