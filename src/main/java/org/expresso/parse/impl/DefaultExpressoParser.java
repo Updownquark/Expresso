@@ -329,6 +329,10 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 						return true;
 				return false;
 			}
+
+			boolean isCached(String type) {
+				return theTypeMatching.containsKey(type);
+			}
 		}
 
 		private final HashMap<Integer, StreamPositionData> thePositions;
@@ -347,6 +351,13 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 				thePositions.put(pos, posData);
 			}
 			return posData.match(stream, session, matchers);
+		}
+
+		boolean isCached(String type, int position) {
+			StreamPositionData posData = thePositions.get(position);
+			if(posData==null)
+				return false;
+			return posData.isCached(type);
 		}
 	}
 
@@ -376,6 +387,11 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 		@Override
 		public boolean includeType(String type) {
 			return theExcludedTypes.remove(type);
+		}
+
+		@Override
+		public boolean isCached(String type, BranchableStream<?, ?> stream) {
+			return theCache.isCached(type, stream.getPosition());
 		}
 
 		ParseMatch<SS> match(SS stream, Collection<? extends ParseMatcher<? super SS>> matchers) throws IOException {

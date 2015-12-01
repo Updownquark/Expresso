@@ -427,7 +427,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 				isOnStepTarget = true;
 		}
 
-		theInternalTreeModel.startNew(matcher, session);
+		theInternalTreeModel.startNew(matcher, session, stream);
 		cursor = theInternalTreeModel.getCursor();
 		if(isOnStepTarget && theStepTargetType == StepTargetType.DESCENDANT && !theStepTargetDescendant.isEmpty()) {
 			isOnStepTarget = false; //Not on the target yet
@@ -439,6 +439,18 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		}
 		int position = stream.getPosition();
 		update(position, matcher, null);
+		// Set the cached flag
+		if(cursor.theMatcher instanceof ReferenceMatcher) {
+			boolean cached = true;
+			for(ParseMatcher<?> m : ((ReferenceMatcher<?>) cursor.theMatcher).getReference(theParser, session)) {
+				cached = session.isCached(m.getName(), stream);
+				if(!cached)
+					break;
+			}
+			cursor.isCached = cached;
+		} else if(cursor.theParent == null || cursor.theParent.theMatcher instanceof ReferenceMatcher) {
+			cursor.isCached = session.isCached(cursor.theMatcher.getName(), stream);
+		}
 
 		boolean didSuspend = false;
 		// TODO fix this terrible formatting
@@ -535,10 +547,11 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			isOnStepTarget = true;
 		}
 		if(isOnStepTarget) {
-			theInternalTreeModel.startNew(matcher, null);
+			theInternalTreeModel.startNew(matcher, null, null);
 			theInternalTreeModel.finish(match);
 		} else if(match != null)
 			theInternalTreeModel.add(match);
+		theInternalTreeModel.theCursor.isCached = true;
 
 		if(isOnStepTarget && !isDebugging)
 			suspend(null);
@@ -597,7 +610,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 				else
 					sb.append(ch);
 			}
-			sb.append("<b><font color=\"red\" size=\"4\">|</font></b>");
+			sb.append("<b><font color=\"red\" weight=\"bold\" size=\"4\">\u25BA</font></b>");
 			for(int c = thePosition; c < theStream.length(); c++) {
 				char ch = theStream.charAt(c);
 				if(ch == '<')
@@ -614,6 +627,8 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			int preHScroll = theMainTextScroll.getHorizontalScrollBar().getValue();
 			theMainText.setText(sb.toString());
 			EventQueue.invokeLater(() -> {
+				if(theParseTree.getSelectionPath() == null)
+					return;
 				int vScroll = preVScroll;
 				int hScroll = preHScroll;
 				ParseNode selected = (ExpressoParserDebugGUI<S>.ParseNode) theParseTree.getSelectionPath().getLastPathComponent();
@@ -656,18 +671,64 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	}
 
 	private void setDebugOperator(ParseNode op) {
-		DefaultListModel<MatcherObject> model = (DefaultListModel<MatcherObject>) theDebugPane.getModel();
-		model.removeAllElements();
+		List<MatcherObject> newModel = new ArrayList<>();
 		if(op == null) {}
 		else if(op.theParent != null && op.theParent.theMatcher instanceof ReferenceMatcher) {
-			MatcherObject refObj = addToModel(model, null, op.theParent.theMatcher, 0, false);
+			boolean passedCursor = false;
+			boolean allCached = true;
+			Set<String> cached = new java.util.LinkedHashSet<>();
+			ParseNode cursor = theInternalTreeModel.theCursor;
+			if(cursor.theParent != op.theParent) {
+				allCached = false;
+			} else {
+				for(ParseMatcher<?> m : ((ReferenceMatcher<?>) op.theParent.theMatcher).getReference(theParser, op.theParent.theSession)) {
+					boolean mCached;
+					if(passedCursor) {
+						mCached = op.theParent.theSession.isCached(op.theMatcher.getName(), op.theParent.theStream);
+					} else if(m == cursor.theMatcher) {
+						passedCursor = true;
+						mCached = cursor.isCached;
+					} else {
+						mCached = false;
+						for(ParseNode node : cursor.theParent.theChildren) {
+							if(node.theMatcher == m) {
+								mCached = node.isCached;
+								break;
+							} else if(node == cursor)
+								break;
+						}
+					}
+					if(mCached)
+						cached.add(m.getName());
+					else
+						allCached = false;
+				}
+			}
+			MatcherObject refObj = addToModel(newModel, null, op.theParent.theMatcher, 0, false, allCached);
 			for(ParseMatcher<?> matcher : ((ReferenceMatcher<?>) op.theParent.theMatcher).getReference(theParser, op.theParent.theSession))
-				addToModel(model, refObj, matcher, 1, false);
-			addEndToModel(model, null, op.theParent.theMatcher, 0);
+				addToModel(newModel, refObj, matcher, 1, false, cached.contains(matcher.getName()));
+			addEndToModel(newModel, null, op.theParent.theMatcher, 0);
 		} else {
 			while(op.theParent != null && !(op.theParent.theMatcher instanceof ReferenceMatcher))
 				op = op.theParent;
-			addToModel(model, null, op.theMatcher, 0, true);
+			addToModel(newModel, null, op.theMatcher, 0, true, op.isCached);
+		}
+
+		DefaultListModel<MatcherObject> model = (DefaultListModel<MatcherObject>) theDebugPane.getModel();
+		boolean changed = model.getSize() != newModel.size();
+		if(!changed) {
+			for(int i = 0; i < newModel.size(); i++) {
+				if(model.getElementAt(i).theMatcher != newModel.get(i).theMatcher) {
+					changed = true;
+					break;
+				} else
+					model.set(i, newModel.get(i));
+			}
+		}
+		if(changed) {
+			model.removeAllElements();
+			for(MatcherObject obj : newModel)
+				model.addElement(obj);
 		}
 
 		// Adjust the scroll to ensure the cursor location is visible in the list
@@ -680,23 +741,27 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 				JScrollBar vBar = theDebugPaneScroll.getVerticalScrollBar();
 				JScrollBar hBar = theDebugPaneScroll.getHorizontalScrollBar();
 
-				int vScroll = adjustScroll(vBar.getValue(), vBar.getModel(), bounds.getMinY(), bounds.getMaxY(), theDebugPane.getHeight());
-				int hScroll = adjustScroll(hBar.getValue(), hBar.getModel(), bounds.getMinX(), bounds.getMaxX(), theDebugPane.getWidth());
-				vBar.setValue(vScroll);
-				hBar.setValue(hScroll);
+				EventQueue.invokeLater(() -> {
+					int vScroll = adjustScroll(vBar.getValue(), vBar.getModel(), bounds.getMinY(), bounds.getMaxY(),
+						theDebugPane.getHeight());
+					int hScroll = adjustScroll(hBar.getValue(), hBar.getModel(), bounds.getMinX(), bounds.getMaxX(),
+						theDebugPane.getWidth());
+					vBar.setValue(vScroll);
+					hBar.setValue(hScroll);
+				});
 			}
 		}
 	}
 
-	private MatcherObject addToModel(DefaultListModel<MatcherObject> model, MatcherObject parent, ParseMatcher<?> op, int indent,
-		boolean withChildren) {
-		MatcherObject newObj = new MatcherObject(parent, op, indent, false);
-		model.addElement(newObj);
+	private MatcherObject addToModel(List<MatcherObject> model, MatcherObject parent, ParseMatcher<?> op, int indent,
+		boolean withChildren, boolean cached) {
+		MatcherObject newObj = new MatcherObject(parent, op, indent, cached, false);
+		model.add(newObj);
 		boolean needsEnd = false;
 		if(withChildren) {
 			for(ParseMatcher<?> sub : op.getComposed()) {
 				needsEnd = true;
-				addToModel(model, newObj, sub, indent + 1, true);
+				addToModel(model, newObj, sub, indent + 1, true, false);
 			}
 		}
 		if(needsEnd)
@@ -704,8 +769,8 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		return newObj;
 	}
 
-	private void addEndToModel(DefaultListModel<MatcherObject> model, MatcherObject parent, ParseMatcher<?> op, int indent) {
-		model.addElement(new MatcherObject(parent, op, indent, true));
+	private void addEndToModel(List<MatcherObject> model, MatcherObject parent, ParseMatcher<?> op, int indent) {
+		model.add(new MatcherObject(parent, op, indent, false, true));
 	}
 
 	private void suspend(ExpressoParserBreakpoint breakpoint) {
@@ -739,6 +804,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		theStepTargetType = StepTargetType.CHILD;
 		setGuiEnabled(false);
 		isSuspended = false;
+		theLastRefresh = System.currentTimeMillis();
 	}
 
 	private void stepInto() {
@@ -749,6 +815,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		theStepTargetType = StepTargetType.CHILD;
 		setGuiEnabled(false);
 		isSuspended = false;
+		theLastRefresh = System.currentTimeMillis();
 	}
 
 	private void stepOut() {
@@ -759,6 +826,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		theStepTargetType = StepTargetType.EXIT;
 		setGuiEnabled(false);
 		isSuspended = false;
+		theLastRefresh = System.currentTimeMillis();
 	}
 
 	private void runTo(){
@@ -775,6 +843,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		}
 		setGuiEnabled(false);
 		isSuspended = false;
+		theLastRefresh = System.currentTimeMillis();
 	}
 
 	private void suspendOrResume() {
@@ -782,6 +851,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			theStepTarget = null;
 			setGuiEnabled(false);
 			isSuspended = false;
+			theLastRefresh = System.currentTimeMillis();
 		} else {
 			isSuspended = true;
 			theResumeButton.setIcon(RESUME_ICON);
@@ -827,10 +897,9 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	}
 
 	private boolean canStepInto(ParseNode cursor) {
-		boolean descendable = isSteppable(cursor) && theParseTree.getSelectionPath() != null
-			&& cursor == getInternalSelection();
+		ParseNode selected = getInternalSelection();
+		boolean descendable = isSteppable(cursor) && cursor == selected;
 		if(descendable) {
-			ParseNode selected = getInternalSelection();
 			if(selected.isFinished)
 				descendable = false;
 			if(descendable) {
@@ -870,6 +939,8 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	}
 
 	private ParseNode getInternalSelection() {
+		if(theParseTree.getSelectionPath() == null)
+			return null;
 		ParseNode selected = (ParseNode) theParseTree.getSelectionPath().getLastPathComponent();
 		if(selected != null)
 			return theInternalTreeModel.navigateTo(selected);
@@ -986,8 +1057,8 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			theCursor = theCursor.theParent;
 		}
 
-		void startNew(ParseMatcher<?> op, ParseSession session) {
-			theCursor = add(op, session);
+		void startNew(ParseMatcher<?> op, ParseSession session, BranchableStream<?, ?> stream) {
+			theCursor = add(op, session, stream);
 		}
 
 		void finish(ParseMatch<? extends S> match) {
@@ -1031,14 +1102,14 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		}
 
 		void add(ParseMatch<? extends S> match) {
-			ParseNode added = add(match.getMatcher(), null);
+			ParseNode added = add(match.getMatcher(), null, null);
 			added.theMatch = match;
 		}
 
-		private ParseNode add(ParseMatcher<?> match, ParseSession session) {
+		private ParseNode add(ParseMatcher<?> match, ParseSession session, BranchableStream<?, ?> stream) {
 			if(theCursor != null && theCursor.isFinished)
 				ascend();
-			ParseNode newNode = new ParseNode(theCursor, match, session);
+			ParseNode newNode = new ParseNode(theCursor, match, session, stream == null ? null : stream.branch());
 			boolean newRoot = theCursor == null;
 			if(newRoot)
 				theRoot = newNode;
@@ -1069,7 +1140,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		@Override
 		public Object getRoot() {
 			if(theRoot == null)
-				return new ParseNode(null, new EmptyMatcher(), null);
+				return new ParseNode(null, new EmptyMatcher(), null, null);
 			return theRoot;
 		}
 
@@ -1161,7 +1232,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		}
 
 		private ParseNode copyNode(ParseNode node, ParseNode parent) {
-			ParseNode ret = new ParseNode(parent, node.theMatcher, node.theSession);
+			ParseNode ret = new ParseNode(parent, node.theMatcher, node.theSession, node.theStream);
 			ret.theMatch = node.theMatch;
 			ret.isFinished = node.isFinished;
 			for(ParseNode child : node.theChildren)
@@ -1317,17 +1388,20 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		final ParseMatcher<?> theMatcher;
 
 		ParseSession theSession;
+		public final BranchableStream<?, ?> theStream;
 		final List<ParseNode> theChildren = new ArrayList<>();
 		private final String theString;
 
+		boolean isCached;
 		ParseMatch<? extends S> theMatch;
 
 		boolean isFinished;
 
-		ParseNode(ParseNode parent, ParseMatcher<?> matcher, ParseSession session) {
+		ParseNode(ParseNode parent, ParseMatcher<?> matcher, ParseSession session, BranchableStream<?, ?> stream) {
 			theParent = parent;
 			theMatcher = matcher;
 			theSession = session;
+			theStream = stream;
 			StringBuilder str = new StringBuilder();
 			str.append("<").append(matcher.getTypeName());
 			if(!(matcher instanceof WhitespaceMatcher) && matcher.getName() != null)
@@ -1350,15 +1424,17 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	private static class MatcherObject {
 		final MatcherObject theParent;
 		final ParseMatcher<?> theMatcher;
+		final boolean isCached;
 
 		final int theIndent;
 
 		final boolean isTerminal;
 
-		MatcherObject(MatcherObject parent, ParseMatcher<?> op, int indent, boolean terminal) {
+		MatcherObject(MatcherObject parent, ParseMatcher<?> op, int indent, boolean cached, boolean terminal) {
 			theParent=parent;
 			theMatcher = op;
 			theIndent = indent;
+			isCached = cached;
 			isTerminal = terminal;
 		}
 
@@ -1743,14 +1819,19 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 				cursor = (theDisplayedTreeModel.getCursor().theMatch != null) == value.isTerminal;
 			boolean selected = !value.isTerminal && theParseTree.getSelectionPath() != null
 				&& ((ParseNode) theParseTree.getSelectionPath().getLastPathComponent()).theMatcher == value.theMatcher;
-			if(cursor && selected)
-				bg = new Color(0, 255, 255);
-			else if(cursor)
+			if(cursor && selected) {
+				if(value.isCached)
+					bg = new Color(128, 255, 255);
+				else
+					bg = new Color(0, 255, 255);
+			} else if(cursor)
 				bg = Color.green;
 			else if(selected)
 				bg = SELECTED;
 			else if(listSelected)
 				bg = Color.orange;
+			else if(value.isCached)
+				bg = Color.yellow;
 			setBackground(bg);
 			return this;
 		}
