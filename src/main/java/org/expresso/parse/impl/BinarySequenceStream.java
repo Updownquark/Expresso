@@ -8,8 +8,6 @@ import org.expresso.parse.BranchableStream;
 
 /** A branchable stream of binary data */
 public abstract class BinarySequenceStream extends BranchableStream<Byte, byte []> {
-	private final byte [] holder = new byte[1];
-
 	/** @see BranchableStream#BranchableStream(int) */
 	protected BinarySequenceStream(int chunkSize) {
 		super(chunkSize);
@@ -21,7 +19,8 @@ public abstract class BinarySequenceStream extends BranchableStream<Byte, byte [
 	 * @throws IOException If the data cannot be retrieved
 	 */
 	public byte getByte(int index) throws IOException {
-		doOn(index, (chunk, idx) -> holder[0] = chunk.getData()[idx]);
+		final byte[] holder = new byte[1];
+		doOn(index, (chunk, idx) -> holder[0] = chunk.getData()[idx], null);
 		return holder[0];
 	}
 
@@ -33,6 +32,11 @@ public abstract class BinarySequenceStream extends BranchableStream<Byte, byte [
 	@Override
 	protected Byte get(byte [] data, int index) {
 		return data[index];
+	}
+
+	@Override
+	public String printPosition() {
+		return "Position " + getPosition();
 	}
 
 	/**

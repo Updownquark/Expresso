@@ -66,7 +66,7 @@ public class JavaTest {
 
 	private void parseClasses(File dir) {
 		for(File file : dir.listFiles()) {
-			if(file.isDirectory())
+			if (file.isDirectory() || !file.getName().toLowerCase().endsWith(".java"))
 				continue;
 			System.out.println("Parsing " + file);
 			ParseMatch<CharSequenceStream> match;
@@ -77,8 +77,18 @@ public class JavaTest {
 			}
 			if(match == null)
 				System.err.println("Could not parse " + file);
-			else if(match.getError() != null)
-				System.err.println("Error parsing " + file + ": " + match.getError());
+			else if (match.getError() != null) {
+				StringBuilder error = new StringBuilder();
+				error.append("Error parsing ").append(file).append(": ").append(match.getError());
+				CharSequenceStream stream = (CharSequenceStream) match.getStream().branch();
+				try {
+					stream.advance(match.getLength());
+					error.append(' ').append(stream.printPosition());
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+				System.err.println(error);
+			}
 		}
 		for(File file : dir.listFiles())
 			if(file.isDirectory())

@@ -1,24 +1,71 @@
 package org.expresso.parse.debug;
 
-import java.awt.*;
-import java.awt.event.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.EventQueue;
+import java.awt.Image;
+import java.awt.Rectangle;
+import java.awt.Window;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EventObject;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
-import javax.swing.*;
-import javax.swing.event.*;
+import javax.swing.BoundedRangeModel;
+import javax.swing.BoxLayout;
+import javax.swing.DefaultListModel;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JPanel;
+import javax.swing.JScrollBar;
+import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
+import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.JTextPane;
+import javax.swing.JToggleButton;
+import javax.swing.JTree;
+import javax.swing.ListSelectionModel;
+import javax.swing.event.CellEditorListener;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
+import javax.swing.event.TreeModelEvent;
+import javax.swing.event.TreeModelListener;
+import javax.swing.event.TreeSelectionEvent;
 import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.text.BadLocationException;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreePath;
 
-import org.expresso.parse.*;
+import org.expresso.parse.BranchableStream;
+import org.expresso.parse.ExpressoParser;
+import org.expresso.parse.ParseMatch;
+import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.ParseSession;
 import org.expresso.parse.impl.CharSequenceStream;
 import org.expresso.parse.impl.ReferenceMatcher;
 import org.expresso.parse.impl.SimpleValueMatcher;
@@ -42,6 +89,13 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	private static final ImageIcon RESUME_ICON = getIcon("play.png", 24, 24);
 	private static final ImageIcon PAUSE_ICON = getIcon("pause.png", 24, 24);
 	private static final long REFRESH_INTERVAL = 1000;
+
+	private static final String OVER_TEXT = "Skip to the next matcher at the current level";
+	private static final String INTO_TEXT = "Descend into the components of the current matcher";
+	private static final String OUT_TEXT = "Skip out to the completion of the current matcher's parent";
+	private static final String RESUME_TEXT = "Allow parsing to continue until the next breakpoint condition";
+	private static final String RUN_TO_TEXT = "Parse until the selected matcher";
+	private static final String DEBUG_MODE_TEXT = "Enter deep debug mode: catch the breakpoint in the java debugger and ignore all breakpoints";
 
 	private JTextPane theMainText;
 	private JScrollPane theMainTextScroll;
@@ -126,18 +180,18 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		});
 		theParseTree.setCellRenderer(new ParseNodeCellRenderer());
 		theOverButton = new JButton(getIcon("arrow180.png", 24, 24));
-		theOverButton.setToolTipText("Skip to the next matcher at the current level");
+		theOverButton.setToolTipText(OVER_TEXT);
 		theIntoButton = new JButton(getIcon("arrow90down.png", 24, 24));
-		theIntoButton.setToolTipText("Descend into the components of the current matcher");
+		theIntoButton.setToolTipText(INTO_TEXT);
 		theOutButton = new JButton(getIcon("arrow90right.png", 24, 24));
-		theOutButton.setToolTipText("Skip out to the completion of the current matcher's parent");
+		theOutButton.setToolTipText(OUT_TEXT);
 		theResumeButton = new JButton(RESUME_ICON);
-		theResumeButton.setToolTipText("Allow parsing to continue until the next breakpoint condition");
+		theResumeButton.setToolTipText(RESUME_TEXT);
 		// Sprint icon made by freepik from www.flaticon.com
 		theRunToButton = new JButton(getIcon("sprint.png", 24, 24));
-		theRunToButton.setToolTipText("Parse until the selected matcher");
+		theRunToButton.setToolTipText(RUN_TO_TEXT);
 		theDebugButton = new JToggleButton(getIcon("bug.png", 24, 24));
-		theDebugButton.setToolTipText("Enter deep debug mode: catch the breakpoint in the java debugger and ignore all breakpoints");
+		theDebugButton.setToolTipText(DEBUG_MODE_TEXT);
 		theAddBreakpointLabel = new JLabel(getIcon("bluePlus.png", 16, 16));
 		theAddBreakpointLabel.setToolTipText("Create a new breakpoint to watch for");
 		theDebugPane = new JList<>(new DefaultListModel<MatcherObject>());
@@ -453,11 +507,11 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		}
 
 		boolean didSuspend = false;
-		// TODO fix this terrible formatting
-		if(isDebugging) {} else if(isSuspended || isOnStepTarget) {
+		if (isDebugging) {
+		} else if (isSuspended || isOnStepTarget) {
 			suspend(null);
 			didSuspend = true;
-		} else if(theStepTarget == null) {
+		} else if (theStepTarget == null) {
 			CharSequence pre = theStream.subSequence(0, position);
 			CharSequence post = theStream.subSequence(position, theStream.length());
 			for(ExpressoParserBreakpoint breakpoint : theBreakpoints) {
@@ -539,13 +593,9 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		if(matcher.getTags().contains(ExpressoParser.IGNORABLE) || inIgnorable > 0)
 			return;
 		boolean isOnStepTarget = false;
-		ParseNode cursor = theInternalTreeModel.getCursor();
-		if(theStepTarget == null || theStepTargetType != StepTargetType.CHILD) {} else if(theStepTarget == cursor)
+		if (theStepTarget == theInternalTreeModel.getCursor())
 			isOnStepTarget = true;
-		else if(cursor.isFinished && cursor.theParent != null && theStepTarget == cursor.theParent) {
-			theInternalTreeModel.ascend();
-			isOnStepTarget = true;
-		}
+
 		if(isOnStepTarget) {
 			theInternalTreeModel.startNew(matcher, null, null);
 			theInternalTreeModel.finish(match);
@@ -674,30 +724,38 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		List<MatcherObject> newModel = new ArrayList<>();
 		if(op == null) {}
 		else if(op.theParent != null && op.theParent.theMatcher instanceof ReferenceMatcher) {
-			boolean passedCursor = false;
+			int pastCursor = -1;
 			boolean allCached = true;
 			Set<String> cached = new java.util.LinkedHashSet<>();
 			ParseNode cursor = theInternalTreeModel.theCursor;
-			if(cursor.theParent != op.theParent) {
+			boolean sameParent;
+			if (cursor.theParent == null)
+				sameParent = op.theParent == null;
+			else if (op.theParent == null)
+				sameParent = false;
+			else
+				sameParent = cursor.theParent.theMatcher == op.theParent.theMatcher;
+			if (!sameParent) {
 				allCached = false;
 			} else {
 				for(ParseMatcher<?> m : ((ReferenceMatcher<?>) op.theParent.theMatcher).getReference(theParser, op.theParent.theSession)) {
+					if (pastCursor < 0 && m == cursor.theMatcher)
+						pastCursor = 0;
 					boolean mCached;
-					if(passedCursor) {
-						mCached = op.theParent.theSession.isCached(op.theMatcher.getName(), op.theParent.theStream);
-					} else if(m == cursor.theMatcher) {
-						passedCursor = true;
+					if (pastCursor < 0 || (pastCursor == 0 && cursor.isFinished)) {
 						mCached = cursor.isCached;
-					} else {
-						mCached = false;
-						for(ParseNode node : cursor.theParent.theChildren) {
-							if(node.theMatcher == m) {
-								mCached = node.isCached;
-								break;
-							} else if(node == cursor)
-								break;
+						if (!mCached) {
+							for (ParseNode node : cursor.theParent.theChildren) {
+								if (node.theMatcher == m) {
+									mCached = node.isCached;
+									break;
+								} else if (node == cursor)
+									break;
+							}
 						}
-					}
+					} else
+						mCached = op.theSession.isCached(op.theMatcher.getName(), op.theParent.theStreamCapture);
+
 					if(mCached)
 						cached.add(m.getName());
 					else
@@ -869,6 +927,11 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	}
 
 	private void setGuiEnabled(boolean enabled) {
+		theOverButton.setToolTipText(OVER_TEXT);
+		theIntoButton.setToolTipText(INTO_TEXT);
+		theOutButton.setToolTipText(OUT_TEXT);
+		theRunToButton.setToolTipText(RUN_TO_TEXT);
+		theResumeButton.setToolTipText(RESUME_TEXT);
 		if(enabled) {
 			safe(() -> render());
 			ParseNode cursor = theInternalTreeModel.getCursor();
@@ -897,39 +960,59 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	}
 
 	private boolean canStepInto(ParseNode cursor) {
-		ParseNode selected = getInternalSelection();
-		boolean descendable = isSteppable(cursor) && cursor == selected;
-		if(descendable) {
-			if(selected.isFinished)
-				descendable = false;
-			if(descendable) {
-				if(cursor.theMatcher.getComposed().isEmpty() && !(cursor.theMatcher instanceof ReferenceMatcher))
-					descendable = false;
-			}
+		if (!isSteppable(cursor)) {
+			return false;
 		}
-		return descendable;
+		ParseNode selected = getInternalSelection();
+		if (cursor != selected) {
+			theIntoButton.setToolTipText("Descent only possible when the selected matcher is the current matcher being parsed");
+			return false;
+		}
+		if (selected.isFinished) {
+			if (selected.isCached)
+				theIntoButton.setToolTipText("The selected matcher was returned from the cache");
+			else
+				theIntoButton.setToolTipText("The selected matcher has already been parsed");
+			return false;
+		}
+		if (cursor.theMatcher.getComposed().isEmpty() && !(cursor.theMatcher instanceof ReferenceMatcher)) {
+			theIntoButton.setToolTipText("The selected matcher does not have any children to descend into");
+			return false;
+		}
+		return true;
 	}
 
 	private boolean canRunTo(ParseNode cursor) {
+		if (!isSteppable(cursor))
+			return false;
 		// TODO Not at all confident that I captured every use case here
-		if(theDebugPane.getSelectedValuesList().size() != 1)
+		if (theDebugPane.getSelectedValuesList().size() != 1) {
+			theRunToButton.setToolTipText("Select a matcher in the list");
 			return false;
-		if(!isSteppable(cursor))
-			return false;
+		}
 		ParseNode selection = getInternalSelection();
+		if (selection == null || selection.theParent == null)
+			return false;
 		MatcherObject listSelection = theDebugPane.getSelectedValue();
 		if(selection.theParent.theMatcher instanceof ReferenceMatcher) {
+			if (listSelection.theMatcher == cursor.theMatcher) {
+				theRunToButton.setToolTipText("Select a different matcher to run to");
+				return false;
+			}
 			// At the moment, we don't keep track of which reference matchers have already been parsed, and anyway it's possible that it may
 			// need to be re-parsed, so we won't try to screen anything here.
 			return true;
 		} else {
-			while(listSelection.theParent != null)
+			while (listSelection.theParent != null && listSelection.theParent.theParent != null)
 				listSelection = listSelection.theParent;
 			int selectIndex = selection.theParent.theMatcher.getComposed().indexOf(listSelection.theMatcher);
-			while(selection.theParent != null && !(selection.theParent.theMatcher instanceof ReferenceMatcher))
+			while (selection.theParent != null && selection.theParent.theParent != null
+					&& !(selection.theParent.theParent.theMatcher instanceof ReferenceMatcher))
 				selection = selection.theParent;
-			if(selection.theParent == null || selection.theParent.theMatcher.getComposed().indexOf(selection.theMatcher) >= selectIndex)
+			if (selection.theParent == null || selection.theParent.theMatcher.getComposed().indexOf(selection.theMatcher) >= selectIndex) {
+				theRunToButton.setToolTipText("The selected matcher has already been parsed");
 				return false; // Already passed the selected matcher
+			}
 			return true;
 		}
 	}
@@ -995,7 +1078,9 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		boolean needsEnding = matcher.getComposed().isEmpty();
 		if(matcher instanceof SimpleValueMatcher) {
 			text.append("<font color=\"blue\">&gt;</font>");
-			text.append(((SimpleValueMatcher<?>) matcher).getValueString().replaceAll("<", "&amp;lt;").replaceAll(">", "&amp;gt;"));
+			String value = ((SimpleValueMatcher<?>) matcher).getValueString();
+			value = value.replaceAll("<", "&amp;lt;").replaceAll(">", "&amp;gt;").replaceAll("\n", "\\\\n").replaceAll("\t", "\\\\t");
+			text.append(value);
 			if(needsEnding) {
 				text.append("<font color=\"blue\">&lt;/</font><font color=\"red\">");
 				text.append(matcher.getTypeName()).append("</font>");
@@ -1232,7 +1317,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		}
 
 		private ParseNode copyNode(ParseNode node, ParseNode parent) {
-			ParseNode ret = new ParseNode(parent, node.theMatcher, node.theSession, node.theStream);
+			ParseNode ret = new ParseNode(parent, node.theMatcher, node.theSession, node.theStreamCapture);
 			ret.theMatch = node.theMatch;
 			ret.isFinished = node.isFinished;
 			for(ParseNode child : node.theChildren)
@@ -1388,7 +1473,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		final ParseMatcher<?> theMatcher;
 
 		ParseSession theSession;
-		public final BranchableStream<?, ?> theStream;
+		final BranchableStream<?, ?> theStreamCapture;
 		final List<ParseNode> theChildren = new ArrayList<>();
 		private final String theString;
 
@@ -1401,7 +1486,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			theParent = parent;
 			theMatcher = matcher;
 			theSession = session;
-			theStream = stream;
+			theStreamCapture = stream;
 			StringBuilder str = new StringBuilder();
 			str.append("<").append(matcher.getTypeName());
 			if(!(matcher instanceof WhitespaceMatcher) && matcher.getName() != null)
@@ -1688,7 +1773,8 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 				.getModel();
 			model.removeAllElements();
 			model.addElement(NONE);
-			for(String opName : theOpNames)
+			Set<String> opNames = new TreeSet<>(theOpNames);
+			for (String opName : opNames)
 				model.addElement(opName);
 			model.setSelectedItem(theEditingBreakpoint.getMatcherName() == null ? NONE : theEditingBreakpoint.getMatcherName());
 			return ret;

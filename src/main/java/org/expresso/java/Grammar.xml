@@ -2,6 +2,9 @@
 
 <grammar>
 	<sequence name="char">
+		<option>
+			<ref type="ignorable" name="pre-ignore" />
+		</option>
 		<without type="ignorable">
 			<literal>&apos;</literal>
 			<one-of>
@@ -14,6 +17,9 @@
 		</without>
 	</sequence>
 	<sequence name="string">
+		<option>
+			<ref type="ignorable" name="pre-ignore" />
+		</option>
 		<without type="ignorable">
 			<literal>&quot;</literal>
 			<up-to name="value">
@@ -26,6 +32,9 @@
 		</without>
 	</sequence>
 	<sequence name="number">
+		<option>
+			<ref type="ignorable" name="pre-ignore" />
+		</option>
 		<option>
 			<literal name="neg">-</literal>
 		</option>
@@ -73,6 +82,9 @@
 		</without>
 	</sequence>
 	<sequence name="hex-int">
+		<option>
+			<ref type="ignorable" name="pre-ignore" />
+		</option>
 		<without type="ignorable">
 			<literal name="hex">0x</literal>
 			<pattern name="value">[_0-9a-fA-F]+</pattern>
@@ -85,6 +97,9 @@
 		</without>
 	</sequence>
 	<sequence name="octal-int">
+		<option>
+			<ref type="ignorable" name="pre-ignore" />
+		</option>
 		<without type="ignorable">
 			<literal name="oct">0</literal>
 			<pattern name="value">[_0-9]+</pattern>
@@ -97,6 +112,9 @@
 		</without>
 	</sequence>
 	<sequence name="binary-int">
+		<option>
+			<ref type="ignorable" name="pre-ignore" />
+		</option>
 		<without type="ignorable">
 			<literal name="binary">0b</literal>
 			<pattern name="value">[_0-9]*</pattern>
@@ -139,10 +157,7 @@
 		<literal>{</literal>
 		<repeat>
 			<ref name="content" />
-			<option>
-				<literal>;</literal>
-			</option>
-		</repeat>>
+		</repeat>
 		<literal>}</literal>
 	</sequence>
 	<sequence name="synchronized-block">
@@ -157,10 +172,10 @@
 		<option>
 			<literal>(</literal>
 			<repeat>
-				<ref name="resource" />
+				<ref type="!statement" name="resource" />
 				<literal>;</literal>
 			</repeat>
-			<ref name="resource" />
+			<ref type="!statement" name="resource" />
 			<option>
 				<literal>;</literal>
 			</option>
@@ -201,15 +216,15 @@
 		<literal name="name">for</literal>
 		<literal>(</literal>
 		<option>
-			<ref name="init" />
+			<ref type="!statement" name="init" />
 			<repeat>
 				<literal>,</literal>
-				<ref name="init" />
+				<ref type="!statement" name="init" />
 			</repeat>
 		</option>
 		<literal>;</literal>
 		<option>
-			<ref name="condition" />
+			<ref type="!statement" name="condition" />
 		</option>
 		<literal>;</literal>
 		<option>
@@ -287,7 +302,6 @@
 					</one-of>
 				</forbid>
 				<ref />
-				<literal>;</literal>
 			</repeat>
 		</repeat>
 		<literal>}</literal>
@@ -311,11 +325,14 @@
 		<literal>double</literal>
 	</one-of>
 	<sequence name="basic-type" priority="998" default="false" tag="type">
-		<repeat>
-			<ref type="identifier" name="name" />
-			<literal>.</literal>
-		</repeat>
+		<!-- Just documenting, this is in this order as opposed to having the repeat first because of var-args.  With the repeat first,
+			var arg parameters were parsed with the repeat successful (identifier, then '.'), but the next identifier wasn't there, so the
+			parsing failed.  This ordering fixes this problem. -->
 		<ref type="identifier" name="name" tag="final-name" />
+		<repeat>
+			<literal>.</literal>
+			<ref type="identifier" name="name" />
+		</repeat>
 	</sequence>
 	<sequence name="array-type" priority="998" default="false" tag="type">
 		<ref type="type" name="component" />
@@ -343,11 +360,13 @@
 	</sequence>
 	<sequence name="type-parameters" default="false">
 		<literal>&lt;</literal>
-		<repeat>
+		<option> <!-- This is optional for the diamond operator -->
 			<ref type="type" name="parameter" />
-			<literal>,</literal>
-		</repeat>
-		<ref type="type" name="parameter" />
+			<repeat>
+				<literal>,</literal>
+				<ref type="type" name="parameter" />
+			</repeat>
+		</option>
 		<literal>&gt;</literal>
 	</sequence>
 	<sequence name="generic-type" priority="998" default="false" tag="type">
@@ -355,37 +374,94 @@
 		<ref type="type-parameters" name="parameters" />
 	</sequence>
 
+	<!-- Control statements -->
+	<sequence name="statement">
+		<ref name="action" />
+		<literal>;</literal>
+	</sequence>
+	<sequence name="return">
+		<literal>return</literal>
+		<option>
+			<ref type="!statement" name="value" />
+		</option>
+		<literal>;</literal>
+	</sequence>
+	<sequence name="throw">
+		<literal>throw</literal>
+		<ref type="!statement" name="value" />
+		<literal>;</literal>
+	</sequence>
+	
 	<!-- Declarations -->
+	<one-of name="annotation-value" default="false">
+		<ref name="value" />
+		<sequence>
+			<literal>{</literal>
+				<ref type="annotation-value" name="value-element" />
+				<repeat>
+					<literal>,</literal>
+					<ref type="annotation-value" name="value-element" />
+				</repeat>
+			<literal>}</literal>
+		</sequence>
+	</one-of>
+	<sequence name="annotations" default="false">
+		<repeat>
+			<literal>@</literal>
+			<ref type="basic-type" name="type" />
+			<option>
+				<literal>(</literal>
+				<one-of>
+					<ref type="annotation-value" name="parameter-value" />
+					<sequence>
+						<ref type="identifier" name="parameter-name" />
+						<literal>=</literal>
+						<ref type="annotation-value" name="parameter-value" />
+					</sequence>
+					<repeat>
+						<literal>,</literal>
+						<ref type="annotation-value" name="parameter-value" />
+						<sequence>
+							<ref type="identifier" name="parameter-name" />
+							<literal>=</literal>
+							<ref type="annotation-value" name="parameter-value" />
+						</sequence>
+					</repeat>
+				</one-of>
+				<literal>)</literal>
+			</option>
+		</repeat>
+	</sequence>
 	<one-of name="qualifier" default="false">
 		<literal>public</literal>
 		<literal>protected</literal>
 		<literal>private</literal>
 		<literal>default</literal>
+		<literal>abstract</literal>
 		<literal>static</literal>
 		<literal>final</literal>
 		<literal>synchronized</literal>
 	</one-of>
 	<sequence name="variable-declaration" tag="declaration,assignable">
+		<ref type="annotations" name="annotations" />
 		<repeat>
 			<ref type="qualifier" name="qualifier" />
 		</repeat>
-		<whitespace />
 		<ref type="type" name="type" />
 		<option>
 			<literal name="var-args">...</literal>
 		</option>
 		<whitespace />
 		<ref type="identifier" name="name" />
-		<literal>;</literal>
 	</sequence>
 	<sequence name="method-declaration" tag="declaration">
+		<ref type="annotations" name="annotations" />
 		<repeat>
 			<ref type="qualifier" name="qualifier" />
 		</repeat>
-		<one-of>
+		<option>
 			<ref type="type-parameters" name="type-parameters" />
-			<whitespace />
-		</one-of>
+		</option>
 		<option>
 			<ref type="type" name="type" />
 			<whitespace />
@@ -393,20 +469,20 @@
 		<ref type="identifier" name="name" />
 		<literal>(</literal>
 			<option>
-				<repeat>
-					<ref type="variable-declaration" name="parameter" />
-					<literal>,</literal>
-				</repeat>
 				<ref type="variable-declaration" name="parameter" />
+				<repeat>
+					<literal>,</literal>
+					<ref type="variable-declaration" name="parameter" />
+				</repeat>
 			</option>
 		<literal>)</literal>
 		<option>
 			<literal>throws</literal>
-			<repeat>
-				<ref type="type" name="thrown" />
-				<literal>,</literal>
-			</repeat>
 			<ref type="type" name="thrown" />
+			<repeat>
+				<literal>,</literal>
+				<ref type="type" name="thrown" />
+			</repeat>
 		</option>
 		<option>
 			<literal>{</literal>
@@ -416,21 +492,20 @@
 			<literal>}</literal>
 		</option>
 	</sequence>
-	<sequence name="class-declaration" default="false" tag="declaration">
+	<sequence name="class-declaration" tag="declaration">
+		<ref type="annotations" name="annotations" />
 		<repeat>
 			<ref type="qualifier" name="qualifier" />
 		</repeat>
-		<whitespace />
 		<one-of>
 			<literal>class</literal>
 			<literal>interface</literal>
 		</one-of>
 		<whitespace />
 		<ref type="identifier" name="name" />
-		<one-of>
+		<option>
 			<ref type="type-parameters" name="type-parameters" />
-			<whitespace />
-		</one-of>
+		</option>
 		<option>
 			<literal>extends</literal>
 			<repeat>
@@ -494,33 +569,19 @@
 		</repeat>
 	</sequence>
 	
-	<!-- Control statements -->
-	<sequence name="statement">
-		<ref name="action" />
-		<literal>;</literal>
-	</sequence>
-	<sequence name="return">
-		<literal>return</literal>
-		<ref name="value" />
-		<literal>;</literal>
-	</sequence>
-	<sequence name="throw">
-		<literal>throw</literal>
-		<ref name="value" />
-		<literal>;</literal>
-	</sequence>
-	
 	<!-- Normal operators -->
-	<sequence name="constructor">
+	<sequence name="constructor"> <!-- Invocation, not declaration -->
 		<literal>new</literal>
 		<whitespace />
 		<ref type="type" name="type" />
 		<literal>(</literal>
-			<repeat>
+			<option>
+				<repeat>
+					<ref name="parameter" />
+					<literal>,</literal>
+				</repeat>
 				<ref name="parameter" />
-				<literal>,</literal>
-			</repeat>
-			<ref name="parameter" />
+			</option>
 		<literal>)</literal>
 		<option>
 			<literal name="anonymous-body">{</literal>
@@ -531,28 +592,33 @@
 		</option>
 	</sequence>
 	<sequence name="lambda">
-		<literal>(</literal>
-		<option>
-			<one-of>
-				<sequence>
-					<repeat>
-						<ref type="type" name="parameter-type" />
-						<ref type="identifier" name="parameter-name" />
-						<literal>,</literal>
-					</repeat>
-					<ref type="type" name="parameter-type" />
-					<ref type="identifier" name="parameter-name" />
-				</sequence>
-				<sequence>
-					<repeat>
-						<ref type="identifier" name="parameter-name" />
-						<literal>,</literal>
-					</repeat>
-					<ref type="identifier" name="parameter-name" />
-				</sequence>
-			</one-of>
-		</option>
-		<literal>)</literal>
+		<one-of>
+			<ref type="identifier" name="parameter-name" />
+			<sequence>
+				<literal>(</literal>
+				<option>
+					<one-of>
+						<sequence>
+							<repeat>
+								<ref type="type" name="parameter-type" />
+								<ref type="identifier" name="parameter-name" />
+								<literal>,</literal>
+							</repeat>
+							<ref type="type" name="parameter-type" />
+							<ref type="identifier" name="parameter-name" />
+						</sequence>
+						<sequence>
+							<repeat>
+								<ref type="identifier" name="parameter-name" />
+								<literal>,</literal>
+							</repeat>
+							<ref type="identifier" name="parameter-name" />
+						</sequence>
+					</one-of>
+				</option>
+				<literal>)</literal>
+			</sequence>
+		</one-of>
 		<literal>-&gt;</literal>
 		<one-of>
 			<sequence name="body">
@@ -803,7 +869,7 @@
 		<literal>]</literal>
 	</sequence>
 	<sequence name="member" priority="250" tag="assignable">
-		<ref name="context" />
+		<ref name="name" />
 		<literal name="dot">.</literal>
 		<ref type="identifier" name="name" />
 		<option>
@@ -817,5 +883,17 @@
 			</option>
 			<literal>)</literal>
 		</option>
+	</sequence>
+	<sequence name="function-invocation" priority="250">
+		<ref type="identifier" name="name" />
+		<literal name="method">(</literal>
+		<option>
+			<ref name="parameter" />
+			<repeat>
+				<literal>,</literal>
+				<ref name="parameter" />
+			</repeat>
+		</option>
+		<literal>)</literal>
 	</sequence>
 </grammar>

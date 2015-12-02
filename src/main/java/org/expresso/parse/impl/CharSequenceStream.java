@@ -8,6 +8,10 @@ import org.expresso.parse.BranchableStream;
 
 /** A branchable stream of character data */
 public abstract class CharSequenceStream extends BranchableStream<Character, char []> implements CharSequence {
+	private int theLineNumber = 1;
+	private int theColumnNumber = 1;
+	private StringBuilder theCurrentLine = new StringBuilder();
+
 	/** @see BranchableStream#BranchableStream(int) */
 	protected CharSequenceStream(int chunkSize) {
 		super(chunkSize);
@@ -22,7 +26,7 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 	public char charAt(int index) {
 		char [] holder = new char[1];
 		try {
-			doOn(index, (chunk, idx) -> holder[0] = chunk.getData()[idx]);
+			doOn(index, (chunk, idx) -> holder[0] = chunk.getData()[idx], null);
 		} catch(IOException e) {
 			throw new IllegalStateException("Could not retrieve data for charAt", e);
 		}
@@ -35,7 +39,7 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 			throw new IndexOutOfBoundsException("" + start);
 		if(end>0){
 			try {
-				doOn(end - 1, (chunk, idx) -> null);
+				doOn(end - 1, (chunk, idx) -> null, null);
 			} catch(IOException e) {
 				throw new IllegalStateException("Could not retrieve data for subsequence", e);
 			} // Check the end index
@@ -91,6 +95,50 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 	@Override
 	protected Character get(char [] data, int index) {
 		return data[index];
+	}
+
+	@Override
+	protected void advancedPast(char[] chunk, int start, int end) {
+		for (int i = start; i < end; i++) {
+			if (chunk[i] == '\n') {
+				theLineNumber++;
+				theColumnNumber = 1;
+				theCurrentLine.setLength(0);
+			} else if (chunk[i] != '\r') {
+				theColumnNumber++;
+				theCurrentLine.append(chunk[i]);
+			}
+		}
+	}
+
+	@Override
+	protected CharSequenceStream clone() {
+		CharSequenceStream ret = (CharSequenceStream) super.clone();
+		ret.theCurrentLine = new StringBuilder(theCurrentLine);
+		return ret;
+	}
+
+	@Override
+	public String printPosition() {
+		StringBuilder ret = new StringBuilder();
+		ret.append("Line ").append(theLineNumber).append(", Column ").append(theColumnNumber).append('\n').append(theCurrentLine);
+		for (int i = 0; i < getDiscoveredLength() || !isDiscovered(); i++) {
+			char c = charAt(i);
+			if (c == '\n')
+				break;
+			else if (c != '\r')
+				ret.append(c);
+		}
+		ret.append('\n');
+		for (int i = 0; i < theCurrentLine.length(); i++) {
+			char ch = theCurrentLine.charAt(i);
+			if (ch == '\t')
+				ret.append('\t');
+			else
+				ret.append(' ');
+		}
+		ret.append('^');
+		return ret.toString();
 	}
 
 	/**

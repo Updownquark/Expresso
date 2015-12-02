@@ -1,10 +1,22 @@
 package org.expresso.parse.impl;
 
 import java.io.IOException;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-import org.expresso.parse.*;
+import org.expresso.parse.BranchableStream;
+import org.expresso.parse.ExpressoParser;
+import org.expresso.parse.ParseMatch;
+import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.ParseSession;
 import org.expresso.parse.debug.ExpressoParsingDebugger;
 
 /**
@@ -248,6 +260,11 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 		private class StreamPositionData {
 			private class Matching {
 				ParseMatch<SS> theMatch;
+				ParseSession theEvaluatingSession;
+
+				Matching(ParseSession session) {
+					theEvaluatingSession = session;
+				}
 			}
 
 			@SuppressWarnings("unused")
@@ -260,23 +277,31 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 				theTypeMatching = new HashMap<>();
 			}
 
-			ParseMatch<SS> match(SS stream, ParseSession session, Collection<? extends ParseMatcher<? super SS>> matchers)
+			ParseMatch<SS> match(SS stream, ParseSessionImpl<SS> session, Collection<? extends ParseMatcher<? super SS>> matchers)
 				throws IOException {
-				Set<ParseMatcher<? super SS>> uncached = matchers.stream().filter(m -> !theTypeMatching.containsKey(m.getName()))
-					.collect(Collectors.toSet());
-				Set<String> uncachedTypeNames = uncached.stream().map(ParseMatcher::getName).collect(Collectors.toSet());
+				Set<String> uncachedTypeNames = new LinkedHashSet<>();
 				boolean loop = false;
 				/* If a match with one any of these parsers may also be the first component in a match with the same or a different one in
 				 * this set, then we need to parse repeatedly until it can't create a further composition.  This is the case with operators
 				 * like addition, where a+b+c needs to be ((a+b)+c). */
-				for(ParseMatcher<? super SS> matcher : uncached) {
-					// Keep the parser from descending deep into unnecessary recursive matching. Do it iteratively instead.
-					theTypeMatching.put(matcher.getName(), new Matching());
-					if(!loop)
-						loop |= containsAny(matcher.getPotentialBeginningTypeReferences(DefaultExpressoParser.this, session),
-							uncachedTypeNames);
+				for (ParseMatcher<? super SS> matcher : matchers) {
+					Matching matching = theTypeMatching.get(matcher.getName());
+					if (matching != null) {
+						if (matching.theEvaluatingSession != null) {
+							// Mark the session as having used cache elements that are still being evaluated so the results are not cached
+							session.markUsedEvaulatingCache(matching.theEvaluatingSession);
+						}
+					} else {
+						uncachedTypeNames.add(matcher.getName());
+						theTypeMatching.put(matcher.getName(), new Matching(session));
+						// Keep the parser from descending deep into unnecessary recursive matching. Do it iteratively instead.
+						if (!loop)
+							loop |= containsAny(matcher.getPotentialBeginningTypeReferences(DefaultExpressoParser.this, session),
+									uncachedTypeNames);
+					}
 				}
 
+				Set<String> notToCache = new LinkedHashSet<>();
 				ParseMatch<SS> match = null;
 				boolean hadBetter;
 				do {
@@ -288,6 +313,12 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 						if(uncachedTypeNames.contains(matcher.getName())) {
 							theDebugger.preParse(stream, matcher, session);
 							ParseMatch<SS> match_i = matcher.match((SS) stream.branch(), DefaultExpressoParser.this, session);
+							if (session.hasUsedEvaluatingCache()) {
+								// Don't want to cache if the evaluation used cache elements that are currently being evaluated by a
+								// different session
+								notToCache.add(matcher.getName());
+								session.clearUsedEvaluatingCache();
+							}
 							theDebugger.postParse(stream, matcher, match_i);
 
 							// Cache the result
@@ -297,17 +328,15 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 								matching.theMatch = match_i;
 
 								// If we beat the cached match, maybe we'll beat the overall match
-								if(match_i != null && match_i.isBetter(match)) {
+								if (match_i.isBetter(match)) {
 									hadBetter = true;
 									if(match != null)
 										theDebugger.matchDiscarded(match.getMatcher(), match);
 									match = match_i;
 								} else
 									theDebugger.matchDiscarded(matcher, match_i);
-							} else {
+							} else
 								theDebugger.matchDiscarded(matcher, match_i);
-								iter.remove();
-							}
 						} else {
 							ParseMatch<SS> match_i = matching.theMatch;
 							theDebugger.usedCache(matcher, match_i);
@@ -317,9 +346,17 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 								match = match_i;
 							} else
 								theDebugger.matchDiscarded(matcher, match_i);
+							iter.remove();
 						}
 					}
 				} while(loop && hadBetter);
+				// Activate the cache elements that need to be cached, clear the ones that don't
+				for (String name : uncachedTypeNames) {
+					if (notToCache.contains(name))
+						theTypeMatching.remove(name);
+					else
+						theTypeMatching.get(name).theEvaluatingSession = null;
+				}
 				return match;
 			}
 
@@ -330,8 +367,9 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 				return false;
 			}
 
-			boolean isCached(String type) {
-				return theTypeMatching.containsKey(type);
+			boolean isCached(String type, ParseSession session) {
+				Matching m = theTypeMatching.get(type);
+				return m != null && m.theEvaluatingSession != session;
 			}
 		}
 
@@ -341,7 +379,8 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 			thePositions = new HashMap<>();
 		}
 
-		ParseMatch<SS> match(SS stream, ParseSession session, Collection<? extends ParseMatcher<? super SS>> matchers) throws IOException {
+		ParseMatch<SS> match(SS stream, ParseSessionImpl<SS> session, Collection<? extends ParseMatcher<? super SS>> matchers)
+				throws IOException {
 			if(matchers.isEmpty())
 				return null;
 			int pos = stream.getPosition();
@@ -353,27 +392,30 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 			return posData.match(stream, session, matchers);
 		}
 
-		boolean isCached(String type, int position) {
+		boolean isCached(String type, int position, ParseSession session) {
 			StreamPositionData posData = thePositions.get(position);
 			if(posData==null)
 				return false;
-			return posData.isCached(type);
+			return posData.isCached(type, session);
 		}
 	}
 
 	private class ParseSessionImpl<SS extends S> implements ParseSession {
+		private final ParseSessionImpl<SS> theParent;
 		private final ParsingCache<SS> theCache;
 		private final Set<String> theExcludedTypes;
+		private boolean usedEvaluatingCache;
 
 		boolean isDebuggingStarted;
 
 		boolean warnedOnlyExcludeIgnore;
 
 		ParseSessionImpl(ParsingCache<SS> cache) {
-			this(cache, false);
+			this(null, cache, false);
 		}
 
-		private ParseSessionImpl(ParsingCache<SS> cache, boolean alreadyStarted) {
+		private ParseSessionImpl(ParseSessionImpl<SS> parent, ParsingCache<SS> cache, boolean alreadyStarted) {
+			theParent = parent;
 			theCache = cache;
 			theExcludedTypes = new java.util.LinkedHashSet<>();
 			isDebuggingStarted = alreadyStarted;
@@ -391,12 +433,12 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 
 		@Override
 		public boolean isCached(String type, BranchableStream<?, ?> stream) {
-			return theCache.isCached(type, stream.getPosition());
+			return theCache.isCached(type, stream.getPosition(), this);
 		}
 
 		ParseMatch<SS> match(SS stream, Collection<? extends ParseMatcher<? super SS>> matchers) throws IOException {
 			excludeTypes(matchers);
-			return theCache.match(stream, new ParseSessionImpl<>(theCache, true), matchers);
+			return theCache.match(stream, new ParseSessionImpl<>(this, theCache, true), matchers);
 		}
 
 		private void excludeTypes(Collection<? extends ParseMatcher<? super SS>> matchers) {
@@ -424,6 +466,22 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 						matcherIter.remove();
 				}
 			}
+		}
+
+		boolean hasUsedEvaluatingCache() {
+			return usedEvaluatingCache;
+		}
+
+		void markUsedEvaulatingCache(ParseSession evaluatingSession) {
+			if (evaluatingSession == this)
+				return;
+			usedEvaluatingCache = true;
+			if (theParent != null)
+				theParent.markUsedEvaulatingCache(evaluatingSession);
+		}
+
+		void clearUsedEvaluatingCache() {
+			usedEvaluatingCache = false;
 		}
 	}
 }

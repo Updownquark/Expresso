@@ -2,11 +2,16 @@ package org.expresso.parse.impl;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.expresso.parse.*;
+import org.expresso.parse.BranchableStream;
+import org.expresso.parse.ExpressoParser;
+import org.expresso.parse.ParseMatch;
+import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.ParseSession;
 
 /**
  * Searches for another matcher and returns all content leading up to the matcher
@@ -61,8 +66,7 @@ public class UpToMatcher<S extends BranchableStream<?, ?>> extends BaseMatcher<S
 			streamCopy = (SS) stream.branch();
 			end = parser.parseWith(streamCopy, session, theMatcher);
 		}
-		stream.advance(end.getLength());
-		return new ParseMatch<>(this, streamBegin, stream.getPosition() - streamCopy.getPosition(), Arrays.asList(end), null, true);
+		return new ParseMatch<>(this, streamBegin, stream.getPosition() - streamBegin.getPosition(), Collections.EMPTY_LIST, null, true);
 	}
 
 	@Override

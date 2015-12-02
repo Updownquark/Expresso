@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.function.BiFunction;
 
 import org.qommons.Sealable;
+import org.qommons.TriFunction;
 
 /**
  * Provides stream iteration over some kind of data
@@ -64,6 +65,7 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 
 	private Chunk theChunk;
 
+	/** This stream's position within the current chunk */
 	private int thePosition;
 
 	private boolean isSealed;
@@ -103,6 +105,11 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 	 *         {@link #clone()}, so the type of the branched stream will be exactly the same as this type.
 	 */
 	public BranchableStream<D, C> branch() {
+		return clone();
+	}
+
+	@Override
+	protected BranchableStream<D, C> clone() {
 		BranchableStream<D, C> ret;
 		try {
 			ret = (BranchableStream<D, C>) super.clone();
@@ -166,7 +173,7 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 	 */
 	public D get(int index) throws IOException {
 		Object [] ret = new Object[1];
-		doOn(index, (chunk, idx) -> ret[0] = get(chunk.getData(), idx));
+		doOn(index, (chunk, idx) -> ret[0] = get(chunk.getData(), idx), null);
 		return (D) ret[0];
 	}
 
@@ -179,13 +186,33 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 	 */
 	public BranchableStream<D, C> advance(int spaces) throws IOException {
 		assertUnsealed();
-		doOn(spaces, (chunk, idx) -> {
-			theChunk = chunk;
-			thePosition = idx;
-			return null;
-		});
+		if (isDiscovered() && spaces == getDiscoveredLength()) {
+			// doOn will throw an out of bounds exception here, but this is acceptable--makes this stream zero-length
+			advancedPast(theChunk.getData(), thePosition, thePosition + spaces);
+			thePosition += spaces;
+			return this;
+		} else {
+			doOn(spaces, (chunk, idx) -> {
+				theChunk = chunk;
+				thePosition = idx;
+				return null;
+			} , (chunk, start, end) -> {
+				advancedPast(chunk, start, end);
+				return null;
+			});
+		}
 		return this;
 	}
+
+	/**
+	 * Called when this stream is advanced. May be overridden by subclasses to allow them to keep track of metadata associated with their
+	 * position (e.g. line and column number for text files)
+	 * 
+	 * @param chunk The data chunk whose data is being advanced past
+	 * @param start The starting position of the data being passed
+	 * @param end The end position +1 of the data being passed
+	 */
+	protected void advancedPast(C chunk, int start, int end) {}
 
 	/**
 	 * Performs some operation on a data point
@@ -193,19 +220,26 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 	 * @param <T> The type of value returned by the operation
 	 * @param index The index of the data point to operate on
 	 * @param op The operation to perform. The function takes the chunk containing the data point and the index within the chunk's data
-	 *            corresponding to the given index from this stream position.
+	 *        corresponding to the given index from this stream position.
+	 * @param skip The operation to perform on data before the given index. May be null.
 	 * @return The value returned by the operation
 	 * @throws IOException If the data cannot be retrieved
 	 */
-	protected <T> T doOn(int index, BiFunction<Chunk, Integer, T> op) throws IOException {
+	protected <T> T doOn(int index, BiFunction<Chunk, Integer, T> op, TriFunction<C, Integer, Integer, Void> skip) throws IOException {
 		if(index < 0)
 			throw new IndexOutOfBoundsException("" + index);
 		Chunk chunk = theChunk;
 		int length = -thePosition;
+		boolean firstChunk = true;
 		while(chunk != null && index >= length + chunk.length()) {
 			if(chunk.length() == theChunkSize) {
 				length += chunk.length();
+				if (skip != null) {
+					int start = firstChunk ? thePosition : 0;
+					skip.apply(chunk.getData(), start, chunk.length());
+				}
 				chunk = chunk.getNext();
+				firstChunk = false;
 			} else if(chunk.isLast)
 				throw new IndexOutOfBoundsException(index + " of " + (length + chunk.length()));
 			else
@@ -213,6 +247,12 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 		}
 		if(chunk == null)
 			throw new IndexOutOfBoundsException(index + " of " + length);
+		int targetPos = index - length;
+		if (skip != null) {
+			int start = firstChunk ? thePosition : 0;
+			if (start != targetPos)
+				skip.apply(chunk.getData(), start, targetPos);
+		}
 		return op.apply(chunk, index - length);
 	}
 
@@ -257,4 +297,7 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 	 * @return The data value at the given index in the given chunk
 	 */
 	protected abstract D get(C data, int index);
+
+	/** @return A representation of this stream's position */
+	public abstract String printPosition();
 }
