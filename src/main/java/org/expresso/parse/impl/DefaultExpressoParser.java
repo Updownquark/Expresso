@@ -266,6 +266,12 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 
 			ParseMatch<SS> match(SS stream, ParseSessionImpl<SS> session, Collection<? extends ParseMatcher<? super SS>> matchers)
 					throws IOException {
+				/* This is the core parsing code.  The basic strategy is to disallow recursive parsing, using the cache to allow
+				 * matchers access to their own or others' matches.  This makes debugging much, much easier and makes the debugging process
+				 * more controllable and, I think, faster.  Not sure what kind of code I'd have to write if I were allowing straight
+				 * recursion, so I can't compare it to this; but the code I had to write here isn't real pretty.  I tried to make the code
+				 * as easy to read as possible and document my logic in the comments as much as possible, but BEWARE of altering this code.
+				 * It breaks parsing pretty much every time I add an optimization or a refactor.  Here there be dragons. */
 				Set<String> uncachedTypeNames = new LinkedHashSet<>();
 				for (ParseMatcher<? super SS> matcher : matchers) {
 					Matching matching = theTypeMatching.get(matcher.getName());
@@ -327,6 +333,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 							iter.remove();
 						}
 
+						// Replace the overall match if the new match is better
 						if (match_i != null && match_i.isBetter(match)) {
 							hadBetter = true;
 							if (match != null)
