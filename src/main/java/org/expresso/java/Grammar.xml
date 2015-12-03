@@ -535,10 +535,57 @@
 			<literal>;</literal>
 		</option>
 	</sequence>
+	<sequence name="enum-declaration" tag="declaration">
+		<option>
+			<ref type="annotations" name="annotations" />
+		</option>
+		<repeat>
+			<ref type="qualifier" name="qualifier" />
+		</repeat>
+		<literal>enum</literal>
+		<whitespace />
+		<ref type="identifier" name="name" />
+		<option>
+			<ref type="type-parameters" name="type-parameters" />
+		</option>
+		<option>
+			<literal>extends</literal> <!-- Not really valid on an enum, but we'll catch it in validation -->
+			<repeat>
+				<ref type="type" name="extends" />
+				<literal>,</literal>
+			</repeat>
+			<ref type="type" name="extends" />
+		</option>
+		<option>
+			<literal>implements</literal>
+			<repeat>
+				<ref type="type" name="implements" />
+				<literal>,</literal>
+			</repeat>
+			<ref type="type" name="implements" />
+		</option>
+		<literal>{</literal>
+			<repeat>
+				<ref type="identifier" name="enum-constant" />
+			</repeat>
+			<option>
+				<literal>;</literal>
+			</option>
+			<repeat>
+				<ref name="body-content" />
+			</repeat>
+		<literal>}</literal>
+		<option>
+			<literal>;</literal>
+		</option>
+	</sequence>
 	<sequence name="type-import" default="false" tag="import">
 		<literal>import</literal>
 		<whitespace />
 		<ref type="basic-type" name="type" />
+		<option>
+			<literal name="wildcard">.*</literal>
+		</option>
 		<literal>;</literal>
 	</sequence>
 	<sequence name="static-import" default="false" tag="import">
@@ -546,11 +593,10 @@
 		<whitespace />
 		<literal>static</literal>
 		<whitespace />
+		<ref type="basic-type" name="type" />
 		<option>
-			<ref type="basic-type" name="type" />
+			<literal name="wildcard">.*</literal>
 		</option>
-		<literal>.</literal>
-		<ref type="identifier" name="member" />
 		<literal>;</literal>
 	</sequence>
 	<sequence name="java-file" default="false">
@@ -899,5 +945,10 @@
 			</repeat>
 		</option>
 		<literal>)</literal>
+	</sequence>
+	<sequence name="resolution" priority="240">
+		<ref name="value" />
+		<literal>::</literal>
+		<ref type="identifier" name="member" />
 	</sequence>
 </grammar>
