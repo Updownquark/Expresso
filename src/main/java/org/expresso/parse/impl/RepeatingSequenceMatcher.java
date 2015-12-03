@@ -3,10 +3,15 @@ package org.expresso.parse.impl;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
 
-import org.expresso.parse.*;
+import org.expresso.parse.BranchableStream;
+import org.expresso.parse.ExpressoParser;
+import org.expresso.parse.ParseMatch;
+import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.ParseSession;
 
 /**
  * Matches a sequence of other matchers optionally or multiple times
@@ -62,35 +67,64 @@ public class RepeatingSequenceMatcher<S extends BranchableStream<?, ?>> extends 
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
-		SS streamCopy = (SS) stream.branch();
-		int count = 0;
-		boolean optionsComplete = true;
-		List<ParseMatch<SS>> optionMatches = new ArrayList<>();
-		while(theMaxRepeat < 0 || count < theMaxRepeat) {
-			ParseMatch<SS> match = super.match((SS) stream.branch(), parser, session);
-			if(match == null)
-				break;
-			if(match.isComplete()) {
-				optionMatches.add(match);
-				count++;
-				stream.advance(match.getLength());
-			} else {
-				if(count < theMinRepeat) {
-					optionMatches.add(match);
-					count++;
-					stream.advance(match.getLength());
-					optionsComplete = false;
+	public <SS extends S> List<ParseMatch<SS>> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
+			throws IOException {
+		List<List<ParseMatch<SS>>> paths = new ArrayList<>();
+		SS copy = (SS) stream.branch();
+		for (ParseMatch<SS> possibility : super.match(copy, parser, session)) {
+			List<ParseMatch<SS>> path = new ArrayList<>();
+			path.add(possibility);
+			paths.add(path);
+		}
+		int iterations;
+		boolean hasWayForward = true;
+		for (iterations = 0; (theMaxRepeat < 0 || iterations < theMaxRepeat) && hasWayForward; iterations++) {
+			int todo = todo; // Refactor to use parseNext()
+			ListIterator<List<ParseMatch<SS>>> pathIter = paths.listIterator();
+			while (pathIter.hasNext()) {
+				List<ParseMatch<SS>> path = pathIter.next();
+				if (path.size() != iterations || !path.get(path.size() - 1).isComplete())
+					continue;
+
+				hasWayForward = true;
+				copy = (SS) stream.branch();
+				for (ParseMatch<SS> pathEl : path)
+					copy.advance(pathEl.getLength());
+				List<ParseMatch<SS>> newMatches = super.match(copy, parser, session);
+				if (newMatches.isEmpty())
+					pathIter.remove();
+				else {
+					// Re-use the path list for the first match
+					path.add(newMatches.get(newMatches.size() - 1));
+					for (int j = 0; j < newMatches.size() - 1; j++) {
+						List<ParseMatch<SS>> newPath = new ArrayList<>();
+						// The path now has the first new match in it, so we can't just do addAll
+						for (int k = 0; k < path.size() - 1; k++)
+							newPath.add(path.get(k));
+						newPath.add(newMatches.get(j));
+						pathIter.add(newPath);
+					}
 				}
-				break;
 			}
 		}
 
-		String error = null;
-		if(optionsComplete && count < theMinRepeat)
-			error = "At least " + theMinRepeat + " repetition" + (theMinRepeat > 1 ? "s" : "") + " expected";
-
-		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), optionMatches, error, error == null);
+		copy = (SS) stream.branch();
+		List<ParseMatch<SS>> ret = new ArrayList<>(paths.size());
+		for (int i = 0; i < ret.size(); i++) {
+			List<ParseMatch<SS>> path = paths.get(i);
+			String errorMsg;
+			if (!path.isEmpty() && path.get(path.size() - 1).getError() != null)
+				errorMsg = null; // Let the deeper message come up
+			else if (path.size() < theMinRepeat)
+				errorMsg = "At least " + theMinRepeat + " repetition" + (theMinRepeat > 1 ? "s" : "") + " expected";
+			else
+				errorMsg = null;
+			int length = 0;
+			for (ParseMatch<SS> el : path)
+				length += el.getLength();
+			ret.add(new ParseMatch<>(this, copy, length, path, errorMsg, path.size() >= theMinRepeat));
+		}
+		return ret;
 	}
 
 	@Override

@@ -1,11 +1,18 @@
 package org.expresso.parse.impl;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.expresso.parse.*;
+import org.expresso.parse.BranchableStream;
+import org.expresso.parse.ExpressoParser;
+import org.expresso.parse.ParseMatch;
+import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.ParseSession;
 
 /**
  * Acts as a switch. Matches any one of a set of matchers against a stream.
@@ -25,7 +32,7 @@ public class OneOfMatcher<S extends BranchableStream<?, ?>> extends ComposedMatc
 
 	@Override
 	public Map<String, String> getAttributes() {
-		return java.util.Collections.EMPTY_MAP;
+		return Collections.EMPTY_MAP;
 	}
 
 	@Override
@@ -37,27 +44,15 @@ public class OneOfMatcher<S extends BranchableStream<?, ?>> extends ComposedMatc
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
-		ParseMatch<SS> match = null;
+	public <SS extends S> List<ParseMatch<SS>> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
+			throws IOException {
+		List<ParseMatch<SS>> matches = new ArrayList<>();
 		for(ParseMatcher<? super S> element : getComposed()) {
 			SS streamCopy = (SS) stream.branch();
-			ParseMatch<SS> optionMatch = parser.parseWith(streamCopy, session, element);
-			if(optionMatch == null)
-				continue;
-			else if(optionMatch.isComplete() && optionMatch.getError() == null) {
-				match = optionMatch;
-				break;
-			} else if(optionMatch.isBetter(match)) {
-				// if(match != null)
-				// theDebugger.matchDiscarded(match);
-				match = optionMatch;
-			}
+			for (ParseMatch<SS> match : parser.parseWith(streamCopy, session, element))
+				matches.add(new ParseMatch<>(this, stream, match.getLength(), Arrays.asList(match), null, true));
 		}
-		if(match == null)
-			return null;
-		SS streamCopy = (SS) stream.branch();
-		stream.advance(match.getLength());
-		return new ParseMatch<>(this, streamCopy, match.getLength(), Arrays.asList(match), null, true);
+		return matches;
 	}
 
 	/**

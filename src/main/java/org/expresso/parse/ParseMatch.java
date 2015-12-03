@@ -37,7 +37,8 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 	 */
 	public ParseMatch(ParseMatcher<? super S> matcher, S stream, int length, List<ParseMatch<S>> children, String error, boolean complete) {
 		theMatcher = matcher;
-		theStream = stream;
+		theStream = (S) stream.branch();
+		theStream.seal();
 		theLength = length;
 		theChildren = java.util.Collections.unmodifiableList(children);
 		theError = error;

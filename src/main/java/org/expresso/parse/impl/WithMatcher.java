@@ -1,9 +1,19 @@
 package org.expresso.parse.impl;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-import org.expresso.parse.*;
+import org.expresso.parse.BranchableStream;
+import org.expresso.parse.ExpressoParser;
+import org.expresso.parse.ParseMatch;
+import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.ParseSession;
 
 /**
  * Fully or partially counters the effect of {@link WithoutMatcher}
@@ -44,7 +54,8 @@ public class WithMatcher<S extends BranchableStream<?, ?>> extends SequenceMatch
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
+	public <SS extends S> List<ParseMatch<SS>> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
+			throws IOException {
 		return doInSession(session, () -> super.match(stream, parser, session));
 	}
 

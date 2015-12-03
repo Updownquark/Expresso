@@ -55,14 +55,14 @@ public interface ParseMatcher<S extends BranchableStream<?, ?>> {
 	List<ParseMatcher<? super S>> getComposed();
 
 	/**
-	 * Parses this matcher's content from the beginning of stream, advancing the stream past the content
+	 * Parses this matcher's content from the beginning of stream. The position of the stream should not be affected.
 	 *
 	 * @param <SS> The sub-type of stream to parse
 	 * @param stream The stream to parse
 	 * @param parser The parser to use to parse reference types
 	 * @param session The current parse session
-	 * @return The parsed match, or null if this matcher does not recognize the content at the beginning of the stream
+	 * @return All matches that may be intended by the input for this matcher. Will be empty if this matcher does not recognize the content
 	 * @throws IOException If an error occurs retrieving the data for matching
 	 */
-	<SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException;
+	<SS extends S> List<ParseMatch<SS>> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException;
 }

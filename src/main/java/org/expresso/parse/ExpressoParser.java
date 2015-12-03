@@ -1,7 +1,13 @@
 package org.expresso.parse;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Contains the mechanism for parsing data from a stream based on the matching capabilities of many component matchers
@@ -49,67 +55,90 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	ParseSession createSession();
 
 	/**
-	 * Parses one match (as complete as can be) out of the stream, advancing the stream to the first position after the match
+	 * Parses possibilities for the first match (as complete as can be) out of the stream
 	 *
 	 * @param <SS> The type of the stream
 	 * @param stream The stream to parse
-	 * @return The match parsed from the stream
+	 * @return The possible matches parsed from the stream
 	 * @throws IOException If an error occurs while retrieving the data to parse
 	 */
-	default <SS extends S> ParseMatch<SS> parse(SS stream) throws IOException {
+	default <SS extends S> List<ParseMatch<SS>> parse(SS stream) throws IOException {
 		return parseByType(stream, createSession(), new String[0]);
 	}
 
+	/**
+	 * Parses the best possibility for the first match (as complete as can be) out of the stream, advancing the stream beyond it
+	 *
+	 * @param <SS> The type of the stream
+	 * @param stream The stream to parse
+	 * @return The possible matches parsed from the stream
+	 * @throws IOException If an error occurs while retrieving the data to parse
+	 */
+	default <SS extends S> ParseMatch<SS> parseBest(SS stream) throws IOException {
+		SS copy = (SS) stream.branch();
+		List<ParseMatch<SS>> matches = parse(copy);
+		ParseMatch<SS> best = null;
+		for (ParseMatch<SS> m : matches) {
+			if (m != null && m.isBetter(best))
+				best = m;
+		}
+		if (best != null)
+			stream.advance(best.getLength());
+		return best;
+	}
+
 	@Override
-	default <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
+	default <SS extends S> List<ParseMatch<SS>> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
+			throws IOException {
 		return parseByType(stream, session, new String[0]);
 	}
 
 	/**
-	 * Parses a match out of the stream whose matcher is named or tagged one of the given types. If <code>types</code> is not provided
-	 * (zero-length), then any default matcher will do.
+	 * Parses possibilities for the first match out of the stream whose matcher is named or tagged one of the given types. If
+	 * <code>types</code> is not provided (zero-length), then any default matcher will do.
 	 *
 	 * @param <SS> The type of the stream
 	 * @param stream The stream to parse
 	 * @param session The parsing session
 	 * @param types The matcher names or tags to use, or empty to use all default matchers
-	 * @return The match parsed from the stream
+	 * @return The possible matches parsed from the stream
 	 * @throws IOException If an error occurs while retrieving the data to parse
 	 */
-	default <SS extends S> ParseMatch<SS> parseByType(SS stream, ParseSession session, String... types) throws IOException {
+	default <SS extends S> List<ParseMatch<SS>> parseByType(SS stream, ParseSession session, String... types) throws IOException {
 		if(session == null)
 			session = createSession();
 		return parse(stream, session, getMatchersFor(session, types));
 	}
 
 	/**
-	 * Parses a match from the stream using one of the given matchers. If zero-length, then all of this parser's default matchers will be
-	 * used.
+	 * Parses possibilities for the first match from the stream using one of the given matchers. If zero-length, then all of this parser's
+	 * default matchers will be used.
 	 *
 	 * @param <SS> The type of the stream
 	 * @param stream The stream to parse
 	 * @param session The parsing session
 	 * @param matchers The matchers to use, or emtpy to use all default matchers. These matchers need not be known by this parser.
-	 * @return The match parsed from the stream
+	 * @return The possible matches parsed from the stream
 	 * @throws IOException If an error occurs while retrieving the data to parse
 	 */
-	default <SS extends S> ParseMatch<SS> parseWith(SS stream, ParseSession session, Collection<? extends ParseMatcher<? super SS>> matchers)
+	default <SS extends S> List<ParseMatch<SS>> parseWith(SS stream, ParseSession session,
+			Collection<? extends ParseMatcher<? super SS>> matchers)
 		throws IOException{
 		return parse(stream, session, matchers.isEmpty() ? getMatchersFor(session) : matchers);
 	}
 
 	/**
-	 * Parses a match from the stream using one of the given matchers. If zero-length, then all of this parser's default matchers will be
-	 * used.
+	 * Parses possibilities for the first match from the stream using one of the given matchers. If zero-length, then all of this parser's
+	 * default matchers will be used.
 	 *
 	 * @param <SS> The type of the stream
 	 * @param stream The stream to parse
 	 * @param session The parsing session
 	 * @param matchers The matchers to use, or emtpy to use all default matchers. These matchers need not be known by this parser.
-	 * @return The match parsed from the stream
+	 * @return The possible matches parsed from the stream
 	 * @throws IOException If an error occurs while retrieving the data to parse
 	 */
-	default <SS extends S> ParseMatch<SS> parseWith(SS stream, ParseSession session, ParseMatcher<? super SS>... matchers)
+	default <SS extends S> List<ParseMatch<SS>> parseWith(SS stream, ParseSession session, ParseMatcher<? super SS>... matchers)
 		throws IOException {
 		return parse(stream, session, matchers.length > 0 ? Arrays.asList(matchers) : getMatchersFor(session));
 	}
@@ -123,15 +152,16 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 * @param stream The stream to parse
 	 * @param session The parsing session
 	 * @param matchers The matchers to use. Need not be known by this parser.
-	 * @return The match parsed from the stream.
+	 * @return The possible matches parsed from the stream.
 	 * @throws IOException If an error occurs while retrieving the data to parse
 	 */
-	<SS extends S> ParseMatch<SS> parse(SS stream, ParseSession session, Collection<? extends ParseMatcher<? super SS>> matchers)
+	<SS extends S> List<ParseMatch<SS>> parse(SS stream, ParseSession session, Collection<? extends ParseMatcher<? super SS>> matchers)
 		throws IOException;
 
 	/**
 	 * Parses matches from the stream iteratively. If an error occurs retrieving data, the {@link Iterator#next()} method may throw an
-	 * {@link IllegalStateException} wrapping the {@link IOException}.
+	 * {@link IllegalStateException} wrapping the {@link IOException}. The best quality match is provided from the possibilities for each
+	 * match.
 	 *
 	 * @param <SS> The type of the stream
 	 * @param stream The stream to parse
@@ -150,7 +180,7 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 					@Override
 					public ParseMatch<SS> next() {
 						try {
-							return parse(stream);
+							return parseBest(stream);
 						} catch(IOException e) {
 							throw new IllegalStateException("Could not retrieve data to parse next match", e);
 						}

@@ -2,10 +2,16 @@ package org.expresso.parse.impl;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-import org.expresso.parse.*;
+import org.expresso.parse.BranchableStream;
+import org.expresso.parse.ExpressoParser;
+import org.expresso.parse.ParseMatch;
+import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.ParseSession;
 
 /**
  * Parses raw text out of a file. Subclasses of this type are inspecting individual characters and not delegating any of their parsing to
@@ -21,38 +27,37 @@ public abstract class SimpleValueMatcher<S extends BranchableStream<?, ?>> exten
 
 	@Override
 	public List<ParseMatcher<? super S>> getComposed() {
-		return java.util.Collections.EMPTY_LIST;
+		return Collections.EMPTY_LIST;
 	}
 
 	@Override
 	public Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
-		return java.util.Collections.EMPTY_SET;
+		return Collections.EMPTY_SET;
 	}
 
 	/** @return A string representation of the value this matcher is looking for */
 	public abstract String getValueString();
 
 	@Override
-	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
-		SS streamBegin = (SS) stream.branch();
+	public <SS extends S> List<ParseMatch<SS>> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
+			throws IOException {
 		SS streamCopy = (SS) stream.branch();
 		List<ParseMatch<SS>> ignorables = new ArrayList<>();
-		ParseMatch<SS> ignorable = parser.parseByType(streamCopy, session, ExpressoParser.IGNORABLE);
-		while(ignorable != null) {
-			ignorables.add(ignorable);
+		List<ParseMatch<SS>> ignorable = parser.parseByType(streamCopy, session, ExpressoParser.IGNORABLE);
+		while (!ignorable.isEmpty()) {
+			ignorables.add(ignorable.get(0));
 			ignorable = parser.parseByType(streamCopy, session, ExpressoParser.IGNORABLE);
 		}
 		int groupLength = streamCopy.getPosition() - stream.getPosition();
 		ParseMatch<SS> valueMatch = parseValue(streamCopy);
 		if(valueMatch == null)
-			return null;
+			return Collections.EMPTY_LIST;
 		groupLength += valueMatch.getLength();
-		stream.advance(groupLength);
 		if(ignorables.isEmpty())
-			return valueMatch;
+			return Arrays.asList(valueMatch);
 		else {
 			ignorables.add(valueMatch);
-			return new ParseMatch<>(WhitespacedGroupMatcher.MATCHER, streamBegin, groupLength, ignorables, null, true);
+			return Arrays.asList(new ParseMatch<>(WhitespacedGroupMatcher.MATCHER, stream, groupLength, ignorables, null, true));
 		}
 	}
 

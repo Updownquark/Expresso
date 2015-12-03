@@ -57,16 +57,18 @@ public class UpToMatcher<S extends BranchableStream<?, ?>> extends BaseMatcher<S
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
+	public <SS extends S> List<ParseMatch<SS>> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
+			throws IOException {
 		SS streamBegin = (SS) stream.branch();
 		SS streamCopy = (SS) stream.branch();
-		ParseMatch<SS> end = parser.parseWith(streamCopy, session, theMatcher);
-		while(end == null && (!stream.isDiscovered() || stream.getDiscoveredLength() > 0)) {
+		List<ParseMatch<SS>> end = parser.parseWith(streamCopy, session, theMatcher);
+		while (end.isEmpty() && (!stream.isDiscovered() || stream.getDiscoveredLength() > 0)) {
 			stream.advance(1);
 			streamCopy = (SS) stream.branch();
 			end = parser.parseWith(streamCopy, session, theMatcher);
 		}
-		return new ParseMatch<>(this, streamBegin, stream.getPosition() - streamBegin.getPosition(), Collections.EMPTY_LIST, null, true);
+		return Arrays.asList(
+				new ParseMatch<>(this, streamBegin, stream.getPosition() - streamBegin.getPosition(), Collections.EMPTY_LIST, null, true));
 	}
 
 	@Override

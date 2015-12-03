@@ -2,7 +2,9 @@ package org.expresso.parse.impl;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
 
@@ -49,30 +51,101 @@ public class SequenceMatcher<S extends BranchableStream<?, ?>> extends ComposedM
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
-		SS streamCopy = (SS) stream.branch();
-		List<ParseMatch<SS>> components = new ArrayList<>();
-		ParseMatcher<? super S> missingEl = null;
-		for(ParseMatcher<? super S> element : getComposed()) {
-			ParseMatch<SS> component = parser.parseWith(stream, session, element);
-			if(component == null) {
-				missingEl = element;
-				break;
-			}
-			components.add(component);
-			if(!component.isComplete())
-				break;
+	public <SS extends S> List<ParseMatch<SS>> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
+			throws IOException {
+		if (getComposed().isEmpty())
+			return Collections.EMPTY_LIST;
+		List<List<ParseMatch<SS>>> paths = new ArrayList<>();
+		SS copy = (SS) stream.branch();
+		for (ParseMatch<SS> possibility : parser.parseWith(copy, session, getComposed().get(0))) {
+			List<ParseMatch<SS>> path = new ArrayList<>();
+			path.add(possibility);
+			paths.add(path);
 		}
-		if(components.isEmpty())
-			return null;
-		String errorMsg;
-		if (!components.isEmpty() && components.get(components.size() - 1).getError() != null)
-			errorMsg = null; // Let the deeper message come up
-		else if (missingEl != null)
-			errorMsg = "Expected " + missingEl;
-		else
-			errorMsg = null;
-		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), components, errorMsg, missingEl == null);
+		for (int i = 1; i < getComposed().size(); i++) {
+			int todo = todo; // Refactor to use parseNext()
+			ParseMatcher<? super S> element = getComposed().get(i);
+			parseNext(stream, s -> parser.parseWith(s, session, element), paths, i);
+			ListIterator<List<ParseMatch<SS>>> pathIter = paths.listIterator();
+			while (pathIter.hasNext()) {
+				List<ParseMatch<SS>> path = pathIter.next();
+				if (path.size() != i || !path.get(path.size() - 1).isComplete())
+					continue;
+
+				copy = (SS) stream.branch();
+				for (ParseMatch<SS> pathEl : path)
+					copy.advance(pathEl.getLength());
+				List<ParseMatch<SS>> newMatches = parser.parseWith(copy, session, element);
+				if (newMatches.isEmpty())
+					pathIter.remove();
+				else {
+					// Re-use the path list for the first match
+					path.add(newMatches.get(newMatches.size() - 1));
+					for (int j = 0; j < newMatches.size() - 1; j++) {
+						List<ParseMatch<SS>> newPath = new ArrayList<>();
+						// The path now has the first new match in it, so we can't just do addAll
+						for (int k = 0; k < path.size() - 1; k++)
+							newPath.add(path.get(k));
+						newPath.add(newMatches.get(j));
+						pathIter.add(newPath);
+					}
+				}
+			}
+		}
+
+		copy = (SS) stream.branch();
+		List<ParseMatch<SS>> ret = new ArrayList<>(paths.size());
+		for (int i = 0; i < ret.size(); i++) {
+			List<ParseMatch<SS>> path = paths.get(i);
+			String errorMsg;
+			if (!path.isEmpty() && path.get(path.size() - 1).getError() != null)
+				errorMsg = null; // Let the deeper message come up
+			else if (path.size() < getComposed().size())
+				errorMsg = "Expected " + getComposed().get(path.size());
+			else
+				errorMsg = null;
+			int length = 0;
+			for (ParseMatch<SS> el : path)
+				length += el.getLength();
+			ret.add(new ParseMatch<>(this, copy, length, path, errorMsg, path.size() == getComposed().size()));
+		}
+		return ret;
+	}
+
+	protected interface MatchParser<S extends BranchableStream<?, ?>> {
+		List<ParseMatch<S>> parse(S stream) throws IOException;
+	}
+
+	protected <SS extends S> boolean parseNext(SS stream, MatchParser<SS> parser, List<List<ParseMatch<SS>>> paths,
+			int depth) throws IOException {
+		boolean madeProgress = false;
+		ListIterator<List<ParseMatch<SS>>> pathIter = paths.listIterator();
+		while (pathIter.hasNext()) {
+			List<ParseMatch<SS>> path = pathIter.next();
+			if (path.size() != depth || !path.get(path.size() - 1).isComplete())
+				continue;
+
+			madeProgress = true;
+			SS copy = (SS) stream.branch();
+			for (ParseMatch<SS> pathEl : path)
+				copy.advance(pathEl.getLength());
+			List<ParseMatch<SS>> newMatches = parser.parse(copy);
+			if (newMatches.isEmpty())
+				pathIter.remove();
+			else {
+				// Re-use the path list for the first match
+				path.add(newMatches.get(newMatches.size() - 1));
+				for (int j = 0; j < newMatches.size() - 1; j++) {
+					List<ParseMatch<SS>> newPath = new ArrayList<>();
+					// The path now has the first new match in it, so we can't just do addAll
+					for (int k = 0; k < path.size() - 1; k++)
+						newPath.add(path.get(k));
+					newPath.add(newMatches.get(j));
+					pathIter.add(newPath);
+				}
+			}
+		}
+		return madeProgress;
 	}
 
 	/**

@@ -95,11 +95,13 @@ public class ReferenceMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
+	public <SS extends S> List<ParseMatch<SS>> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
+			throws IOException {
 		SS streamCopy = (SS) stream.branch();
-		ParseMatch<SS> refMatch = parser.<SS> parseWith(stream, session, getReference(parser, session));
-		if(refMatch == null)
-			return null;
-		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), Arrays.asList(refMatch), null, true);
+		List<ParseMatch<SS>> ret = new ArrayList<>();
+		for (ParseMatch<SS> refMatch : parser.<SS> parseWith(stream, session, getReference(parser, session)))
+			ret.add(new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), Arrays.asList(refMatch), null,
+					true));
+		return ret;
 	}
 }

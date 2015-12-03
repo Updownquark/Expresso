@@ -1,6 +1,7 @@
 package org.expresso.parse.impl;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -56,14 +57,16 @@ public class WhitespaceMatcher<S extends CharSequenceStream> implements ParseMat
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
+	public <SS extends S> List<ParseMatch<SS>> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
+			throws IOException {
 		if(!isNextWS(stream))
-			return null;
+			return Collections.EMPTY_LIST;
 		SS streamCopy = (SS) stream.branch();
 		do {
 			stream.advance(1);
 		} while(isNextWS(stream));
-		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), Collections.EMPTY_LIST, null, true);
+		return Arrays.asList(
+				new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), Collections.EMPTY_LIST, null, true));
 	}
 
 	private boolean isNextWS(CharSequenceStream stream) {
