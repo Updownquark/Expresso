@@ -36,8 +36,6 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 	 *            can still recognize.
 	 */
 	public ParseMatch(ParseMatcher<? super S> matcher, S stream, int length, List<ParseMatch<S>> children, String error, boolean complete) {
-		if(!complete && error == null)
-			throw new IllegalArgumentException("Incomplete matches must have an error message");
 		theMatcher = matcher;
 		theStream = stream;
 		theLength = length;
@@ -45,6 +43,8 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 		theError = error;
 		isThisComplete = complete;
 		isComplete = getIncompleteMatch() == null;
+		if (!isThisComplete && getErrorMatch() == null)
+			throw new IllegalArgumentException("Incomplete matches must have an error message");
 		toString();
 	}
 

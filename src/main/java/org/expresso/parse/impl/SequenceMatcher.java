@@ -6,7 +6,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.expresso.parse.*;
+import org.expresso.parse.BranchableStream;
+import org.expresso.parse.ExpressoParser;
+import org.expresso.parse.ParseMatch;
+import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.ParseSession;
 
 /**
  * Matches a sequence of other matchers
@@ -62,12 +66,12 @@ public class SequenceMatcher<S extends BranchableStream<?, ?>> extends ComposedM
 		if(components.isEmpty())
 			return null;
 		String errorMsg;
-		if (missingEl == null)
-			errorMsg = null;
-		else if (!components.isEmpty() && components.get(components.size() - 1).getError() != null)
+		if (!components.isEmpty() && components.get(components.size() - 1).getError() != null)
 			errorMsg = null; // Let the deeper message come up
-		else
+		else if (missingEl != null)
 			errorMsg = "Expected " + missingEl;
+		else
+			errorMsg = null;
 		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), components, errorMsg, missingEl == null);
 	}
 
