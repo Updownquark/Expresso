@@ -1,71 +1,24 @@
 package org.expresso.parse.debug;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.EventQueue;
-import java.awt.Image;
-import java.awt.Rectangle;
-import java.awt.Window;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
-import java.awt.event.KeyEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.WindowEvent;
+import java.awt.*;
+import java.awt.event.*;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.EventObject;
-import java.util.LinkedList;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
-import javax.swing.BoundedRangeModel;
-import javax.swing.BoxLayout;
-import javax.swing.DefaultListModel;
-import javax.swing.ImageIcon;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JPanel;
-import javax.swing.JScrollBar;
-import javax.swing.JScrollPane;
-import javax.swing.JSplitPane;
-import javax.swing.JTable;
-import javax.swing.JTextField;
-import javax.swing.JTextPane;
-import javax.swing.JToggleButton;
-import javax.swing.JTree;
-import javax.swing.ListSelectionModel;
-import javax.swing.event.CellEditorListener;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.ListSelectionListener;
-import javax.swing.event.TreeModelEvent;
-import javax.swing.event.TreeModelListener;
-import javax.swing.event.TreeSelectionEvent;
+import javax.swing.*;
+import javax.swing.event.*;
 import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.text.BadLocationException;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreePath;
 
-import org.expresso.parse.BranchableStream;
-import org.expresso.parse.ExpressoParser;
-import org.expresso.parse.ParseMatch;
-import org.expresso.parse.ParseMatcher;
-import org.expresso.parse.ParseSession;
+import org.expresso.parse.*;
 import org.expresso.parse.impl.CharSequenceStream;
 import org.expresso.parse.impl.ReferenceMatcher;
 import org.expresso.parse.impl.SimpleValueMatcher;
@@ -340,7 +293,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		Window window = getWindow();
 		if(window != null) {
 			window.setBounds(config.getInt("x", window.getX()), config.getInt("y", window.getY()), config.getInt("w", window.getWidth()),
-				config.getInt("h", window.getHeight()));
+					config.getInt("h", window.getHeight()));
 		}
 		if(getWidth() > 0) {
 			theMainSplit.setDividerLocation(config.getFloat("main-split", .5f));
@@ -354,9 +307,9 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			for(MutableConfig breakpointConfig : config.subConfig("breakpoints").subConfigs("breakpoint")) {
 				ExpressoParserBreakpoint breakpoint = new ExpressoParserBreakpoint();
 				breakpoint.setPreCursorText(
-					breakpointConfig.get("pre") == null ? null : Pattern.compile(".*" + breakpointConfig.get("pre"), Pattern.DOTALL));
+						breakpointConfig.get("pre") == null ? null : Pattern.compile(".*" + breakpointConfig.get("pre"), Pattern.DOTALL));
 				breakpoint.setPostCursorText(
-					breakpointConfig.get("post") == null ? null : Pattern.compile(breakpointConfig.get("post") + ".*", Pattern.DOTALL));
+						breakpointConfig.get("post") == null ? null : Pattern.compile(breakpointConfig.get("post") + ".*", Pattern.DOTALL));
 				breakpoint.setMatcherName(breakpointConfig.get("operator"));
 				breakpoint.setEnabled(breakpointConfig.is("enabled", true));
 				theBreakpoints.add(breakpoint);
@@ -388,11 +341,11 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		}
 		for(ExpressoParserBreakpoint bp : theBreakpoints) {
 			MutableConfig bpConfig = breakpoints.addSubConfig(new MutableConfig("breakpoint")
-				.set("pre", bp.getPreCursorText() == null ? null : bp.getPreCursorText().pattern().substring(2))
-				.set("post",
-					bp.getPostCursorText() == null ? null
-						: bp.getPostCursorText().pattern().substring(0, bp.getPostCursorText().pattern().length() - 2))
-				.set("enabled", "" + bp.isEnabled()));
+					.set("pre", bp.getPreCursorText() == null ? null : bp.getPreCursorText().pattern().substring(2))
+					.set("post",
+							bp.getPostCursorText() == null ? null
+									: bp.getPostCursorText().pattern().substring(0, bp.getPostCursorText().pattern().length() - 2))
+					.set("enabled", "" + bp.isEnabled()));
 			if(bp.getMatcherName() != null)
 				bpConfig.set("operator", bp.getMatcherName());
 		}
@@ -631,9 +584,9 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 					JScrollBar vBar = theTreeScroll.getVerticalScrollBar();
 					JScrollBar hBar = theTreeScroll.getHorizontalScrollBar();
 					int vScroll = adjustScroll(vBar.getValue(), vBar.getModel(), bounds.getMinY(), bounds.getMaxY(),
-						theMainText.getHeight());
+							theMainText.getHeight());
 					int hScroll = adjustScroll(hBar.getValue(), hBar.getModel(), bounds.getMinX(), bounds.getMaxX(),
-						theMainText.getWidth());
+							theMainText.getWidth());
 					vBar.setValue(vScroll);
 					hBar.setValue(hScroll);
 				}
@@ -753,8 +706,10 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 									break;
 							}
 						}
-					} else
+					} else if (op.theSession != null && op.theParent != null && op.theParent.theStreamCapture != null)
 						mCached = op.theSession.isCached(op.theMatcher.getName(), op.theParent.theStreamCapture);
+					else
+						mCached = false;
 
 					if(mCached)
 						cached.add(m.getName());
@@ -793,7 +748,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		for(int i = 0; i < theDebugPane.getModel().getSize(); i++) {
 			MatcherObject o = theDebugPane.getModel().getElementAt(i);
 			boolean selected = !o.isTerminal && theParseTree.getSelectionPath() != null
-				&& ((ParseNode) theParseTree.getSelectionPath().getLastPathComponent()).theMatcher == o.theMatcher;
+					&& ((ParseNode) theParseTree.getSelectionPath().getLastPathComponent()).theMatcher == o.theMatcher;
 			if(selected) {
 				Rectangle bounds = theDebugPane.getCellBounds(i, i);
 				JScrollBar vBar = theDebugPaneScroll.getVerticalScrollBar();
@@ -801,9 +756,9 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 
 				EventQueue.invokeLater(() -> {
 					int vScroll = adjustScroll(vBar.getValue(), vBar.getModel(), bounds.getMinY(), bounds.getMaxY(),
-						theDebugPane.getHeight());
+							theDebugPane.getHeight());
 					int hScroll = adjustScroll(hBar.getValue(), hBar.getModel(), bounds.getMinX(), bounds.getMaxX(),
-						theDebugPane.getWidth());
+							theDebugPane.getWidth());
 					vBar.setValue(vScroll);
 					hBar.setValue(hScroll);
 				});
@@ -812,7 +767,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	}
 
 	private MatcherObject addToModel(List<MatcherObject> model, MatcherObject parent, ParseMatcher<?> op, int indent,
-		boolean withChildren, boolean cached) {
+			boolean withChildren, boolean cached) {
 		MatcherObject newObj = new MatcherObject(parent, op, indent, cached, false);
 		model.add(newObj);
 		boolean needsEnd = false;
@@ -1376,7 +1331,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			});
 			if(!removedChildren.isEmpty())
 				model.fire(TreeEventType.REMOVE, removedIndexes.toArray(),
-					removedChildren.toArray(new ExpressoParserDebugGUI.ParseNode[removedChildren.size()]));
+						removedChildren.toArray(new ExpressoParserDebugGUI.ParseNode[removedChildren.size()]));
 
 			List<ParseNode> addedChildren = new ArrayList<>();
 			List<ParseNode> changedChildren = new ArrayList<>();
@@ -1420,7 +1375,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 				model.fire(TreeEventType.ADD, null, addedChildren.toArray(new ExpressoParserDebugGUI.ParseNode[addedChildren.size()]));
 			if(!changedChildren.isEmpty())
 				model.fire(TreeEventType.CHANGE, null,
-					changedChildren.toArray(new ExpressoParserDebugGUI.ParseNode[changedChildren.size()]));
+						changedChildren.toArray(new ExpressoParserDebugGUI.ParseNode[changedChildren.size()]));
 
 			for(int i = 0; i < from.theChildren.size(); i++) {
 				if(addedChildren.contains(into.theChildren.get(i)))
@@ -1463,7 +1418,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 
 		@Override
 		public <SS extends BranchableStream<?, ?>> ParseMatch<SS> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
-			throws IOException {
+				throws IOException {
 			throw new IllegalStateException("This placeholder does not do any parsing");
 		}
 	}
@@ -1532,7 +1487,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	private static class BreakpointEnabledRenderer extends JCheckBox implements TableCellRenderer {
 		@Override
 		public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row,
-			int column) {
+				int column) {
 			if(value instanceof ExpressoParserBreakpoint)
 				setSelected(((ExpressoParserBreakpoint) value).isEnabled());
 			else if(value instanceof Boolean)
@@ -1571,7 +1526,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	private static class BreakpointTextRenderer extends JLabel implements TableCellRenderer {
 		@Override
 		public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row,
-			int column) {
+				int column) {
 			ExpressoParserBreakpoint breakpoint = (ExpressoParserBreakpoint) value;
 			String pre = breakpoint.getPreCursorText() == null ? null : breakpoint.getPreCursorText().pattern();
 			String post = breakpoint.getPostCursorText() == null ? null : breakpoint.getPostCursorText().pattern();
@@ -1743,7 +1698,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 
 		@Override
 		public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row,
-			int column) {
+				int column) {
 			ExpressoParserBreakpoint breakpoint = (ExpressoParserBreakpoint) value;
 			super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
 			if(breakpoint.getMatcherName() == null)
@@ -1770,7 +1725,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			Component ret = super.getTableCellEditorComponent(table, value, isSelected, row, column);
 			theEditingBreakpoint = (ExpressoParserBreakpoint) value;
 			javax.swing.DefaultComboBoxModel<String> model = (javax.swing.DefaultComboBoxModel<String>) ((JComboBox<String>) getComponent())
-				.getModel();
+					.getModel();
 			model.removeAllElements();
 			model.addElement(NONE);
 			Set<String> opNames = new TreeSet<>(theOpNames);
@@ -1810,7 +1765,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 
 		@Override
 		public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row,
-			int column) {
+				int column) {
 			super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
 			setText("");
 			setIcon(ICON);
@@ -1886,7 +1841,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 
 		@Override
 		public Component getListCellRendererComponent(JList<? extends MatcherObject> list, MatcherObject value, int index,
-			boolean listSelected, boolean cellHasFocus) {
+				boolean listSelected, boolean cellHasFocus) {
 			StringBuilder text;
 			if(value.isTerminal) {
 				text = new StringBuilder("<html>");
@@ -1904,7 +1859,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			if(cursor)
 				cursor = (theDisplayedTreeModel.getCursor().theMatch != null) == value.isTerminal;
 			boolean selected = !value.isTerminal && theParseTree.getSelectionPath() != null
-				&& ((ParseNode) theParseTree.getSelectionPath().getLastPathComponent()).theMatcher == value.theMatcher;
+					&& ((ParseNode) theParseTree.getSelectionPath().getLastPathComponent()).theMatcher == value.theMatcher;
 			if(cursor && selected) {
 				if(value.isCached)
 					bg = new Color(128, 255, 255);
@@ -1926,7 +1881,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	private class ParseNodeCellRenderer extends DefaultTreeCellRenderer {
 		@Override
 		public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, boolean expanded, boolean leaf, int row,
-			boolean hasFocus2) {
+				boolean hasFocus2) {
 			super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus2);
 			setIcon(null);
 			if(!(value instanceof ExpressoParserDebugGUI.ParseNode))
