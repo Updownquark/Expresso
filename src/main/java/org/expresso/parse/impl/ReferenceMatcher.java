@@ -1,10 +1,21 @@
 package org.expresso.parse.impl;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.expresso.parse.*;
+import org.expresso.parse.BranchableStream;
+import org.expresso.parse.ExpressoParser;
+import org.expresso.parse.ParseMatch;
+import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.ParseSession;
 
 /**
  * A matcher that just delegates to the outer parser
@@ -43,7 +54,7 @@ public class ReferenceMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 
 	@Override
 	public Map<String, String> getAttributes() {
-		if(theIncludedTypes.isEmpty())
+		if (theIncludedTypes.isEmpty() && theExcludedTypes.isEmpty())
 			return Collections.EMPTY_MAP;
 		LinkedHashMap<String, String> ret = new LinkedHashMap<>();
 		String typeStr = theIncludedTypes.toString();
