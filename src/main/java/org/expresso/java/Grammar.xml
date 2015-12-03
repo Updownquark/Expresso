@@ -405,33 +405,31 @@
 			<literal>}</literal>
 		</sequence>
 	</one-of>
-	<sequence name="annotations" default="false">
-		<repeat>
-			<literal>@</literal>
-			<ref type="basic-type" name="type" />
-			<option>
-				<literal>(</literal>
-				<one-of>
+	<repeat min="1" name="annotations" default="false">
+		<literal>@</literal>
+		<ref type="basic-type" name="type" />
+		<option>
+			<literal>(</literal>
+			<one-of>
+				<ref type="annotation-value" name="parameter-value" />
+				<sequence>
+					<ref type="identifier" name="parameter-name" />
+					<literal>=</literal>
+					<ref type="annotation-value" name="parameter-value" />
+				</sequence>
+				<repeat>
+					<literal>,</literal>
 					<ref type="annotation-value" name="parameter-value" />
 					<sequence>
 						<ref type="identifier" name="parameter-name" />
 						<literal>=</literal>
 						<ref type="annotation-value" name="parameter-value" />
 					</sequence>
-					<repeat>
-						<literal>,</literal>
-						<ref type="annotation-value" name="parameter-value" />
-						<sequence>
-							<ref type="identifier" name="parameter-name" />
-							<literal>=</literal>
-							<ref type="annotation-value" name="parameter-value" />
-						</sequence>
-					</repeat>
-				</one-of>
-				<literal>)</literal>
-			</option>
-		</repeat>
-	</sequence>
+				</repeat>
+			</one-of>
+			<literal>)</literal>
+		</option>
+	</repeat>
 	<one-of name="qualifier" default="false">
 		<literal>public</literal>
 		<literal>protected</literal>
@@ -443,7 +441,9 @@
 		<literal>synchronized</literal>
 	</one-of>
 	<sequence name="variable-declaration" tag="declaration,assignable">
-		<ref type="annotations" name="annotations" />
+		<option>
+			<ref type="annotations" name="annotations" />
+		</option>
 		<repeat>
 			<ref type="qualifier" name="qualifier" />
 		</repeat>
@@ -455,7 +455,9 @@
 		<ref type="identifier" name="name" />
 	</sequence>
 	<sequence name="method-declaration" tag="declaration">
-		<ref type="annotations" name="annotations" />
+		<option>
+			<ref type="annotations" name="annotations" />
+		</option>
 		<repeat>
 			<ref type="qualifier" name="qualifier" />
 		</repeat>
@@ -493,7 +495,9 @@
 		</option>
 	</sequence>
 	<sequence name="class-declaration" tag="declaration">
-		<ref type="annotations" name="annotations" />
+		<option>
+			<ref type="annotations" name="annotations" />
+		</option>
 		<repeat>
 			<ref type="qualifier" name="qualifier" />
 		</repeat>
