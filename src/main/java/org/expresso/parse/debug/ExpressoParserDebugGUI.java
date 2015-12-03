@@ -753,7 +753,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 
 	private int adjustScroll(int scroll, BoundedRangeModel model, double min, double max, int size) {
 		int modelRange = model.getMaximum() - model.getMinimum();
-		int buffer = (int) ((max - min) / size * modelRange * 2);
+		int buffer = (int) ((max - min) / size * modelRange * 3); // 3x buffer
 		double minNeeded = min / size;
 		double minDisplayed = scroll * 1.0 / modelRange;
 		if (minDisplayed > minNeeded)
