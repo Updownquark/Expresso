@@ -272,7 +272,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 					if (matching != null) {
 						if (matching.theEvaluatingSession != null) {
 							// Mark the session as having used cache elements that are still being evaluated so the results are not cached
-							session.markUsedEvaulatingCache(matching.theEvaluatingSession);
+							session.markUsedEvaulatingCache(matching.theEvaluatingSession, matcher);
 						}
 					} else {
 						uncachedTypeNames.add(matcher.getName());
@@ -295,11 +295,13 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 							theDebugger.preParse(stream, matcher, session);
 							match_i = matcher.match((SS) stream.branch(), DefaultExpressoParser.this, session);
 							theDebugger.postParse(stream, matcher, match_i);
-							if (session.hasUsedEvaluatingCache()) {
+							// If the matcher referred to one of the currently evaluating matchers, we need to keep iterating because this
+							// cache may change as a result of each successive iteration
+							loop |= session.hasUsedOwnEvaluatingCache();
+							if (session.hasUsedEvaluatingCache() || hasCommon(session.getUsedOwnEvaluatingCache(), notToCache)) {
 								// Don't want to cache if the evaluation used cache elements that are currently being evaluated by a
 								// different session
 								notToCache.add(matcher.getName());
-								session.clearUsedEvaluatingCache();
 							} else if (!session.hasUsedOwnEvaluatingCache()) {
 								// The matcher didn't need anything that is currently being evaluated, so we can cache the result and not
 								// evaluate it again
@@ -309,11 +311,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 								iter.remove();
 								uncachedTypeNames.remove(matcher.getName());
 							}
-							if (session.hasUsedOwnEvaluatingCache()) {
-								// The matcher referred to one of the currently evaluating matchers. This cache may change as a result of
-								// each successive iteration, so we need to keep iterating
-								loop = true;
-							}
+							session.clearUsedEvaluatingCache();
 
 							// Store the result in this frame
 							ParseMatch<SS> oldMatch = matches.get(matcher.getName());
@@ -330,6 +328,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 						}
 
 						if (match_i != null && match_i.isBetter(match)) {
+							hadBetter = true;
 							if (match != null)
 								theDebugger.matchDiscarded(match.getMatcher(), match);
 							match = match_i;
@@ -343,12 +342,12 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 				} while(loop && hadBetter);
 
 				// Activate the cache elements that need to be cached, clear the ones that don't
-				for (String name : uncachedTypeNames) {
-					if (notToCache.contains(name))
-						theTypeMatching.remove(name);
-					else
-						theTypeMatching.get(name).theEvaluatingSession = null;
+				for (String name : notToCache) {
+					theTypeMatching.remove(name);
+					uncachedTypeNames.remove(name);
 				}
+				for (String name : uncachedTypeNames)
+					theTypeMatching.get(name).theEvaluatingSession = null;
 				return match;
 			}
 
@@ -356,6 +355,19 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 				Matching m = theTypeMatching.get(type);
 				return m != null && m.theEvaluatingSession != session;
 			}
+		}
+
+		private boolean hasCommon(Set<String> set1, Set<String> set2) {
+			if (set1.size() < set2.size()) {
+				for (String s : set1)
+					if (set2.contains(s))
+						return true;
+			} else {
+				for (String s : set2)
+					if (set1.contains(s))
+						return true;
+			}
+			return false;
 		}
 
 		private final HashMap<Integer, StreamPositionData> thePositions;
@@ -390,7 +402,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 		private final ParsingCache<SS> theCache;
 		private final Set<String> theExcludedTypes;
 		private boolean usedEvaluatingCache;
-		private boolean usedOwnEvaluatingCache;
+		private Set<String> usedOwnEvaluatingCache;
 
 		boolean isDebuggingStarted;
 
@@ -403,7 +415,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 		private ParseSessionImpl(ParseSessionImpl<SS> parent, ParsingCache<SS> cache, boolean alreadyStarted) {
 			theParent = parent;
 			theCache = cache;
-			theExcludedTypes = new java.util.LinkedHashSet<>();
+			theExcludedTypes = new LinkedHashSet<>();
 			isDebuggingStarted = alreadyStarted;
 		}
 
@@ -459,22 +471,29 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 		}
 
 		boolean hasUsedOwnEvaluatingCache() {
-			return usedOwnEvaluatingCache;
+			return usedOwnEvaluatingCache != null && !usedOwnEvaluatingCache.isEmpty();
 		}
 
-		void markUsedEvaulatingCache(ParseSession evaluatingSession) {
+		Set<String> getUsedOwnEvaluatingCache() {
+			return usedOwnEvaluatingCache == null ? Collections.EMPTY_SET : usedOwnEvaluatingCache;
+		}
+
+		void markUsedEvaulatingCache(ParseSession evaluatingSession, ParseMatcher<? super SS> matcher) {
 			if (evaluatingSession == this) {
-				usedOwnEvaluatingCache = true;
+				if (usedOwnEvaluatingCache == null)
+					usedOwnEvaluatingCache = new LinkedHashSet<>();
+				usedOwnEvaluatingCache.add(matcher.getName());
 				return;
 			}
 			usedEvaluatingCache = true;
 			if (theParent != null)
-				theParent.markUsedEvaulatingCache(evaluatingSession);
+				theParent.markUsedEvaulatingCache(evaluatingSession, matcher);
 		}
 
 		void clearUsedEvaluatingCache() {
 			usedEvaluatingCache = false;
-			usedOwnEvaluatingCache = false;
+			if (usedOwnEvaluatingCache != null)
+				usedOwnEvaluatingCache.clear();
 		}
 	}
 }
