@@ -1,9 +1,22 @@
 package org.expresso.parse.impl;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-import org.expresso.parse.*;
+import org.expresso.parse.BranchableStream;
+import org.expresso.parse.ExpressoParser;
+import org.expresso.parse.ParseMatch;
+import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.ParseSession;
 import org.expresso.parse.debug.ExpressoParsingDebugger;
 
 /**
@@ -69,6 +82,8 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 					List<ParseMatcher<? super S>> taggedMatchers = theMatchersByTag.get(type);
 					if(taggedMatchers != null)
 						matchers.addAll(taggedMatchers);
+					else if ("default".equals(type))
+						matchers.addAll(theDefaultMatchers);
 				}
 			}
 		} else
@@ -226,7 +241,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 			List<String []> unmetDepends = new ArrayList<>();
 			for(ParseMatcher<? super S> matcher : allMatchers.values()) {
 				for(String depend : matcher.getExternalTypeDependencies())
-					if(!allMatchers.containsKey(depend) && !theMatcherTags.contains(depend))
+					if (!allMatchers.containsKey(depend) && !theMatcherTags.contains(depend) && !"default".equals(depend))
 						unmetDepends.add(new String[] {matcher.getName(), depend});
 			}
 			if(!unmetDepends.isEmpty()) {
