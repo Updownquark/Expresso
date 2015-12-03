@@ -658,57 +658,57 @@
 		<ref name="operand" />
 	</sequence>
 	<sequence name="add-assign" priority="100" tag="assignment,binary">
-		<ref name="variable" />
+		<ref type="assignable" name="variable" />
 		<literal name="name">+=</literal>
 		<ref name="operand" />
 	</sequence>
 	<sequence name="subtract-assign" priority="100" tag="assignment,binary">
-		<ref name="variable" />
+		<ref type="assignable" name="variable" />
 		<literal name="name">-=</literal>
 		<ref name="operand" />
 	</sequence>
 	<sequence name="multiply-assign" priority="100" tag="assignment,binary">
-		<ref name="variable" />
+		<ref type="assignable" name="variable" />
 		<literal name="name">*=</literal>
 		<ref name="operand" />
 	</sequence>
 	<sequence name="divide-assign" priority="100" tag="assignment,binary">
-		<ref name="variable" />
+		<ref type="assignable" name="variable" />
 		<literal name="name">/=</literal>
 		<ref name="operand" />
 	</sequence>
 	<sequence name="modulo-assign" priority="100" tag="assignment,binary">
-		<ref name="variable" />
+		<ref type="assignable" name="variable" />
 		<literal name="name">%=</literal>
 		<ref name="operand" />
 	</sequence>
 	<sequence name="or-assign" priority="100" tag="assignment,binary">
-		<ref name="variable" />
+		<ref type="assignable" name="variable" />
 		<literal name="name">|=</literal>
 		<ref name="operand" />
 	</sequence>
 	<sequence name="and-assign" priority="100" tag="assignment,binary">
-		<ref name="variable" />
+		<ref type="assignable" name="variable" />
 		<literal name="name">&amp;=</literal>
 		<ref name="operand" />
 	</sequence>
 	<sequence name="xor-assign" priority="100" tag="assignment,binary">
-		<ref name="variable" />
+		<ref type="assignable" name="variable" />
 		<literal name="name">^=</literal>
 		<ref name="operand" />
 	</sequence>
 	<sequence name="left-shift-assign" priority="100" tag="assignment,binary">
-		<ref name="variable" />
+		<ref type="assignable" name="variable" />
 		<literal name="name">&lt;&lt;=</literal>
 		<ref name="operand" />
 	</sequence>
 	<sequence name="right-shift-assign" priority="100" tag="assignment,binary">
-		<ref name="variable" />
+		<ref type="assignable" name="variable" />
 		<literal name="name">&gt;&gt;=</literal>
 		<ref name="operand" />
 	</sequence>
 	<sequence name="unsigned-right-shift-assign" priority="100" tag="assignment,binary">
-		<ref name="variable" />
+		<ref type="assignable" name="variable" />
 		<literal name="name">&gt;&gt;&gt;=</literal>
 		<ref name="operand" />
 	</sequence>
@@ -759,24 +759,24 @@
 		<literal name="name">instanceof</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="less" priority="180" tag="binary">
-		<ref name="left" />
-		<literal name="name">&lt;</literal>
-		<ref name="right" />
-	</sequence>
 	<sequence name="less-equal" priority="180" tag="binary">
 		<ref name="left" />
 		<literal name="name">&lt;=</literal>
 		<ref name="right" />
 	</sequence>
-	<sequence name="greater" priority="180" tag="binary">
+	<sequence name="less" priority="180" tag="binary">
 		<ref name="left" />
-		<literal name="name">&gt;</literal>
+		<literal name="name">&lt;</literal>
 		<ref name="right" />
 	</sequence>
 	<sequence name="greater-equal" priority="180" tag="binary">
 		<ref name="left" />
 		<literal name="name">&gt;=</literal>
+		<ref name="right" />
+	</sequence>
+	<sequence name="greater" priority="180" tag="binary">
+		<ref name="left" />
+		<literal name="name">&gt;</literal>
 		<ref name="right" />
 	</sequence>
 	<sequence name="left-shift" priority="190" tag="binary">
