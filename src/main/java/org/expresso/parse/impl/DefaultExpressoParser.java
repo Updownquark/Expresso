@@ -1,22 +1,9 @@
 package org.expresso.parse.impl;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
-import org.expresso.parse.BranchableStream;
-import org.expresso.parse.ExpressoParser;
-import org.expresso.parse.ParseMatch;
-import org.expresso.parse.ParseMatcher;
-import org.expresso.parse.ParseSession;
+import org.expresso.parse.*;
 import org.expresso.parse.debug.ExpressoParsingDebugger;
 
 /**
@@ -104,7 +91,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 
 	@Override
 	public <SS extends S> ParseMatch<SS> parse(SS stream, ParseSession session, Collection<? extends ParseMatcher<? super SS>> matchers)
-		throws IOException {
+			throws IOException {
 		boolean finishDebugging = false;
 		if(!((ParseSessionImpl<S>) session).isDebuggingStarted) {
 			theDebugger.start(stream);
@@ -213,13 +200,13 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 			ParseMatcher<? super S> previous = allMatchers.get(matcher.getName());
 			if(previous != null)
 				throw new IllegalArgumentException(
-					"Duplicate matchers named \"" + matcher.getName() + "\": " + previous + " and " + matcher);
+						"Duplicate matchers named \"" + matcher.getName() + "\": " + previous + " and " + matcher);
 			if(theMatcherTags.contains(matcher.getName()))
 				throw new IllegalArgumentException("Matcher \"" + matcher.getName() + "\" has the same name as a tag");
 			for(String tag : matcher.getTags()) {
 				if(allMatchers.containsKey(tag))
 					throw new IllegalArgumentException(
-						"Matcher \"" + matcher.getName() + "\" uses a tag (\"" + tag + "\") that is the same as the" + "name of a matcher");
+							"Matcher \"" + matcher.getName() + "\" uses a tag (\"" + tag + "\") that is the same as the" + "name of a matcher");
 			}
 			isDefault &= !matcher.getTags().contains(IGNORABLE);
 			allMatchers.put(matcher.getName(), matcher);
@@ -278,7 +265,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 			}
 
 			ParseMatch<SS> match(SS stream, ParseSessionImpl<SS> session, Collection<? extends ParseMatcher<? super SS>> matchers)
-				throws IOException {
+					throws IOException {
 				Set<String> uncachedTypeNames = new LinkedHashSet<>();
 				boolean loop = false;
 				/* If a match with one any of these parsers may also be the first component in a match with the same or a different one in
@@ -301,6 +288,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 					}
 				}
 
+				Map<String, ParseMatch<SS>> matches = new LinkedHashMap<>();
 				Set<String> notToCache = new LinkedHashSet<>();
 				ParseMatch<SS> match = null;
 				boolean hadBetter;
@@ -309,7 +297,6 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 					Iterator<? extends ParseMatcher<? super SS>> iter = matchers.iterator();
 					while(iter.hasNext()) {
 						ParseMatcher<? super SS> matcher = iter.next();
-						Matching matching = theTypeMatching.get(matcher.getName());
 						if(uncachedTypeNames.contains(matcher.getName())) {
 							theDebugger.preParse(stream, matcher, session);
 							ParseMatch<SS> match_i = matcher.match((SS) stream.branch(), DefaultExpressoParser.this, session);
@@ -321,11 +308,12 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 							}
 							theDebugger.postParse(stream, matcher, match_i);
 
-							// Cache the result
-							if(match_i != null && match_i.isBetter(matching.theMatch)) {
-								if(matching.theMatch != null)
-									theDebugger.matchDiscarded(matcher, matching.theMatch);
-								matching.theMatch = match_i;
+							// Store the result in this frame
+							ParseMatch<SS> oldMatch = matches.get(matcher.getName());
+							if (match_i != null && match_i.isBetter(oldMatch)) {
+								if (oldMatch != null)
+									theDebugger.matchDiscarded(matcher, oldMatch);
+								matches.put(matcher.getName(), match_i);
 
 								// If we beat the cached match, maybe we'll beat the overall match
 								if (match_i.isBetter(match)) {
@@ -338,7 +326,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 							} else
 								theDebugger.matchDiscarded(matcher, match_i);
 						} else {
-							ParseMatch<SS> match_i = matching.theMatch;
+							ParseMatch<SS> match_i = theTypeMatching.get(matcher.getName()).theMatch;
 							theDebugger.usedCache(matcher, match_i);
 							if(match_i != null && match_i.isBetter(match)) {
 								if(match != null)
@@ -349,6 +337,9 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 							iter.remove();
 						}
 					}
+					// After each round, save the matches in the cache
+					for (String name : uncachedTypeNames)
+						theTypeMatching.get(name).theMatch = matches.get(name);
 				} while(loop && hadBetter);
 				// Activate the cache elements that need to be cached, clear the ones that don't
 				for (String name : uncachedTypeNames) {
@@ -459,7 +450,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 					if(!matcher.getName().equals(IGNORABLE) && !matcher.getTags().contains(IGNORABLE)) {
 						if(!warnedOnlyExcludeIgnore) {
 							System.err.println("Session-excluded type \"" + removeType + "\" would exclude non-ignorable type \""
-								+ matcher.getName() + "\". Only ignorable types may be session-excluded (e.g. via <without>).");
+									+ matcher.getName() + "\". Only ignorable types may be session-excluded (e.g. via <without>).");
 							warnedOnlyExcludeIgnore = true;
 						}
 					} else

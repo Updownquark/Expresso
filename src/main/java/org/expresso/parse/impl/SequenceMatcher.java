@@ -61,8 +61,14 @@ public class SequenceMatcher<S extends BranchableStream<?, ?>> extends ComposedM
 		}
 		if(components.isEmpty())
 			return null;
-		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), components,
-			missingEl == null ? null : "Expected " + missingEl, missingEl == null);
+		String errorMsg;
+		if (missingEl == null)
+			errorMsg = null;
+		else if (!components.isEmpty() && components.get(components.size() - 1).getError() != null)
+			errorMsg = null; // Let the deeper message come up
+		else
+			errorMsg = "Expected " + missingEl;
+		return new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), components, errorMsg, missingEl == null);
 	}
 
 	/**
