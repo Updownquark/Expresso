@@ -1,24 +1,72 @@
 package org.expresso.parse.debug;
 
-import java.awt.*;
-import java.awt.event.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.EventQueue;
+import java.awt.Image;
+import java.awt.Rectangle;
+import java.awt.Window;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.WindowEvent;
+import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EventObject;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
-import javax.swing.*;
-import javax.swing.event.*;
+import javax.swing.BoundedRangeModel;
+import javax.swing.BoxLayout;
+import javax.swing.DefaultListModel;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JPanel;
+import javax.swing.JScrollBar;
+import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
+import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.JTextPane;
+import javax.swing.JToggleButton;
+import javax.swing.JTree;
+import javax.swing.ListSelectionModel;
+import javax.swing.event.CellEditorListener;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
+import javax.swing.event.TreeModelEvent;
+import javax.swing.event.TreeModelListener;
+import javax.swing.event.TreeSelectionEvent;
 import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.text.BadLocationException;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreePath;
 
-import org.expresso.parse.*;
+import org.expresso.parse.BranchableStream;
+import org.expresso.parse.ExpressoParser;
+import org.expresso.parse.ParseMatch;
+import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.ParseSession;
 import org.expresso.parse.impl.CharSequenceStream;
 import org.expresso.parse.impl.ReferenceMatcher;
 import org.expresso.parse.impl.SimpleValueMatcher;
@@ -73,6 +121,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	private JLabel theAddBreakpointLabel;
 
 	private JSplitPane theMainSplit;
+	private JSplitPane theBottomSplit;
 	private JSplitPane theRightSplit;
 
 	private File theConfigFile;
@@ -117,6 +166,8 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		theMainText.setContentType("text/html");
 		theMainText.setEditable(false);
 		theMainText.setBackground(java.awt.Color.white);
+		theMainText.getCaret().setVisible(true);
+		theMainText.getCaret().setSelectionVisible(true);
 		theInternalTreeModel = new ParsingExpressionTreeModel();
 		theDisplayedTreeModel = new ParsingExpressionTreeModel();
 		theParseTree = new JTree(theDisplayedTreeModel);
@@ -140,7 +191,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		theOutButton.setToolTipText(OUT_TEXT);
 		theResumeButton = new JButton(RESUME_ICON);
 		theResumeButton.setToolTipText(RESUME_TEXT);
-		// Sprint icon made by freepik from www.flaticon.com
+		// DON'T ERASE: Sprint icon made by freepik from www.flaticon.com
 		theRunToButton = new JButton(getIcon("sprint.png", 24, 24));
 		theRunToButton.setToolTipText(RUN_TO_TEXT);
 		theDebugButton = new JToggleButton(getIcon("bug.png", 24, 24));
@@ -184,18 +235,20 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		theBreakpointList.getColumnModel().getColumn(3).setPreferredWidth(w);
 		theBreakpointList.getColumnModel().getColumn(3).setMaxWidth(w);
 		theBreakpointList.getColumnModel().getColumn(3).setResizable(false);
-		theMainSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+		theMainSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+		theBottomSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
 		theRightSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
 
 		theBreakpoints = new java.util.concurrent.CopyOnWriteArrayList<>();
 
 		theMainTextScroll = new JScrollPane(theMainText);
 		theMainTextScroll.setPreferredSize(new Dimension(100, 200));
-		add(theMainTextScroll, BorderLayout.NORTH);
-		add(theMainSplit);
+		add(theMainSplit, BorderLayout.CENTER);
+		theMainSplit.setTopComponent(theMainTextScroll);
+		theMainSplit.setBottomComponent(theBottomSplit);
 		theTreeScroll = new JScrollPane(theParseTree);
 		theTreeScroll.setPreferredSize(new Dimension(450, 400));
-		theMainSplit.setLeftComponent(theTreeScroll);
+		theBottomSplit.setLeftComponent(theTreeScroll);
 		JPanel buttonPanel = new JPanel();
 		buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.X_AXIS));
 		buttonPanel.add(theOverButton);
@@ -205,7 +258,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		buttonPanel.add(theRunToButton);
 		buttonPanel.add(theDebugButton);
 		JPanel rightPanel = new JPanel(new BorderLayout());
-		theMainSplit.setRightComponent(rightPanel);
+		theBottomSplit.setRightComponent(rightPanel);
 		rightPanel.add(buttonPanel, BorderLayout.NORTH);
 		rightPanel.add(theRightSplit);
 		JPanel breakpointPanel = new JPanel(new BorderLayout());
@@ -221,8 +274,10 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 
 		theOpNames = new ArrayList<>();
 
-		theMainSplit.addPropertyChangeListener(JSplitPane.LAST_DIVIDER_LOCATION_PROPERTY, e -> writeConfig());
-		theRightSplit.addPropertyChangeListener(JSplitPane.LAST_DIVIDER_LOCATION_PROPERTY, e -> writeConfig());
+		PropertyChangeListener divLocPCL = e -> writeConfig();
+		theMainSplit.addPropertyChangeListener(JSplitPane.LAST_DIVIDER_LOCATION_PROPERTY, divLocPCL);
+		theBottomSplit.addPropertyChangeListener(JSplitPane.LAST_DIVIDER_LOCATION_PROPERTY, divLocPCL);
+		theRightSplit.addPropertyChangeListener(JSplitPane.LAST_DIVIDER_LOCATION_PROPERTY, divLocPCL);
 
 		theAddBreakpointLabel.addMouseListener(new MouseAdapter() {
 			@Override
@@ -289,47 +344,61 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	}
 
 	private void readSizeConfig() {
-		MutableConfig config = getConfig();
-		Window window = getWindow();
-		if(window != null) {
-			window.setBounds(config.getInt("x", window.getX()), config.getInt("y", window.getY()), config.getInt("w", window.getWidth()),
-					config.getInt("h", window.getHeight()));
-		}
-		if(getWidth() > 0) {
-			theMainSplit.setDividerLocation(config.getFloat("main-split", .5f));
-			theRightSplit.setDividerLocation(config.getFloat("right-split", .5f));
+		theCallbackLock = true;
+		try {
+			MutableConfig config = getConfig();
+			Window window = getWindow();
+			if (window != null) {
+				window.setBounds(config.getInt("x", window.getX()), config.getInt("y", window.getY()),
+						config.getInt("w", window.getWidth()), config.getInt("h", window.getHeight()));
+			}
+			if (getWidth() > 0) {
+				theMainSplit.setDividerLocation(config.getFloat("main-split", .5f));
+				theBottomSplit.setDividerLocation(config.getFloat("bottom-split", .5f));
+				theRightSplit.setDividerLocation(config.getFloat("right-split", .5f));
+			}
+		} finally {
+			theCallbackLock = false;
 		}
 	}
 
 	private void readConfig() {
-		MutableConfig config = getConfig();
-		if(config.subConfig("breakpoints") != null) {
-			for(MutableConfig breakpointConfig : config.subConfig("breakpoints").subConfigs("breakpoint")) {
-				ExpressoParserBreakpoint breakpoint = new ExpressoParserBreakpoint();
-				breakpoint.setPreCursorText(
-						breakpointConfig.get("pre") == null ? null : Pattern.compile(".*" + breakpointConfig.get("pre"), Pattern.DOTALL));
-				breakpoint.setPostCursorText(
-						breakpointConfig.get("post") == null ? null : Pattern.compile(breakpointConfig.get("post") + ".*", Pattern.DOTALL));
-				breakpoint.setMatcherName(breakpointConfig.get("operator"));
-				breakpoint.setEnabled(breakpointConfig.is("enabled", true));
-				theBreakpoints.add(breakpoint);
-				((javax.swing.table.DefaultTableModel) theBreakpointList.getModel())
-				.addRow(new Object[] {breakpoint, breakpoint, breakpoint, breakpoint});
+		theCallbackLock = true;
+		try {
+			MutableConfig config = getConfig();
+			if (config.subConfig("breakpoints") != null) {
+				for (MutableConfig breakpointConfig : config.subConfig("breakpoints").subConfigs("breakpoint")) {
+					ExpressoParserBreakpoint breakpoint = new ExpressoParserBreakpoint();
+					breakpoint.setPreCursorText(breakpointConfig.get("pre") == null ? null
+							: Pattern.compile(".*" + breakpointConfig.get("pre"), Pattern.DOTALL));
+					breakpoint.setPostCursorText(breakpointConfig.get("post") == null ? null
+							: Pattern.compile(breakpointConfig.get("post") + ".*", Pattern.DOTALL));
+					breakpoint.setMatcherName(breakpointConfig.get("operator"));
+					breakpoint.setEnabled(breakpointConfig.is("enabled", true));
+					theBreakpoints.add(breakpoint);
+					((javax.swing.table.DefaultTableModel) theBreakpointList.getModel())
+							.addRow(new Object[] { breakpoint, breakpoint, breakpoint, breakpoint });
+				}
 			}
+		} finally {
+			theCallbackLock = false;
 		}
 	}
 
 	private void writeConfig() {
+		if (theCallbackLock)
+			return;
 		MutableConfig config = getConfig();
 		Window window = getWindow();
-		if(window != null) {
-			config.set("x", "" + window.getX());
-			config.set("y", "" + window.getY());
-			config.set("w", "" + window.getWidth());
-			config.set("h", "" + window.getHeight());
-		}
+		if (window == null || !window.isVisible())
+			return;
+		config.set("x", "" + window.getX());
+		config.set("y", "" + window.getY());
+		config.set("w", "" + window.getWidth());
+		config.set("h", "" + window.getHeight());
 		if(getWidth() > 0) {
-			config.set("main-split", "" + (theMainSplit.getDividerLocation() * 1.0f / theMainSplit.getWidth()));
+			config.set("main-split", "" + (theMainSplit.getDividerLocation() * 1.0f / theMainSplit.getHeight()));
+			config.set("bottom-split", "" + (theBottomSplit.getDividerLocation() * 1.0f / theBottomSplit.getWidth()));
 			config.set("right-split", "" + (theRightSplit.getDividerLocation() * 1.0f / theRightSplit.getHeight()));
 		}
 		MutableConfig breakpoints = config.subConfig("breakpoints");
@@ -574,6 +643,8 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 	private void render() {
 		theLastRefresh = System.currentTimeMillis();
 		if(theInternalTreeModel.isDirty) {
+			int preVScroll = theTreeScroll.getVerticalScrollBar().getValue();
+			int preHScroll = theTreeScroll.getHorizontalScrollBar().getValue();
 			theInternalTreeModel.isDirty = false;
 			theInternalTreeModel.sync(theDisplayedTreeModel);
 			theDisplayedTreeModel.syncSelection();
@@ -581,40 +652,71 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			if(theParseTree.getSelectionPath() != null) {
 				Rectangle bounds = theParseTree.getPathBounds(theParseTree.getSelectionPath());
 				if(bounds != null) {
-					JScrollBar vBar = theTreeScroll.getVerticalScrollBar();
-					JScrollBar hBar = theTreeScroll.getHorizontalScrollBar();
-					int vScroll = adjustScroll(vBar.getValue(), vBar.getModel(), bounds.getMinY(), bounds.getMaxY(),
-							theMainText.getHeight());
-					int hScroll = adjustScroll(hBar.getValue(), hBar.getModel(), bounds.getMinX(), bounds.getMaxX(),
-							theMainText.getWidth());
-					vBar.setValue(vScroll);
-					hBar.setValue(hScroll);
+					EventQueue.invokeLater(() -> {
+						JScrollBar vBar = theTreeScroll.getVerticalScrollBar();
+						JScrollBar hBar = theTreeScroll.getHorizontalScrollBar();
+						int vScroll = adjustScroll(preVScroll, vBar.getModel(), bounds.getMinY(), bounds.getMaxY(),
+								theParseTree.getHeight());
+						int hScroll = adjustScroll(preHScroll, hBar.getModel(), bounds.getMinX(), bounds.getMaxX(),
+								theParseTree.getWidth());
+						vBar.setValue(vScroll);
+						hBar.setValue(hScroll);
+					});
 				}
 			}
 		}
 		if(isPopupWhenHit && isSuspended) {
 			Window window = getWindow();
-			if(window != null)
+			if (window != null && !window.isVisible()) {
+				theCallbackLock = true; // Prevent writing the config just for displaying the frame
 				window.setVisible(true);
+				EventQueue.invokeLater(() -> theCallbackLock = false);
+			}
 		}
 
 		if(theStream == null)
 			theMainText.setText("");
 		else {
+			ParseNode selected;
+			if (theParseTree.getSelectionPath() != null)
+				selected = (ExpressoParserDebugGUI<S>.ParseNode) theParseTree.getSelectionPath().getLastPathComponent();
+			else if (theInternalTreeModel.getCursor() != null)
+				selected = theInternalTreeModel.getCursor();
+			else
+				selected = null;
+			int streamPos;
+			if (selected != null)
+				streamPos = selected.theMatch == null ? thePosition : selected.theMatch.getStream().getPosition();
+			else
+				streamPos = thePosition;
+			int preVScroll = theMainTextScroll.getVerticalScrollBar().getValue();
+			int preHScroll = theMainTextScroll.getHorizontalScrollBar().getValue();
+			int textPos = 1;
+			// The numbers for textPos were determined experimentally. Basically only content counts.
 			StringBuilder sb = new StringBuilder("<html>");
-			for(int c = 0; c < thePosition; c++) {
+			for (int c = 0; c < streamPos; c++) {
 				char ch = theStream.charAt(c);
-				if(ch == '<')
+				if (ch == '<') {
 					sb.append("&lt;");
-				else if(ch == '\n')
+					textPos++;
+				} else if (ch == '\n') {
 					sb.append("<br>");
-				else if(ch == '\r') {} else if(ch == '\t')
+					textPos++;
+				} else if (ch == '\r') {
+				} else if (ch == '\t') {
 					sb.append("&nbsp;&nbsp;&nbsp;&nbsp;");
-				else
+					textPos += 4;
+				} else if (ch == ' ') {
+					sb.append("&nbsp;");
+					textPos++;
+				} else {
 					sb.append(ch);
+					textPos++;
+				}
 			}
 			sb.append("<b><font color=\"red\" weight=\"bold\" size=\"4\">\u25BA</font></b>");
-			for(int c = thePosition; c < theStream.length(); c++) {
+			textPos++;
+			for (int c = streamPos; c < theStream.length(); c++) {
 				char ch = theStream.charAt(c);
 				if(ch == '<')
 					sb.append("&lt;");
@@ -626,57 +728,56 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 					sb.append(ch);
 			}
 			sb.append("</html>");
-			int preVScroll = theMainTextScroll.getVerticalScrollBar().getValue();
-			int preHScroll = theMainTextScroll.getHorizontalScrollBar().getValue();
 			theMainText.setText(sb.toString());
-			EventQueue.invokeLater(() -> {
-				if(theParseTree.getSelectionPath() == null)
-					return;
-				int vScroll = preVScroll;
-				int hScroll = preHScroll;
-				ParseNode selected = (ExpressoParserDebugGUI<S>.ParseNode) theParseTree.getSelectionPath().getLastPathComponent();
-				int pos = selected.theMatch == null ? thePosition : selected.theMatch.getStream().getPosition();
-				Rectangle bounds;
-				try {
-					bounds = theMainText.getUI().modelToView(theMainText, pos);
-				} catch(BadLocationException e) {
-					bounds = null;
-				}
-				JScrollBar vBar = theMainTextScroll.getVerticalScrollBar();
-				JScrollBar hBar = theMainTextScroll.getHorizontalScrollBar();
-				if(bounds != null) {
-					vScroll = adjustScroll(vScroll, vBar.getModel(), bounds.getMinY(), bounds.getMaxY(), theMainText.getHeight());
-					hScroll = adjustScroll(hScroll, hBar.getModel(), bounds.getMinX(), bounds.getMaxX(), theMainText.getWidth());
-				}
-				vBar.setValue(vScroll);
-				hBar.setValue(hScroll);
-			});
+			Rectangle bounds;
+			try {
+				bounds = theMainText.modelToView(textPos);
+			} catch (BadLocationException e) {
+				bounds = null;
+			}
+			if (bounds != null) {
+				Rectangle visBounds = bounds;
+				EventQueue.invokeLater(() -> {
+					int vScroll = preVScroll;
+					int hScroll = preHScroll;
+					JScrollBar vBar = theMainTextScroll.getVerticalScrollBar();
+					JScrollBar hBar = theMainTextScroll.getHorizontalScrollBar();
+					vScroll = adjustScroll(vScroll, vBar.getModel(), visBounds.getMinY(), visBounds.getMaxY(), theMainText.getHeight());
+					hScroll = adjustScroll(hScroll, hBar.getModel(), visBounds.getMinX(), visBounds.getMaxX(), theMainText.getWidth());
+					vBar.setValue(vScroll);
+					hBar.setValue(hScroll);
+				});
+			}
 		}
 	}
 
-	private int adjustScroll(int vScroll, BoundedRangeModel model, double min, double max, int size) {
+	private int adjustScroll(int scroll, BoundedRangeModel model, double min, double max, int size) {
+		int modelRange = model.getMaximum() - model.getMinimum();
+		int buffer = (int) ((max - min) / size * modelRange * 2);
 		double minNeeded = min / size;
-		double minDisplayed = vScroll * 1.0 / (model.getMaximum() - model.getMinimum());
-		if(minNeeded < minDisplayed)
-			return model.getMinimum() + (int) (minNeeded * (model.getMaximum() - model.getMinimum()));
+		double minDisplayed = scroll * 1.0 / modelRange;
+		if (minDisplayed > minNeeded)
+			return model.getMinimum() + (int) (minNeeded * modelRange) - buffer;
 
 		double maxNeeded = max / size;
-		double maxDisplayed = (vScroll + model.getExtent()) * 1.0 / (model.getMaximum() - model.getMinimum());
-		if(maxNeeded > maxDisplayed) {
-			int ret = model.getMinimum() + (int) (maxNeeded * (model.getMaximum() - model.getMinimum())) - model.getExtent();
-			minDisplayed = ret * 1.0 / (model.getMaximum() - model.getMinimum());
-			if(minNeeded < minDisplayed)
-				return model.getMinimum() + (int) (minNeeded * (model.getMaximum() - model.getMinimum()));
+		double maxDisplayed = (scroll + model.getExtent()) * 1.0 / modelRange;
+		if (maxDisplayed < maxNeeded) {
+			int ret = (int) (maxNeeded * modelRange) - model.getExtent() + buffer;
+			minDisplayed = ret * 1.0 / modelRange;
+			if (minDisplayed > minNeeded)
+				return model.getMinimum() + (int) (minNeeded * modelRange) - buffer;
 			else
-				return ret;
+				return model.getMinimum() + ret;
 		}
-		return vScroll;
+		return scroll;
 	}
 
 	private void setDebugOperator(ParseNode op) {
+		int preVScroll = theDebugPaneScroll.getVerticalScrollBar().getValue();
+		int preHScroll = theDebugPaneScroll.getHorizontalScrollBar().getValue();
 		List<MatcherObject> newModel = new ArrayList<>();
-		if(op == null) {}
-		else if(op.theParent != null && op.theParent.theMatcher instanceof ReferenceMatcher) {
+		if (op == null) {
+		} else if (op.theParent != null && op.theParent.theMatcher instanceof ReferenceMatcher) {
 			int pastCursor = -1;
 			boolean allCached = true;
 			Set<String> cached = new java.util.LinkedHashSet<>();
@@ -755,10 +856,8 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 				JScrollBar hBar = theDebugPaneScroll.getHorizontalScrollBar();
 
 				EventQueue.invokeLater(() -> {
-					int vScroll = adjustScroll(vBar.getValue(), vBar.getModel(), bounds.getMinY(), bounds.getMaxY(),
-							theDebugPane.getHeight());
-					int hScroll = adjustScroll(hBar.getValue(), hBar.getModel(), bounds.getMinX(), bounds.getMaxX(),
-							theDebugPane.getWidth());
+					int vScroll = adjustScroll(preVScroll, vBar.getModel(), bounds.getMinY(), bounds.getMaxY(), theDebugPane.getHeight());
+					int hScroll = adjustScroll(preHScroll, hBar.getModel(), bounds.getMinX(), bounds.getMaxX(), theDebugPane.getWidth());
 					vBar.setValue(vScroll);
 					hBar.setValue(hScroll);
 				});
