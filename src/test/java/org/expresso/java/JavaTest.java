@@ -38,7 +38,7 @@ public class JavaTest {
 		List<PrioritizedMatcher> matchers;
 		try {
 			matchers = DefaultGrammarParser.getMatchers(
-				new InputStreamReader(DefaultGrammarParser.class.getResourceAsStream("/org/expresso/java/Grammar.xml"), "UTF-8"));
+					new InputStreamReader(DefaultGrammarParser.class.getResourceAsStream("/org/expresso/java/Grammar.xml"), "UTF-8"));
 		} catch(IOException | JDOMException e) {
 			throw new IllegalStateException("Could not setup default java parsing", e);
 		}
@@ -71,11 +71,11 @@ public class JavaTest {
 			System.out.println("Parsing " + file);
 			ParseMatch<CharSequenceStream> match;
 			try {
-				match = theParser.parseByType(CharSequenceStream.from(file, 4096), null, "java-file");
+				match = theParser.parseBestByType(CharSequenceStream.from(file, 4096), null, "java-file");
 			} catch(IOException e) {
 				throw new IllegalStateException("Could not read " + file, e);
 			}
-			if(match == null)
+			if (match == null)
 				System.err.println("Could not parse " + file);
 			else if (match.getError() != null) {
 				StringBuilder error = new StringBuilder();

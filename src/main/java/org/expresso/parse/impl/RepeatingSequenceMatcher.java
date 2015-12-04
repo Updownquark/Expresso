@@ -3,15 +3,10 @@ package org.expresso.parse.impl;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
 
-import org.expresso.parse.BranchableStream;
-import org.expresso.parse.ExpressoParser;
-import org.expresso.parse.ParseMatch;
-import org.expresso.parse.ParseMatcher;
-import org.expresso.parse.ParseSession;
+import org.expresso.parse.*;
 
 /**
  * Matches a sequence of other matchers optionally or multiple times
@@ -78,35 +73,8 @@ public class RepeatingSequenceMatcher<S extends BranchableStream<?, ?>> extends 
 		}
 		int iterations;
 		boolean hasWayForward = true;
-		for (iterations = 0; (theMaxRepeat < 0 || iterations < theMaxRepeat) && hasWayForward; iterations++) {
-			int todo = todo; // Refactor to use parseNext()
-			ListIterator<List<ParseMatch<SS>>> pathIter = paths.listIterator();
-			while (pathIter.hasNext()) {
-				List<ParseMatch<SS>> path = pathIter.next();
-				if (path.size() != iterations || !path.get(path.size() - 1).isComplete())
-					continue;
-
-				hasWayForward = true;
-				copy = (SS) stream.branch();
-				for (ParseMatch<SS> pathEl : path)
-					copy.advance(pathEl.getLength());
-				List<ParseMatch<SS>> newMatches = super.match(copy, parser, session);
-				if (newMatches.isEmpty())
-					pathIter.remove();
-				else {
-					// Re-use the path list for the first match
-					path.add(newMatches.get(newMatches.size() - 1));
-					for (int j = 0; j < newMatches.size() - 1; j++) {
-						List<ParseMatch<SS>> newPath = new ArrayList<>();
-						// The path now has the first new match in it, so we can't just do addAll
-						for (int k = 0; k < path.size() - 1; k++)
-							newPath.add(path.get(k));
-						newPath.add(newMatches.get(j));
-						pathIter.add(newPath);
-					}
-				}
-			}
-		}
+		for (iterations = 0; (theMaxRepeat < 0 || iterations < theMaxRepeat) && hasWayForward; iterations++)
+			parseNext(stream, s -> super.match(s, parser, session), paths, iterations);
 
 		copy = (SS) stream.branch();
 		List<ParseMatch<SS>> ret = new ArrayList<>(paths.size());
@@ -201,7 +169,7 @@ public class RepeatingSequenceMatcher<S extends BranchableStream<?, ?>> extends 
 			if(theMaximum < theMinimum) {
 				if(isMaxSet)
 					throw new IllegalArgumentException(
-						"Min and max values for the repeater are invalid: " + theMinimum + " and " + theMaximum);
+							"Min and max values for the repeater are invalid: " + theMinimum + " and " + theMaximum);
 				theMaximum = Integer.MAX_VALUE; // If the minimum is set but no maximum, assume max is infinite
 			}
 			return new RepeatingSequenceMatcher<>(name, tags, theMinimum, theMaximum);
