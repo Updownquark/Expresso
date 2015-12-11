@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.qommons.ex.ExIterable;
+
 /**
  * Parses a defined set of content from a stream
  *
@@ -55,7 +57,14 @@ public interface ParseMatcher<S extends BranchableStream<?, ?>> {
 	List<ParseMatcher<? super S>> getComposed();
 
 	/**
+	 * <p>
 	 * Parses this matcher's content from the beginning of stream. The position of the stream should not be affected.
+	 * </p>
+	 * <p>
+	 * If multiple possible matches may result from this call, then the work to parse each possibility should be done in the
+	 * {@link java.util.Iterator#next()} method of the iterator, not in this call itself. If only a single non-trivial result is possible,
+	 * the work may be done in either place. The iterator's next method may return null if a possible match didn't pan out at all.
+	 * </p>
 	 *
 	 * @param <SS> The sub-type of stream to parse
 	 * @param stream The stream to parse
@@ -64,5 +73,6 @@ public interface ParseMatcher<S extends BranchableStream<?, ?>> {
 	 * @return All matches that may be intended by the input for this matcher. Will be empty if this matcher does not recognize the content
 	 * @throws IOException If an error occurs retrieving the data for matching
 	 */
-	<SS extends S> List<ParseMatch<SS>> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session) throws IOException;
+	<SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
+			throws IOException;
 }

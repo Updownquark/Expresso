@@ -4,6 +4,9 @@ import java.io.IOException;
 import java.util.*;
 import java.util.function.Function;
 
+import org.qommons.ex.ExIterable;
+import org.qommons.ex.ExIterator;
+
 /**
  * Contains the mechanism for parsing data from a stream based on the matching capabilities of many component matchers
  *
@@ -12,7 +15,7 @@ import java.util.function.Function;
 public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseMatcher<S> {
 	/**
 	 * The tag for ignorable matchers, i.e., matchers for bits of data that can be present just about anywhere and don't typically
-	 * contribute to the syntax. E.g. whitespace, comments, etc.
+	 * contribute to the syntax. E.g. whitespace and comments
 	 */
 	public static final String IGNORABLE = "ignorable";
 
@@ -57,7 +60,7 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 * @return The possible matches parsed from the stream
 	 * @throws IOException If an error occurs while retrieving the data to parse
 	 */
-	default <SS extends S> List<ParseMatch<SS>> parse(SS stream) throws IOException {
+	default <SS extends S> ExIterable<ParseMatch<SS>, IOException> parse(SS stream) throws IOException {
 		return parseByType(stream, createSession(), new String[0]);
 	}
 
@@ -71,9 +74,10 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 */
 	default <SS extends S> ParseMatch<SS> parseBest(SS stream) throws IOException {
 		SS copy = (SS) stream.branch();
-		List<ParseMatch<SS>> matches = parse(copy);
+		ExIterator<ParseMatch<SS>, IOException> matches = parse(copy).iterator();
 		ParseMatch<SS> best = null;
-		for (ParseMatch<SS> m : matches) {
+		while (matches.hasNext()) {
+			ParseMatch<SS> m = matches.next();
 			if (m != null && m.isBetter(best))
 				best = m;
 		}
@@ -83,7 +87,7 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	}
 
 	@Override
-	default <SS extends S> List<ParseMatch<SS>> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
+	default <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
 			throws IOException {
 		return parseByType(stream, session, new String[0]);
 	}
@@ -99,9 +103,10 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 */
 	default <SS extends S> ParseMatch<SS> parseBestByType(SS stream, String... types) throws IOException {
 		SS copy = (SS) stream.branch();
-		List<ParseMatch<SS>> matches = parseByType(copy, null, types);
+		ExIterator<ParseMatch<SS>, IOException> matches = parseByType(copy, null, types).iterator();
 		ParseMatch<SS> best = null;
-		for (ParseMatch<SS> m : matches) {
+		while (matches.hasNext()) {
+			ParseMatch<SS> m = matches.next();
 			if (m != null && m.isBetter(best))
 				best = m;
 		}
@@ -121,8 +126,9 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 * @return The possible matches parsed from the stream
 	 * @throws IOException If an error occurs while retrieving the data to parse
 	 */
-	default <SS extends S> List<ParseMatch<SS>> parseByType(SS stream, ParseSession session, String... types) throws IOException {
-		if(session == null)
+	default <SS extends S> ExIterable<ParseMatch<SS>, IOException> parseByType(SS stream, ParseSession session, String... types)
+			throws IOException {
+		if (session == null)
 			session = createSession();
 		return parse(stream, session, getMatchersFor(session, types));
 	}
@@ -134,13 +140,12 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 * @param <SS> The type of the stream
 	 * @param stream The stream to parse
 	 * @param session The parsing session
-	 * @param matchers The matchers to use, or emtpy to use all default matchers. These matchers need not be known by this parser.
+	 * @param matchers The matchers to use, or empty to use all default matchers. These matchers need not be known by this parser.
 	 * @return The possible matches parsed from the stream
 	 * @throws IOException If an error occurs while retrieving the data to parse
 	 */
-	default <SS extends S> List<ParseMatch<SS>> parseWith(SS stream, ParseSession session,
-			Collection<? extends ParseMatcher<? super SS>> matchers)
-					throws IOException{
+	default <SS extends S> ExIterable<ParseMatch<SS>, IOException> parseWith(SS stream, ParseSession session,
+			Collection<? extends ParseMatcher<? super SS>> matchers) throws IOException {
 		return parse(stream, session, matchers.isEmpty() ? getMatchersFor(session) : matchers);
 	}
 
@@ -151,12 +156,13 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 * @param <SS> The type of the stream
 	 * @param stream The stream to parse
 	 * @param session The parsing session
-	 * @param matchers The matchers to use, or emtpy to use all default matchers. These matchers need not be known by this parser.
+	 * @param matchers The matchers to use, or empty to use all default matchers. These matchers need not be known by this parser.
 	 * @return The possible matches parsed from the stream
 	 * @throws IOException If an error occurs while retrieving the data to parse
 	 */
-	default <SS extends S> List<ParseMatch<SS>> parseWith(SS stream, ParseSession session, ParseMatcher<? super SS>... matchers)
-			throws IOException {
+	default <SS extends S> ExIterable<ParseMatch<SS>, IOException> parseWith(SS stream, ParseSession session,
+			ParseMatcher<? super SS>... matchers)
+					throws IOException {
 		return parse(stream, session, matchers.length > 0 ? Arrays.asList(matchers) : getMatchersFor(session));
 	}
 
@@ -172,74 +178,30 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 * @return The possible matches parsed from the stream.
 	 * @throws IOException If an error occurs while retrieving the data to parse
 	 */
-	<SS extends S> List<ParseMatch<SS>> parse(SS stream, ParseSession session, Collection<? extends ParseMatcher<? super SS>> matchers)
-			throws IOException;
+	<SS extends S> ExIterable<ParseMatch<SS>, IOException> parse(SS stream, ParseSession session,
+			Collection<? extends ParseMatcher<? super SS>> matchers) throws IOException;
 
 	interface SimpleMatchParser<S extends BranchableStream<?, ?>> {
-		List<ParseMatch<S>> parse(S stream, ParseSession session, int depth) throws IOException;
+		ExIterable<ParseMatch<S>, IOException> parse(S stream, ParseSession session, int depth) throws IOException;
 	}
 
-	default <SS extends BranchableStream<?, ?>> List<ParseMatch<SS>> parseMatchPaths(SS stream, ParseSession session,
-			SimpleMatchParser<SS> parser, int maxDepth, ParseMatcher<? super SS> matcher, Function<Integer, String> error)
-					throws IOException {
-		List<List<ParseMatch<SS>>> paths = new ArrayList<>();
-		SS copy = (SS) stream.branch();
-		// preParse(parser, copy, session);
-		for (ParseMatch<SS> possibility : parser.parse(copy, session, 0)) {
-			// postParse(parser, possibility, copy, session);
-			List<ParseMatch<SS>> path = new ArrayList<>();
-			path.add(possibility);
-			paths.add(path);
-		}
-		boolean madeProgress = true;
-		for (int depth = 1; depth < maxDepth && madeProgress; depth++) {
-			madeProgress = false;
-			ListIterator<List<ParseMatch<SS>>> pathIter = paths.listIterator();
-			while (pathIter.hasNext()) {
-				List<ParseMatch<SS>> path = pathIter.next();
-				if (path.size() != depth || !path.get(path.size() - 1).isComplete())
-					continue;
-
-				madeProgress = true;
-				copy = (SS) stream.branch();
-				for (ParseMatch<SS> pathEl : path)
-					copy.advance(pathEl.getLength());
-				List<ParseMatch<SS>> newMatches = parser.parse(copy, session, depth);
-				if (newMatches.isEmpty())
-					pathIter.remove();
-				else {
-					// Re-use the path list for the first match
-					path.add(newMatches.get(newMatches.size() - 1));
-					for (int j = 0; j < newMatches.size() - 1; j++) {
-						List<ParseMatch<SS>> newPath = new ArrayList<>();
-						// The path now has the first new match in it, so we can't just do addAll
-						for (int k = 0; k < path.size() - 1; k++)
-							newPath.add(path.get(k));
-						newPath.add(newMatches.get(j));
-						pathIter.add(newPath);
-					}
-				}
-			}
-		}
-
-		copy = (SS) stream.branch();
-		List<ParseMatch<SS>> ret = new ArrayList<>(paths.size());
-		for (int i = 0; i < ret.size(); i++) {
-			List<ParseMatch<SS>> path = paths.get(i);
-			String errorMsg;
-			if (!path.isEmpty() && path.get(path.size() - 1).getError() != null)
-				errorMsg = null; // Let the deeper message come up
-			else if (path.size() < maxDepth)
-				errorMsg = error.apply(path.size());
-			else
-				errorMsg = null;
-			int length = 0;
-			for (ParseMatch<SS> el : path)
-				length += el.getLength();
-			ret.add(new ParseMatch<>(matcher, copy, length, path, errorMsg, path.size() == maxDepth));
-		}
-		return ret;
-	}
+	/**
+	 * Parses all possible paths of a parsing sequence from a stream
+	 *
+	 * @param <SS> The sub-type of stream
+	 * @param stream The stream to parse
+	 * @param session The parsing session (may not be null, must be created by this parser)
+	 * @param parser Creates the actual matches for each item in the sequence
+	 * @param minDepth The minimum number of items in the sequence for the match to be valid
+	 * @param maxDepth The maximum depth to parse
+	 * @param matcher The matcher to create the resulting matches for
+	 * @param error Creates an error message for a match that does not meet the minimum depth
+	 * @return The iterable to iterate through the matches
+	 * @throws IOException If an error occurs
+	 */
+	<SS extends BranchableStream<?, ?>> ExIterable<ParseMatch<SS>, IOException> parseMatchPaths(SS stream, ParseSession session,
+			SimpleMatchParser<SS> parser, int minDepth, int maxDepth, ParseMatcher<? super SS> matcher, Function<Integer, String> error)
+					throws IOException;
 
 	/**
 	 * Parses matches from the stream iteratively. If an error occurs retrieving data, the {@link Iterator#next()} method may throw an
@@ -264,7 +226,7 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 					public ParseMatch<SS> next() {
 						try {
 							return parseBest(stream);
-						} catch(IOException e) {
+						} catch (IOException e) {
 							throw new IllegalStateException("Could not retrieve data to parse next match", e);
 						}
 					}
@@ -280,16 +242,16 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 * @param excludeTypes The types (names or tags) to exclude
 	 */
 	public static void removeTypes(Collection<? extends ParseMatcher<?>> matchers, Set<String> excludeTypes) {
-		if(excludeTypes.isEmpty())
+		if (excludeTypes.isEmpty())
 			return;
 		Iterator<? extends ParseMatcher<?>> iter = matchers.iterator();
-		while(iter.hasNext()) {
+		while (iter.hasNext()) {
 			ParseMatcher<?> matcher = iter.next();
-			if(matcher.getName() != null && excludeTypes.contains(matcher.getName()))
+			if (matcher.getName() != null && excludeTypes.contains(matcher.getName()))
 				iter.remove();
 			else {
-				for(String tag : matcher.getTags())
-					if(excludeTypes.contains(tag)) {
+				for (String tag : matcher.getTags())
+					if (excludeTypes.contains(tag)) {
 						iter.remove();
 						break;
 					}

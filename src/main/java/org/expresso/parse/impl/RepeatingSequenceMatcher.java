@@ -1,12 +1,11 @@
 package org.expresso.parse.impl;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.expresso.parse.*;
+import org.qommons.ex.ExIterable;
 
 /**
  * Matches a sequence of other matchers optionally or multiple times
@@ -62,37 +61,11 @@ public class RepeatingSequenceMatcher<S extends BranchableStream<?, ?>> extends 
 	}
 
 	@Override
-	public <SS extends S> List<ParseMatch<SS>> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
+	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
 			throws IOException {
-		List<List<ParseMatch<SS>>> paths = new ArrayList<>();
-		SS copy = (SS) stream.branch();
-		for (ParseMatch<SS> possibility : super.match(copy, parser, session)) {
-			List<ParseMatch<SS>> path = new ArrayList<>();
-			path.add(possibility);
-			paths.add(path);
-		}
-		int iterations;
-		boolean hasWayForward = true;
-		for (iterations = 0; (theMaxRepeat < 0 || iterations < theMaxRepeat) && hasWayForward; iterations++)
-			parseNext(stream, s -> super.match(s, parser, session), paths, iterations);
-
-		copy = (SS) stream.branch();
-		List<ParseMatch<SS>> ret = new ArrayList<>(paths.size());
-		for (int i = 0; i < ret.size(); i++) {
-			List<ParseMatch<SS>> path = paths.get(i);
-			String errorMsg;
-			if (!path.isEmpty() && path.get(path.size() - 1).getError() != null)
-				errorMsg = null; // Let the deeper message come up
-			else if (path.size() < theMinRepeat)
-				errorMsg = "At least " + theMinRepeat + " repetition" + (theMinRepeat > 1 ? "s" : "") + " expected";
-			else
-				errorMsg = null;
-			int length = 0;
-			for (ParseMatch<SS> el : path)
-				length += el.getLength();
-			ret.add(new ParseMatch<>(this, copy, length, path, errorMsg, path.size() >= theMinRepeat));
-		}
-		return ret;
+		return parser.parseMatchPaths(stream, session, (strm, sess, depth) -> super.match(strm, parser, sess), theMinRepeat,
+				theMaxRepeat < 0 ? Integer.MAX_VALUE : theMaxRepeat, this,
+						depth -> "At least " + theMinRepeat + " repetition" + (theMinRepeat > 1 ? "s" : "") + " expected");
 	}
 
 	@Override

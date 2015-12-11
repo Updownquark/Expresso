@@ -1,17 +1,10 @@
 package org.expresso.parse.impl;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
-import org.expresso.parse.BranchableStream;
-import org.expresso.parse.ExpressoParser;
-import org.expresso.parse.ParseMatch;
-import org.expresso.parse.ParseMatcher;
-import org.expresso.parse.ParseSession;
+import org.expresso.parse.*;
+import org.qommons.ex.ExIterable;
 
 /**
  * Parses raw text out of a file. Subclasses of this type are inspecting individual characters and not delegating any of their parsing to
@@ -39,7 +32,7 @@ public abstract class SimpleValueMatcher<S extends BranchableStream<?, ?>> exten
 	public abstract String getValueString();
 
 	@Override
-	public <SS extends S> List<ParseMatch<SS>> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
+	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
 			throws IOException {
 		SS streamCopy = (SS) stream.branch();
 		List<ParseMatch<SS>> ignorables = new ArrayList<>();

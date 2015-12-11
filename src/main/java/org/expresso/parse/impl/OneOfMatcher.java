@@ -1,18 +1,14 @@
 package org.expresso.parse.impl;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.expresso.parse.BranchableStream;
-import org.expresso.parse.ExpressoParser;
-import org.expresso.parse.ParseMatch;
-import org.expresso.parse.ParseMatcher;
-import org.expresso.parse.ParseSession;
+import org.expresso.parse.*;
+import org.qommons.ex.ExFunction;
+import org.qommons.ex.ExIterable;
 
 /**
  * Acts as a switch. Matches any one of a set of matchers against a stream.
@@ -44,15 +40,13 @@ public class OneOfMatcher<S extends BranchableStream<?, ?>> extends ComposedMatc
 	}
 
 	@Override
-	public <SS extends S> List<ParseMatch<SS>> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
+	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
 			throws IOException {
-		List<ParseMatch<SS>> matches = new ArrayList<>();
-		for(ParseMatcher<? super S> element : getComposed()) {
-			SS streamCopy = (SS) stream.branch();
-			for (ParseMatch<SS> match : parser.parseWith(streamCopy, session, element))
-				matches.add(new ParseMatch<>(this, stream, match.getLength(), Arrays.asList(match), null, true));
-		}
-		return matches;
+		ExFunction<ParseMatcher<? super S>, ExIterable<ParseMatch<SS>, IOException>, IOException> map = element -> parser
+				.parseWith((SS) stream.branch(), session, element);
+		ExIterable<ExIterable<ParseMatch<SS>, IOException>, IOException> deep = ExIterable
+				.<ParseMatcher<? super S>, IOException> iterate(getComposed()).map(map);
+		return ExIterable.flatten(deep).map(match -> new ParseMatch<>(this, stream, match.getLength(), Arrays.asList(match), null, true));
 	}
 
 	/**

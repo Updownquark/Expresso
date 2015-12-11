@@ -2,16 +2,13 @@ package org.expresso.parse.impl;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.expresso.parse.BranchableStream;
-import org.expresso.parse.ExpressoParser;
-import org.expresso.parse.ParseMatch;
-import org.expresso.parse.ParseMatcher;
-import org.expresso.parse.ParseSession;
+import org.expresso.parse.*;
+import org.qommons.ex.ExIterable;
+import org.qommons.ex.ExIterator;
 
 /**
  * Searches for forbidden content, returning an error if it is present
@@ -52,16 +49,17 @@ public class ForbiddenMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 	}
 
 	@Override
-	public <SS extends S> List<ParseMatch<SS>> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
+	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
 			throws IOException {
 		SS streamCopy = (SS) stream.branch();
-		List<ParseMatch<SS>> matches = parser.parseWith(stream, session, theContent);
-		for (ParseMatch<SS> match : matches) {
+		ExIterator<ParseMatch<SS>, IOException> matches = parser.parseWith(stream, session, theContent).iterator();
+		while (matches.hasNext()) {
+			ParseMatch<SS> match = matches.next();
 			if (match.isComplete() && match.getError() == null)
-				return Arrays.asList(new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(),
-						Arrays.asList(match), "Forbidden content present", true));
+				return ExIterable.<ParseMatch<SS>, IOException> iterate(new ParseMatch<>(this, streamCopy,
+						stream.getPosition() - streamCopy.getPosition(), Arrays.asList(match), "Forbidden content present", true));
 		}
-		return Collections.EMPTY_LIST;
+		return ExIterable.<ParseMatch<SS>, IOException> iterate();
 	}
 
 	@Override

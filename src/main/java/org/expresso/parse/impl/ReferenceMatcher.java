@@ -1,21 +1,12 @@
 package org.expresso.parse.impl;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
-import org.expresso.parse.BranchableStream;
-import org.expresso.parse.ExpressoParser;
-import org.expresso.parse.ParseMatch;
-import org.expresso.parse.ParseMatcher;
-import org.expresso.parse.ParseSession;
+import org.expresso.parse.*;
+import org.qommons.ex.ExFunction;
+import org.qommons.ex.ExIterable;
 
 /**
  * A matcher that just delegates to the outer parser
@@ -95,13 +86,11 @@ public class ReferenceMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 	}
 
 	@Override
-	public <SS extends S> List<ParseMatch<SS>> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
+	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
 			throws IOException {
 		SS streamCopy = (SS) stream.branch();
-		List<ParseMatch<SS>> ret = new ArrayList<>();
-		for (ParseMatch<SS> refMatch : parser.<SS> parseWith(stream, session, getReference(parser, session)))
-			ret.add(new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), Arrays.asList(refMatch), null,
-					true));
-		return ret;
+		ExFunction<ParseMatch<SS>, ParseMatch<SS>, IOException> map = refMatch -> new ParseMatch<>(this, streamCopy,
+				stream.getPosition() - streamCopy.getPosition(), Arrays.asList(refMatch), null, true);
+		return parser.<SS> parseWith(stream, session, getReference(parser, session)).map(map);
 	}
 }

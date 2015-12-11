@@ -1,17 +1,11 @@
 package org.expresso.parse.impl;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
-import org.expresso.parse.BranchableStream;
-import org.expresso.parse.ExpressoParser;
-import org.expresso.parse.ParseMatch;
-import org.expresso.parse.ParseMatcher;
-import org.expresso.parse.ParseSession;
+import org.expresso.parse.*;
+import org.qommons.ex.ExIterable;
+import org.qommons.ex.ExIterator;
 
 /**
  * Searches for another matcher and returns all content leading up to the matcher
@@ -57,17 +51,23 @@ public class UpToMatcher<S extends BranchableStream<?, ?>> extends BaseMatcher<S
 	}
 
 	@Override
-	public <SS extends S> List<ParseMatch<SS>> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
+	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
 			throws IOException {
 		SS streamBegin = (SS) stream.branch();
 		SS streamCopy = (SS) stream.branch();
-		List<ParseMatch<SS>> end = parser.parseWith(streamCopy, session, theMatcher);
-		while (end.isEmpty() && (!stream.isDiscovered() || stream.getDiscoveredLength() > 0)) {
-			stream.advance(1);
-			streamCopy = (SS) stream.branch();
-			end = parser.parseWith(streamCopy, session, theMatcher);
-		}
-		return Arrays.asList(
+		ExIterator<ParseMatch<SS>, IOException> end = parser.parseWith(streamCopy, session, theMatcher).iterator();
+		do {
+			ParseMatch<SS> endMatch = null;
+			while (endMatch == null && end.hasNext())
+				endMatch = end.next();
+			if (end == null && (!stream.isDiscovered() || stream.getDiscoveredLength() > 0)) {
+				stream.advance(1);
+				streamCopy = (SS) stream.branch();
+				end = parser.parseWith(streamCopy, session, theMatcher).iterator();
+			} else
+				break;
+		} while (true);
+		return ExIterable.iterate(
 				new ParseMatch<>(this, streamBegin, stream.getPosition() - streamBegin.getPosition(), Collections.EMPTY_LIST, null, true));
 	}
 

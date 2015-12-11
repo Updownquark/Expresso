@@ -1,72 +1,25 @@
 package org.expresso.parse.debug;
 
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.EventQueue;
-import java.awt.Image;
-import java.awt.Rectangle;
-import java.awt.Window;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
-import java.awt.event.KeyEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.WindowEvent;
+import java.awt.*;
+import java.awt.event.*;
 import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.EventObject;
-import java.util.LinkedList;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
-import javax.swing.BoundedRangeModel;
-import javax.swing.BoxLayout;
-import javax.swing.DefaultListModel;
-import javax.swing.ImageIcon;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JPanel;
-import javax.swing.JScrollBar;
-import javax.swing.JScrollPane;
-import javax.swing.JSplitPane;
-import javax.swing.JTable;
-import javax.swing.JTextField;
-import javax.swing.JTextPane;
-import javax.swing.JToggleButton;
-import javax.swing.JTree;
-import javax.swing.ListSelectionModel;
-import javax.swing.event.CellEditorListener;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.ListSelectionListener;
-import javax.swing.event.TreeModelEvent;
-import javax.swing.event.TreeModelListener;
-import javax.swing.event.TreeSelectionEvent;
+import javax.swing.*;
+import javax.swing.event.*;
 import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.text.BadLocationException;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreePath;
 
-import org.expresso.parse.BranchableStream;
-import org.expresso.parse.ExpressoParser;
-import org.expresso.parse.ParseMatch;
-import org.expresso.parse.ParseMatcher;
-import org.expresso.parse.ParseSession;
+import org.expresso.parse.*;
 import org.expresso.parse.impl.CharSequenceStream;
 import org.expresso.parse.impl.ReferenceMatcher;
 import org.expresso.parse.impl.SimpleValueMatcher;
@@ -74,6 +27,7 @@ import org.expresso.parse.impl.WhitespaceMatcher;
 import org.qommons.ArrayUtils;
 import org.qommons.config.MutableConfig;
 import org.qommons.config.QommonsConfig;
+import org.qommons.ex.ExIterable;
 
 /**
  * A graphical debugger for the {@link ExpressoParser}
@@ -377,7 +331,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 					breakpoint.setEnabled(breakpointConfig.is("enabled", true));
 					theBreakpoints.add(breakpoint);
 					((javax.swing.table.DefaultTableModel) theBreakpointList.getModel())
-							.addRow(new Object[] { breakpoint, breakpoint, breakpoint, breakpoint });
+					.addRow(new Object[] { breakpoint, breakpoint, breakpoint, breakpoint });
 				}
 			}
 		} finally {
@@ -1516,8 +1470,8 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		}
 
 		@Override
-		public <SS extends BranchableStream<?, ?>> List<ParseMatch<SS>> match(SS stream, ExpressoParser<? super SS> parser,
-				ParseSession session) throws IOException {
+		public <SS extends BranchableStream<?, ?>> ExIterable<ParseMatch<SS>, IOException> match(SS stream,
+				ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
 			throw new IllegalStateException("This placeholder does not do any parsing");
 		}
 	}
