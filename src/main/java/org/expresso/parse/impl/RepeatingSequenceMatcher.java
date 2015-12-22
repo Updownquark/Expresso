@@ -61,8 +61,8 @@ public class RepeatingSequenceMatcher<S extends BranchableStream<?, ?>> extends 
 	}
 
 	@Override
-	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
-			throws IOException {
+	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser,
+			ParseSession session) {
 		return parser.parseMatchPaths(stream, session, (strm, sess, depth) -> super.match(strm, parser, sess), theMinRepeat,
 				theMaxRepeat < 0 ? Integer.MAX_VALUE : theMaxRepeat, this,
 						depth -> "At least " + theMinRepeat + " repetition" + (theMinRepeat > 1 ? "s" : "") + " expected");

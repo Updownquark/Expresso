@@ -40,8 +40,8 @@ public class OneOfMatcher<S extends BranchableStream<?, ?>> extends ComposedMatc
 	}
 
 	@Override
-	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
-			throws IOException {
+	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser,
+			ParseSession session) {
 		ExFunction<ParseMatcher<? super S>, ExIterable<ParseMatch<SS>, IOException>, IOException> map = element -> parser
 				.parseWith((SS) stream.branch(), session, element);
 		ExIterable<ExIterable<ParseMatch<SS>, IOException>, IOException> deep = ExIterable

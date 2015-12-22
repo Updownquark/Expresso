@@ -51,24 +51,36 @@ public class UpToMatcher<S extends BranchableStream<?, ?>> extends BaseMatcher<S
 	}
 
 	@Override
-	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
-			throws IOException {
-		SS streamBegin = (SS) stream.branch();
-		SS streamCopy = (SS) stream.branch();
-		ExIterator<ParseMatch<SS>, IOException> end = parser.parseWith(streamCopy, session, theMatcher).iterator();
-		do {
-			ParseMatch<SS> endMatch = null;
-			while (endMatch == null && end.hasNext())
-				endMatch = end.next();
-			if (end == null && (!stream.isDiscovered() || stream.getDiscoveredLength() > 0)) {
-				stream.advance(1);
-				streamCopy = (SS) stream.branch();
-				end = parser.parseWith(streamCopy, session, theMatcher).iterator();
-			} else
-				break;
-		} while (true);
-		return ExIterable.iterate(
-				new ParseMatch<>(this, streamBegin, stream.getPosition() - streamBegin.getPosition(), Collections.EMPTY_LIST, null, true));
+	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser,
+			ParseSession session) {
+		SS copy = (SS) stream.branch();
+		return () -> new ExIterator<ParseMatch<SS>, IOException>() {
+			private boolean found;
+
+			@Override
+			public boolean hasNext() throws IOException {
+				return !found && !(copy.isDiscovered() && copy.getDiscoveredLength() == 0);
+			}
+
+			@Override
+			public ParseMatch<SS> next() throws IOException {
+				if (!hasNext())
+					throw new java.util.NoSuchElementException();
+				ExIterator<ParseMatch<SS>, IOException> contentIter = parser.parseWith(copy, session, theMatcher).iterator();
+				if (!contentIter.hasNext()) {
+					copy.advance(1);
+					return null;
+				}
+				ParseMatch<SS> contentNext = contentIter.next();
+				if (contentNext == null || !contentNext.isComplete() || contentNext.getError() != null) {
+					copy.advance(1);
+					return null;
+				}
+				found = true;
+				return new ParseMatch<>(UpToMatcher.this, stream, copy.getPosition() - stream.getPosition(), Collections.EMPTY_LIST, null,
+						true);
+			}
+		};
 	}
 
 	@Override

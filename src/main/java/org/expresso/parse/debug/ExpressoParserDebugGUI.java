@@ -1471,7 +1471,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 
 		@Override
 		public <SS extends BranchableStream<?, ?>> ExIterable<ParseMatch<SS>, IOException> match(SS stream,
-				ExpressoParser<? super SS> parser, ParseSession session) throws IOException {
+				ExpressoParser<? super SS> parser, ParseSession session) {
 			throw new IllegalStateException("This placeholder does not do any parsing");
 		}
 	}

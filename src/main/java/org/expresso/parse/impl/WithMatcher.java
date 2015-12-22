@@ -45,8 +45,8 @@ public class WithMatcher<S extends BranchableStream<?, ?>> extends SequenceMatch
 	}
 
 	@Override
-	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
-			throws IOException {
+	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser,
+			ParseSession session) {
 		return doInSession(session, () -> super.match(stream, parser, session));
 	}
 

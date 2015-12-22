@@ -44,8 +44,8 @@ public class SequenceMatcher<S extends BranchableStream<?, ?>> extends ComposedM
 	}
 
 	@Override
-	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
-			throws IOException {
+	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser,
+			ParseSession session) {
 		return parser.parseMatchPaths(stream, session, (strm, sess, depth) -> getComposed().get(depth).match(strm, parser, sess),
 				getComposed().size(), getComposed().size(), this, depth -> "Expected " + getComposed().get(depth));
 	}

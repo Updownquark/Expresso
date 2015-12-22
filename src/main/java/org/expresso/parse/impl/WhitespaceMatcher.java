@@ -11,6 +11,7 @@ import org.expresso.parse.ParseMatch;
 import org.expresso.parse.ParseMatcher;
 import org.expresso.parse.ParseSession;
 import org.qommons.ex.ExIterable;
+import org.qommons.ex.ExIterator;
 
 /**
  * Searches for whitespace in a stream
@@ -57,16 +58,26 @@ public class WhitespaceMatcher<S extends CharSequenceStream> implements ParseMat
 	}
 
 	@Override
-	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
-			throws IOException {
+	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser,
+			ParseSession session) {
 		if(!isNextWS(stream))
 			return ExIterable.iterate();
-		SS streamCopy = (SS) stream.branch();
-		do {
-			stream.advance(1);
-		} while(isNextWS(stream));
-		return ExIterable.iterate(
-				new ParseMatch<>(this, streamCopy, stream.getPosition() - streamCopy.getPosition(), Collections.EMPTY_LIST, null, true));
+		return () -> new ExIterator<ParseMatch<SS>, IOException>() {
+			@Override
+			public boolean hasNext() throws IOException {
+				return true;
+			}
+
+			@Override
+			public ParseMatch<SS> next() throws IOException {
+				SS streamCopy = (SS) stream.branch();
+				do {
+					stream.advance(1);
+				} while (isNextWS(stream));
+				return new ParseMatch<>(WhitespaceMatcher.this, streamCopy, stream.getPosition() - streamCopy.getPosition(),
+						Collections.EMPTY_LIST, null, true);
+			}
+		};
 	}
 
 	private boolean isNextWS(CharSequenceStream stream) {

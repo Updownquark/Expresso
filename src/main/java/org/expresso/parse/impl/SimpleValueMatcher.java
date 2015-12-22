@@ -1,9 +1,12 @@
 package org.expresso.parse.impl;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 
 import org.expresso.parse.*;
+import org.expresso.parse.ExpressoParser.SimpleMatchParser;
 import org.qommons.ex.ExIterable;
 
 /**
@@ -32,26 +35,26 @@ public abstract class SimpleValueMatcher<S extends BranchableStream<?, ?>> exten
 	public abstract String getValueString();
 
 	@Override
-	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
-			throws IOException {
-		SS streamCopy = (SS) stream.branch();
-		List<ParseMatch<SS>> ignorables = new ArrayList<>();
-		List<ParseMatch<SS>> ignorable = parser.parseByType(streamCopy, session, ExpressoParser.IGNORABLE);
-		while (!ignorable.isEmpty()) {
-			ignorables.add(ignorable.get(0));
-			ignorable = parser.parseByType(streamCopy, session, ExpressoParser.IGNORABLE);
-		}
-		int groupLength = streamCopy.getPosition() - stream.getPosition();
-		ParseMatch<SS> valueMatch = parseValue(streamCopy);
-		if(valueMatch == null)
-			return Collections.EMPTY_LIST;
-		groupLength += valueMatch.getLength();
-		if(ignorables.isEmpty())
-			return Arrays.asList(valueMatch);
-		else {
-			ignorables.add(valueMatch);
-			return Arrays.asList(new ParseMatch<>(WhitespacedGroupMatcher.MATCHER, stream, groupLength, ignorables, null, true));
-		}
+	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser,
+			ParseSession session) {
+		ParseMatch<SS> PASS = new ParseMatch<>(this, stream, 0, Collections.EMPTY_LIST, null, true);
+		return parser.parseMatchPaths(stream, session, new SimpleMatchParser<SS>() {
+			@Override
+			public ExIterable<ParseMatch<SS>, IOException> parse(SS strm, ParseSession sess, int depth) {
+				return parser.parseByType(strm, sess, ExpressoParser.IGNORABLE);
+			}
+		}, 0, -1, this, null).map(m -> {
+			if (m == null || !m.isComplete())
+				return PASS;
+			SS advanced = (SS) stream.advance(m.getLength());
+			ParseMatch<SS> valueMatch = parseValue(advanced);
+			if (valueMatch == null)
+				return null;
+			if (m.getLength() == 0)
+				return valueMatch;
+			return new ParseMatch<>(WhitespacedGroupMatcher.MATCHER, stream, m.getLength() + valueMatch.getLength(), m.getChildren(), null,
+					true);
+		}).filter(m -> m != PASS);
 	}
 
 	/**

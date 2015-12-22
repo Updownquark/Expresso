@@ -6,6 +6,7 @@ import java.util.function.Function;
 
 import org.expresso.parse.*;
 import org.expresso.parse.debug.ExpressoParsingDebugger;
+import org.qommons.ex.ExIterable;
 import org.qommons.ex.ExIterator;
 
 /**
@@ -138,63 +139,82 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 	}
 
 	@Override
-	public <SS extends BranchableStream<?, ?>> List<ParseMatch<SS>> parseMatchPaths(SS stream, ParseSession session,
-			SimpleMatchParser<SS> parser, int minDepth, int maxDepth, ParseMatcher<? super SS> matcher, Function<Integer, String> error)
-					throws IOException {
-		List<List<ParseMatch<SS>>> paths = new ArrayList<>();
+	public <SS extends BranchableStream<?, ?>> ExIterable<ParseMatch<SS>, IOException> parseMatchPaths(SS stream, ParseSession session,
+			SimpleMatchParser<SS> parser, int minDepth, int maxDepth, ParseMatcher<? super SS> matcher, Function<Integer, String> error) {
 		SS copy = (SS) stream.branch();
-		// Recursively parse each possible path of matches from the stream
-		parseBranch(new ArrayList<>(), copy, session, parser, 0, maxDepth, paths);
+		return () -> new ExIterator<ParseMatch<SS>, IOException>() {
+			private final ExIterator<List<ParseMatch<SS>>, IOException> pathParser = parseBranch(new ArrayList<>(), copy, session, parser,
+					0, maxDepth).iterator();
 
-		copy = (SS) stream.branch();
-		List<ParseMatch<SS>> ret = new ArrayList<>(paths.size());
-		for (int i = 0; i < ret.size(); i++) {
-			List<ParseMatch<SS>> path = paths.get(i);
-			String errorMsg;
-			if (!path.isEmpty() && path.get(path.size() - 1).getError() != null)
-				errorMsg = null; // Let the deeper message come up
-			else if (path.size() < minDepth)
-				errorMsg = error.apply(path.size());
-			else
-				errorMsg = null;
-			int length = 0;
-			for (ParseMatch<SS> el : path)
-				length += el.getLength();
-			ret.add(new ParseMatch<>(matcher, copy, length, path, errorMsg, path.size() == maxDepth));
-		}
-		return ret;
+			@Override
+			public boolean hasNext() throws IOException {
+				return pathParser.hasNext();
+			}
+
+			@Override
+			public ParseMatch<SS> next() throws IOException {
+				List<ParseMatch<SS>> path = pathParser.next();
+
+				String errorMsg;
+				if (!path.isEmpty() && path.get(path.size() - 1).getError() != null)
+					errorMsg = null; // Let the deeper message come up
+				else if (path.size() < minDepth)
+					errorMsg = error.apply(path.size());
+				else
+					errorMsg = null;
+				int length = 0;
+				for (ParseMatch<SS> el : path)
+					length += el.getLength();
+				return new ParseMatch<>(matcher, copy, length, path, errorMsg, path.size() == maxDepth);
+			}
+		};
 	}
 
-	private <SS extends BranchableStream<?, ?>> void parseBranch(List<ParseMatch<SS>> path, SS stream, ParseSession session,
-			org.expresso.parse.ExpressoParser.SimpleMatchParser<SS> parser, int depth, int maxDepth, List<List<ParseMatch<SS>>> allPaths)
-					throws IOException {
-		/* A small note on the use of the paths variable.  Although this method is designed to handle any number of sequential matchers each
+	private <SS extends BranchableStream<?, ?>> ExIterable<List<ParseMatch<SS>>, IOException> parseBranch(List<ParseMatch<SS>> path,
+			SS stream, ParseSession session, org.expresso.parse.ExpressoParser.SimpleMatchParser<SS> parser, int depth, int maxDepth){
+		/* A small note on the use of the path variable.  Although this method is designed to handle any number of sequential matchers each
 		 * returning any number of matches, in practice most branches in this tree will be trivial and not stored in allPaths.  Therefore,
 		 * to prevent unnecessary list creation, I am re-using the path variable and creating copies only as necessary. */
-		ExIterator<ParseMatch<SS>, IOException> matchIterator = parser.parse(stream, session, depth).iterator();
-		boolean needPathCopy = false;
-		while (matchIterator.hasNext()) {
-			ParseMatch<SS> match = matchIterator.next();
-			if (match == null)
-				continue;
-			if (needPathCopy)
-				path = new ArrayList<>(path);
-			path.add(match);
+		return () -> new ExIterator<List<ParseMatch<SS>>, IOException>() {
+			private final ExIterator<ParseMatch<SS>, IOException> matchIterator = parser.parse(stream, session, depth).iterator();
+			private ExIterator<List<ParseMatch<SS>>, IOException> subIterator;
+			private ParseMatch<SS> match;
+			private boolean calledHasNext;
 
-			if (depth == maxDepth - 1 || !match.isComplete()) {
-				needPathCopy = true;
-				allPaths.add(path);
-			} else {
-				SS advanced = (SS) stream.branch().advance(match.getLength());
-				int preSize = allPaths.size();
-				parseBranch(path, advanced, session, parser, depth + 1, maxDepth, allPaths);
-				if (allPaths.size() > preSize)
-					needPathCopy = true; // The recursive call used the path variable and put it in allPaths, so we may need to create a
-				// copy
-				else
-					path.remove(match); // Re-use the path variable
+			@Override
+			public boolean hasNext() throws IOException {
+				calledHasNext = true;
+				while (subIterator == null || !subIterator.hasNext()) {
+					subIterator = null;
+					if (match != null)
+						path.remove(path.size() - 1);
+					match = matchIterator.next();
+					if (match == null)
+						continue;
+					path.add(match);
+
+					if (depth == maxDepth - 1 || !match.isComplete()) {
+						return true;
+					} else {
+						SS advanced = (SS) stream.branch().advance(match.getLength());
+						subIterator = parseBranch(path, advanced, session, parser, depth + 1, maxDepth).iterator();
+					}
+				}
+				return subIterator != null && subIterator.hasNext();
 			}
-		}
+
+			@Override
+			public List<ParseMatch<SS>> next() throws IOException {
+				if (!calledHasNext && !hasNext())
+					throw new java.util.NoSuchElementException();
+
+				calledHasNext = false;
+				if (subIterator != null)
+					return subIterator.next();
+				else
+					return path;
+			}
+		};
 	}
 
 	/**

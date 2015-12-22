@@ -87,8 +87,8 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	}
 
 	@Override
-	default <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session)
-			throws IOException {
+	default <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser,
+			ParseSession session) {
 		return parseByType(stream, session, new String[0]);
 	}
 
@@ -124,10 +124,8 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 * @param session The parsing session
 	 * @param types The matcher names or tags to use, or empty to use all default matchers
 	 * @return The possible matches parsed from the stream
-	 * @throws IOException If an error occurs while retrieving the data to parse
 	 */
-	default <SS extends S> ExIterable<ParseMatch<SS>, IOException> parseByType(SS stream, ParseSession session, String... types)
-			throws IOException {
+	default <SS extends S> ExIterable<ParseMatch<SS>, IOException> parseByType(SS stream, ParseSession session, String... types) {
 		if (session == null)
 			session = createSession();
 		return parse(stream, session, getMatchersFor(session, types));
@@ -142,10 +140,9 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 * @param session The parsing session
 	 * @param matchers The matchers to use, or empty to use all default matchers. These matchers need not be known by this parser.
 	 * @return The possible matches parsed from the stream
-	 * @throws IOException If an error occurs while retrieving the data to parse
 	 */
 	default <SS extends S> ExIterable<ParseMatch<SS>, IOException> parseWith(SS stream, ParseSession session,
-			Collection<? extends ParseMatcher<? super SS>> matchers) throws IOException {
+			Collection<? extends ParseMatcher<? super SS>> matchers) {
 		return parse(stream, session, matchers.isEmpty() ? getMatchersFor(session) : matchers);
 	}
 
@@ -158,11 +155,9 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 * @param session The parsing session
 	 * @param matchers The matchers to use, or empty to use all default matchers. These matchers need not be known by this parser.
 	 * @return The possible matches parsed from the stream
-	 * @throws IOException If an error occurs while retrieving the data to parse
 	 */
 	default <SS extends S> ExIterable<ParseMatch<SS>, IOException> parseWith(SS stream, ParseSession session,
-			ParseMatcher<? super SS>... matchers)
-					throws IOException {
+			ParseMatcher<? super SS>... matchers) {
 		return parse(stream, session, matchers.length > 0 ? Arrays.asList(matchers) : getMatchersFor(session));
 	}
 
@@ -176,13 +171,12 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 * @param session The parsing session
 	 * @param matchers The matchers to use. Need not be known by this parser.
 	 * @return The possible matches parsed from the stream.
-	 * @throws IOException If an error occurs while retrieving the data to parse
 	 */
 	<SS extends S> ExIterable<ParseMatch<SS>, IOException> parse(SS stream, ParseSession session,
-			Collection<? extends ParseMatcher<? super SS>> matchers) throws IOException;
+			Collection<? extends ParseMatcher<? super SS>> matchers);
 
 	interface SimpleMatchParser<S extends BranchableStream<?, ?>> {
-		ExIterable<ParseMatch<S>, IOException> parse(S stream, ParseSession session, int depth) throws IOException;
+		ExIterable<ParseMatch<S>, IOException> parse(S stream, ParseSession session, int depth);
 	}
 
 	/**
@@ -197,11 +191,9 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 * @param matcher The matcher to create the resulting matches for
 	 * @param error Creates an error message for a match that does not meet the minimum depth
 	 * @return The iterable to iterate through the matches
-	 * @throws IOException If an error occurs
 	 */
 	<SS extends BranchableStream<?, ?>> ExIterable<ParseMatch<SS>, IOException> parseMatchPaths(SS stream, ParseSession session,
-			SimpleMatchParser<SS> parser, int minDepth, int maxDepth, ParseMatcher<? super SS> matcher, Function<Integer, String> error)
-					throws IOException;
+			SimpleMatchParser<SS> parser, int minDepth, int maxDepth, ParseMatcher<? super SS> matcher, Function<Integer, String> error);
 
 	/**
 	 * Parses matches from the stream iteratively. If an error occurs retrieving data, the {@link Iterator#next()} method may throw an
