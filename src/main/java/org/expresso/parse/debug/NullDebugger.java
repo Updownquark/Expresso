@@ -11,6 +11,9 @@ import org.expresso.parse.ParseSession;
  * @param <S> The type of stream to parse
  */
 public class NullDebugger<S extends org.expresso.parse.BranchableStream<?, ?>> implements ExpressoParsingDebugger<S> {
+	/** An instance of this debugger */
+	@SuppressWarnings("rawtypes")
+	public static NullDebugger INSTANCE = new NullDebugger();
 	@Override
 	public void init(ExpressoParser<?> parser) {
 	}

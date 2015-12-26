@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.util.*;
 import java.util.function.Function;
 
+import org.expresso.parse.debug.ExpressoParsingDebugger;
+import org.expresso.parse.debug.NullDebugger;
 import org.qommons.ex.ExIterable;
 import org.qommons.ex.ExIterator;
 
@@ -48,6 +50,19 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 * @return Matchers in this parser whose name or one of its tags matches one of the given types
 	 */
 	Collection<ParseMatcher<? super S>> getMatchersFor(ParseSession session, String... types);
+
+	/**
+	 * @param debugger The debugger for this parser to use. May not be supported.
+	 * @return This parser
+	 */
+	default ExpressoParser<S> setDebugger(ExpressoParsingDebugger<S> debugger) {
+		return this;
+	}
+
+	/** @return The debugger that this parser uses. */
+	default ExpressoParsingDebugger<S> getDebugger() {
+		return NullDebugger.INSTANCE;
+	}
 
 	/** @return A new session valid for parsing a complete set of data in this parser */
 	ParseSession createSession();

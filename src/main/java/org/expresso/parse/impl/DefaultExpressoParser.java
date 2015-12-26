@@ -37,12 +37,18 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 		theDebugger = new org.expresso.parse.debug.NullDebugger<>();
 	}
 
-	/** @param debugger The debugger to be notified of this parser's parsing steps */
-	public void setDebugger(ExpressoParsingDebugger<S> debugger) {
+	@Override
+	public DefaultExpressoParser<S> setDebugger(ExpressoParsingDebugger<S> debugger) {
 		if(debugger == null)
 			debugger = new org.expresso.parse.debug.NullDebugger<>();
 		theDebugger = debugger;
 		debugger.init(this);
+		return this;
+	}
+
+	@Override
+	public ExpressoParsingDebugger<S> getDebugger() {
+		return theDebugger;
 	}
 
 	private void addMatcher(ParseMatcher<? super S> matcher, boolean isDefault) {
@@ -95,14 +101,8 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 	}
 
 	@Override
-	public <SS extends S> ParseMatch<SS> parse(SS stream, ParseSession session, Collection<? extends ParseMatcher<? super SS>> matchers)
-			throws IOException {
-		boolean finishDebugging = false;
-		if(!((ParseSessionImpl<S>) session).isDebuggingStarted) {
-			theDebugger.start(stream);
-			((ParseSessionImpl<S>) session).isDebuggingStarted = true;
-			finishDebugging = true;
-		}
+	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> parse(SS stream, ParseSession session,
+			Collection<? extends ParseMatcher<? super SS>> matchers) {
 		Collection<ParseMatcher<? super SS>> memberMatchers = new ArrayList<>();
 		Collection<ParseMatcher<? super SS>> foreignMatchers = new ArrayList<>();
 		for(ParseMatcher<? super SS> matcher : matchers) {
@@ -111,31 +111,17 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 			else
 				memberMatchers.add(matcher);
 		}
-		ParseMatch<SS> match = null;
+		MatchResultIterable<SS> matches;
 		if(!memberMatchers.isEmpty())
-			match = ((ParseSessionImpl<SS>) session).match(stream, memberMatchers);
+			matches = ((ParseSessionImpl<SS>) session).match(stream, memberMatchers);
+		else
+			matches = new MatchResultIterable<>();
+		matches.setRoot(!((ParseSessionImpl<S>) session).isDebuggingStarted);
 		for(ParseMatcher<? super SS> matcher : foreignMatchers) {
-			theDebugger.preParse(stream, matcher, session);
-			ParseMatch<SS> fMatch = matcher.match((SS) stream.branch(), this, session);
-			theDebugger.postParse(stream, matcher, fMatch);
-			if(fMatch != null && fMatch.isBetter(match)) {
-				if(match != null)
-					theDebugger.matchDiscarded(match.getMatcher(), match);
-				match = fMatch;
-			} else
-				theDebugger.matchDiscarded(matcher, fMatch);
+			SS branch = (SS) stream.branch();
+			matches.add(branch, session, matcher, matcher.match(branch, this, session), false);
 		}
-
-		if(match != null)
-			stream.advance(match.getLength());
-		if(finishDebugging) {
-			if(match == null || match.getError() != null || !match.isComplete())
-				theDebugger.fail(stream, match);
-			else
-				theDebugger.end(match);
-			((ParseSessionImpl<S>) session).isDebuggingStarted = false;
-		}
-		return match;
+		return matches;
 	}
 
 	@Override
@@ -172,9 +158,8 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 
 	private <SS extends BranchableStream<?, ?>> ExIterable<List<ParseMatch<SS>>, IOException> parseBranch(List<ParseMatch<SS>> path,
 			SS stream, ParseSession session, org.expresso.parse.ExpressoParser.SimpleMatchParser<SS> parser, int depth, int maxDepth){
-		/* A small note on the use of the path variable.  Although this method is designed to handle any number of sequential matchers each
-		 * returning any number of matches, in practice most branches in this tree will be trivial and not stored in allPaths.  Therefore,
-		 * to prevent unnecessary list creation, I am re-using the path variable and creating copies only as necessary. */
+		/* The path variable will be re-used here for performance.  If the paths returned from the iterator need to be persisted, then
+		 * copies must be made */
 		return () -> new ExIterator<List<ParseMatch<SS>>, IOException>() {
 			private final ExIterator<ParseMatch<SS>, IOException> matchIterator = parser.parse(stream, session, depth).iterator();
 			private ExIterator<List<ParseMatch<SS>>, IOException> subIterator;
@@ -327,6 +312,99 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 		}
 	}
 
+	private class MatchResultIterable<SS extends S> implements ExIterable<ParseMatch<SS>, IOException> {
+		private class ParseResultState {
+			final SS stream;
+			final ParseSession session;
+			final ParseMatcher<? super SS> matcher;
+			final ExIterable<ParseMatch<SS>, IOException> results;
+			final boolean isFromCache;
+
+			public ParseResultState(SS strm, ParseSession sess, ParseMatcher<? super SS> matchr,
+					ExIterable<ParseMatch<SS>, IOException> res, boolean fromCache) {
+				stream = strm;
+				session = sess;
+				matcher = matchr;
+				results = res;
+				isFromCache = fromCache;
+			}
+		}
+
+		private final List<ParseResultState> theMatchResults = new ArrayList<>();
+		private boolean isRoot;
+
+		private class MatchResultIterator implements ExIterator<ParseMatch<SS>, IOException> {
+			private final Iterator<ParseResultState> theMatches = theMatchResults.iterator();
+			private ParseResultState theCurrentState;
+			private ExIterator<ParseMatch<SS>, IOException> theResultIter;
+			private ParseMatch<SS> theBestMatch;
+			private boolean hasStarted;
+			private boolean hasFinished;
+			private SS theStartStream;
+			private ParseSession theStartSession;
+
+			@Override
+			public boolean hasNext() throws IOException {
+				while ((theResultIter == null || !theResultIter.hasNext()) && theMatches.hasNext()) {
+					theCurrentState = theMatches.next();
+					if (isRoot && !hasStarted) {
+						hasStarted = true;
+						theStartStream = theCurrentState.stream;
+						theStartSession = theCurrentState.session;
+						theDebugger.start(theStartStream);
+						((ParseSessionImpl<S>) theStartSession).isDebuggingStarted = true;
+					}
+					theResultIter = theCurrentState.results.iterator();
+				}
+				boolean ret = theResultIter != null && theResultIter.hasNext();
+				if (!ret && isRoot && !hasFinished) {
+					hasFinished = true;
+					if (theBestMatch == null || theBestMatch.getError() != null || !theBestMatch.isComplete())
+						theDebugger.fail(theStartStream, theBestMatch);
+					else
+						theDebugger.end(theBestMatch);
+					((ParseSessionImpl<S>) theStartSession).isDebuggingStarted = false;
+				}
+				return ret;
+			}
+
+			@Override
+			public ParseMatch<SS> next() throws IOException {
+				if (!hasNext())
+					throw new java.util.NoSuchElementException();
+				theDebugger.preParse(theCurrentState.stream, theCurrentState.matcher, theCurrentState.session);
+				ParseMatch<SS> next = theResultIter.next();
+				if (theCurrentState.isFromCache)
+					theDebugger.usedCache(theCurrentState.matcher, next);
+				else
+					theDebugger.postParse(theCurrentState.stream, theCurrentState.matcher, next);
+				if (next == null)
+					theDebugger.matchDiscarded(theCurrentState.matcher, next);
+				else if (next.isBetter(theBestMatch)) {
+					if (theBestMatch != null)
+						theDebugger.matchDiscarded(theBestMatch.getMatcher(), theBestMatch);
+					theBestMatch = next;
+				} else
+					theDebugger.matchDiscarded(theCurrentState.matcher, next);
+				return next;
+			}
+		}
+
+		@Override
+		public ExIterator<ParseMatch<SS>, IOException> iterator() {
+			return new MatchResultIterator();
+		}
+
+		void setRoot(boolean root) {
+			isRoot = root;
+		}
+
+		void add(SS stream, ParseSession session, ParseMatcher<? super SS> matcher, ExIterable<ParseMatch<SS>, IOException> results,
+				boolean cached) {
+			theMatchResults.add(new ParseResultState(stream, session, matcher, results, cached));
+		}
+	}
+
 	private class ParsingCache<SS extends S> {
 		private class StreamPositionData {
 			private class Matching {
@@ -348,8 +426,8 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 				theTypeMatching = new HashMap<>();
 			}
 
-			ParseMatch<SS> match(SS stream, ParseSessionImpl<SS> session, Collection<? extends ParseMatcher<? super SS>> matchers)
-					throws IOException {
+			MatchResultIterable<SS> match(SS stream, ParseSessionImpl<SS> session,
+					Collection<? extends ParseMatcher<? super SS>> matchers) {
 				/* This is the core parsing code.  The basic strategy is to disallow recursive parsing, using the cache to allow
 				 * matchers access to their own or others' matches.  This makes debugging much, much easier and makes the debugging process
 				 * more controllable and, I think, faster.  Not sure what kind of code I'd have to write if I were allowing straight
@@ -467,8 +545,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 			thePositions = new HashMap<>();
 		}
 
-		ParseMatch<SS> match(SS stream, ParseSessionImpl<SS> session, Collection<? extends ParseMatcher<? super SS>> matchers)
-				throws IOException {
+		MatchResultIterable<SS> match(SS stream, ParseSessionImpl<SS> session, Collection<? extends ParseMatcher<? super SS>> matchers) {
 			if(matchers.isEmpty())
 				return null;
 			int pos = stream.getPosition();
@@ -525,7 +602,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 			return theCache.isCached(type, stream.getPosition(), this);
 		}
 
-		ParseMatch<SS> match(SS stream, Collection<? extends ParseMatcher<? super SS>> matchers) throws IOException {
+		MatchResultIterable<SS> match(SS stream, Collection<? extends ParseMatcher<? super SS>> matchers) {
 			excludeTypes(matchers);
 			return theCache.match(stream, new ParseSessionImpl<>(this, theCache, true), matchers);
 		}
