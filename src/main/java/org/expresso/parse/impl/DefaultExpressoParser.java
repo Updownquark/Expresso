@@ -112,11 +112,10 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 			else
 				memberMatchers.add(matcher);
 		}
-		MatchResultIterable<SS> matches;
+		ParseSessionImpl<SS> sessionImpl = (ParseSessionImpl<SS>) session;
+		MatchResultIterable<SS> matches = new MatchResultIterable<>(stream, sessionImpl);
 		if(!memberMatchers.isEmpty())
-			matches = ((ParseSessionImpl<SS>) session).match(stream, memberMatchers);
-		else
-			matches = new MatchResultIterable<>(stream, (ParseSessionImpl<SS>)session);
+			matches.add(sessionImpl.match(stream, memberMatchers));
 		if(!foreignMatchers.isEmpty()){
 			Function<ParseMatcher<? super SS>, ParseMatcherState<SS>> map;
 			map = matcher -> new ParseMatcherState<SS>(session, matcher,
@@ -442,7 +441,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 				theTypeMatching = new HashMap<>();
 			}
 
-			MatchResultIterable<SS> match(SS stream, ParseSessionImpl<SS> session,
+			Iterable<ParseMatcherState<SS>> match(SS stream, ParseSessionImpl<SS> session,
 					Collection<? extends ParseMatcher<? super SS>> matchers) {
 				/* This is the core parsing code.  The basic strategy is to disallow recursive parsing, using the cache to allow
 				 * matchers access to their own or others' matches.  This makes debugging much, much easier and makes the debugging process
@@ -575,7 +574,8 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 			thePositions = new HashMap<>();
 		}
 
-		MatchResultIterable<SS> match(SS stream, ParseSessionImpl<SS> session, Collection<? extends ParseMatcher<? super SS>> matchers) {
+		Iterable<ParseMatcherState<SS>> match(SS stream, ParseSessionImpl<SS> session,
+				Collection<? extends ParseMatcher<? super SS>> matchers) {
 			if(matchers.isEmpty())
 				return null;
 			int pos = stream.getPosition();
@@ -632,7 +632,7 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 			return theCache.isCached(type, stream.getPosition(), this);
 		}
 
-		MatchResultIterable<SS> match(SS stream, Collection<? extends ParseMatcher<? super SS>> matchers) {
+		Iterable<ParseMatcherState<SS>> match(SS stream, Collection<? extends ParseMatcher<? super SS>> matchers) {
 			excludeTypes(matchers);
 			return theCache.match(stream, new ParseSessionImpl<>(this, theCache, true), matchers);
 		}
