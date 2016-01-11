@@ -463,6 +463,109 @@ public class DefaultExpressoParser<S extends BranchableStream<?, ?>> extends Bas
 				 * Thus, recursive matching is flattened and tamed.  This approach is much easier to debug (the deep tree structure is
 				 * 		difficult to understand in the UI and the deep stack is difficult in the debugger) and, I believe, more performant.
 				 */
+				return new Iterable<ParseMatcherState<SS>>() {
+					@Override
+					public Iterator<ParseMatcherState<SS>> iterator() {
+						final Collection<ParseMatcher<? super SS>> matchersCopy = new ArrayList<>(matchers);
+						final Set<String> uncachedTypeNames = new LinkedHashSet<>();
+						for (ParseMatcher<? super SS> matcher : matchers) {
+							Matching matching = theTypeMatching.get(matcher.getName());
+							if (matching != null) {
+								if (matching.theEvaluatingSession != null) {
+									// Mark the session as having used cache elements that are still being evaluated so the results are not
+									// cached
+									session.markUsedEvaulatingCache(matching.theEvaluatingSession, matcher);
+								}
+							} else {
+								uncachedTypeNames.add(matcher.getName());
+								theTypeMatching.put(matcher.getName(), new Matching(session));
+							}
+						}
+						return new Iterator<ParseMatcherState<SS>>() {
+							private Iterator<ParseMatcher<? super SS>> matcherIter = matchersCopy.iterator();
+							boolean needsAnotherLoop;
+							Set<String> notToCache = new LinkedHashSet<>();
+							Map<String, ParseMatch<SS>> loopMatches = new LinkedHashMap<>();
+
+							@Override
+							public boolean hasNext() {
+								if (matcherIter.hasNext())
+									return true;
+
+								// After each round, save the matches in the cache
+								for (String name : uncachedTypeNames)
+									theTypeMatching.get(name).theMatch = loopMatches.get(name);
+
+								if (needsAnotherLoop)
+									matcherIter = matchersCopy.iterator();
+								return matcherIter.hasNext();
+							}
+
+							@Override
+							public ParseMatcherState<SS> next() {
+								ParseMatcher<? super SS> matcher = matcherIter.next();
+								return new ParseMatcherState<>(session, matcher, new ExIterable<ParseMatchResult<SS>, IOException>() {
+									@Override
+									public ExIterator<ParseMatchResult<SS>, IOException> iterator() {
+										if (uncachedTypeNames.contains(matcher.getName())) {
+											return new ExIterator<ParseMatchResult<SS>, IOException>() {
+												private ExIterator<ParseMatch<SS>, IOException> backing = matcher
+														.match(stream, DefaultExpressoParser.this, session).iterator();
+
+												@Override
+												public boolean hasNext() throws IOException {
+													return backing.hasNext();
+												}
+
+												@Override
+												public ParseMatchResult<SS> next() throws IOException {
+													theDebugger.preParse(stream, matcher, session);
+													ParseMatch<SS> match = backing.next();
+													theDebugger.postParse(stream, matcher, match);
+													matched(matcher, match);
+													// TODO Auto-generated method stub
+												}
+											};
+										} else {
+											// TODO Retrieve from cache
+										}
+									}
+								});
+							}
+
+							void matched(ParseMatcher<? super SS> matcher, ParseMatch<SS> match) {
+								// If the matcher referred to one of the currently evaluating matchers, we need to keep iterating because
+								// this
+								// cache may change as a result of each successive iteration
+								needsAnotherLoop |= session.hasUsedOwnEvaluatingCache();
+								if (session.hasUsedEvaluatingCache() || hasCommon(session.getUsedOwnEvaluatingCache(), notToCache)) {
+									// Don't want to cache if the evaluation used cache elements that are currently being evaluated by a
+									// different session
+									notToCache.add(matcher.getName());
+								} else if (!session.hasUsedOwnEvaluatingCache()) {
+									// The matcher didn't need anything that is currently being evaluated, so we can cache the result and
+									// not
+									// evaluate it again
+									Matching cached = theTypeMatching.get(matcher.getName());
+									cached.theMatch = match;
+									cached.theEvaluatingSession = null;
+									matcherIter.remove();
+									uncachedTypeNames.remove(matcher.getName());
+								}
+								session.clearUsedEvaluatingCache();
+
+								// Store the result in this frame
+								ParseMatch<SS> oldMatch = loopMatches.get(matcher.getName());
+								if (match != null && match.isBetter(oldMatch)) {
+									if (oldMatch != null)
+										theDebugger.matchDiscarded(matcher, oldMatch);
+									loopMatches.put(matcher.getName(), match);
+								} else
+									theDebugger.matchDiscarded(matcher, match);
+							}
+						};
+					}
+				};
 				Set<String> uncachedTypeNames = new LinkedHashSet<>();
 				for (ParseMatcher<? super SS> matcher : matchers) {
 					Matching matching = theTypeMatching.get(matcher.getName());
