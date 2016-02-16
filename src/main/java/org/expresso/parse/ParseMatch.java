@@ -173,13 +173,13 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 	/** Implements a depth-first iteration over this match's structure. The first match returned will be {@code this}. */
 	@Override
 	public java.util.Iterator<ParseMatch<S>> iterator() {
-		return org.qommons.ArrayUtils.depthFirst(this, ParseMatch::getChildren, null).iterator();
+		return org.qommons.IterableUtils.depthFirst(this, ParseMatch::getChildren, null).iterator();
 	}
 
 	/** @return A depth-first iterator over this match's local nodes, i.e. the nodes that this match's matcher parsed directly */
 	public Iterable<ParseMatch<S>> localMatches() {
-		return org.qommons.ArrayUtils.depthFirst(this, ParseMatch::getChildren,
-			match -> !(match.getMatcher() instanceof org.expresso.parse.impl.ReferenceMatcher));
+		return org.qommons.IterableUtils.depthFirst(this, ParseMatch::getChildren,
+				match -> !(match.getMatcher() instanceof org.expresso.parse.impl.ReferenceMatcher));
 	}
 
 	/**
