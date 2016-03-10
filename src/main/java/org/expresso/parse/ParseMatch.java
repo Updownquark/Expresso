@@ -43,10 +43,17 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 		theChildren = java.util.Collections.unmodifiableList(children);
 		theError = error;
 		isThisComplete = complete;
+		int childLen = 0;
+		for (ParseMatch<S> child : children) {
+			if (child == null)
+				throw new IllegalArgumentException("Null child");
+			childLen += child.theLength;
+		}
+		if (childLen > length)
+			throw new IllegalArgumentException("Children are longer than this match");
 		isComplete = getIncompleteMatch() == null;
 		if (!isThisComplete && getErrorMatch() == null)
 			throw new IllegalArgumentException("Incomplete matches must have an error message");
-		toString();
 	}
 
 	/** @return The matcher that found this match */
@@ -94,7 +101,7 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 
 	/** @return Whether this match represents whitespace in the stream */
 	public boolean isWhitespace() {
-		return theMatcher instanceof org.expresso.parse.impl.WhitespaceMatcher;
+		return theMatcher instanceof org.expresso.parse.matchers.WhitespaceMatcher;
 	}
 
 	/** @return The match that directly caused this match's error */
@@ -179,7 +186,7 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 	/** @return A depth-first iterator over this match's local nodes, i.e. the nodes that this match's matcher parsed directly */
 	public Iterable<ParseMatch<S>> localMatches() {
 		return org.qommons.IterableUtils.depthFirst(this, ParseMatch::getChildren,
-				match -> !(match.getMatcher() instanceof org.expresso.parse.impl.ReferenceMatcher));
+				match -> !(match.getMatcher() instanceof org.expresso.parse.matchers.ReferenceMatcher));
 	}
 
 	/**
@@ -247,7 +254,7 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 				if(!first)
 					ret.append(",");
 				first = false;
-				ret.append(match.toString());
+				ret.append(match);
 			}
 			if(theChildren.size() > 1)
 				ret.append(')');

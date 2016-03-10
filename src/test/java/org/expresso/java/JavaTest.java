@@ -11,17 +11,17 @@ import javax.swing.UnsupportedLookAndFeelException;
 
 import org.expresso.parse.ParseMatch;
 import org.expresso.parse.impl.CharSequenceStream;
-import org.expresso.parse.impl.DefaultExpressoParser;
-import org.expresso.parse.impl.DefaultGrammarParser;
-import org.expresso.parse.impl.DefaultGrammarParser.PrioritizedMatcher;
-import org.expresso.parse.impl.WhitespaceMatcher;
+import org.expresso.parse.impl.DefaultExpressoParser2;
+import org.expresso.parse.matchers.DefaultGrammarParser;
+import org.expresso.parse.matchers.DefaultGrammarParser.PrioritizedMatcher;
+import org.expresso.parse.matchers.WhitespaceMatcher;
 import org.jdom2.JDOMException;
 import org.junit.Before;
 import org.junit.Test;
 
 /** Tests the capabilities of the java parsing */
 public class JavaTest {
-	private DefaultExpressoParser<CharSequenceStream> theParser;
+	private DefaultExpressoParser2<CharSequenceStream> theParser;
 
 	/** Sets up the java parser */
 	@Before
@@ -43,7 +43,7 @@ public class JavaTest {
 			throw new IllegalStateException("Could not setup default java parsing", e);
 		}
 
-		DefaultExpressoParser.Builder<CharSequenceStream> builder = DefaultExpressoParser.build("Java");
+		DefaultExpressoParser2.Builder<CharSequenceStream> builder = DefaultExpressoParser2.build("Java");
 		builder.addMatcher(new WhitespaceMatcher<>(), false);
 		for(PrioritizedMatcher matcher : matchers)
 			builder.addMatcher(matcher.matcher, matcher.isDefault);
@@ -60,11 +60,15 @@ public class JavaTest {
 		File current = new File(System.getProperty("user.dir"));
 		if(!current.getName().equals("Expresso"))
 			throw new IllegalStateException("Expected working directory to be the root of the Expresso project");
-		parseClasses(new File(current, "src/main/java"));
-		parseClasses(new File(current, "src/test/java"));
+		boolean success = true;
+		success &= parseClasses(new File(current, "src/main/java"));
+		success &= parseClasses(new File(current, "src/test/java"));
+		if (!success)
+			throw new IllegalStateException("Could not parse some files.  See error messages in console.");
 	}
 
-	private void parseClasses(File dir) {
+	private boolean parseClasses(File dir) {
+		boolean success = true;
 		for(File file : dir.listFiles()) {
 			if (file.isDirectory() || !file.getName().toLowerCase().endsWith(".java"))
 				continue;
@@ -75,8 +79,10 @@ public class JavaTest {
 			} catch(IOException e) {
 				throw new IllegalStateException("Could not read " + file, e);
 			}
-			if (match == null)
+			if (match == null) {
 				System.err.println("Could not parse " + file);
+				success = false;
+			}
 			else if (match.getError() != null) {
 				StringBuilder error = new StringBuilder();
 				error.append("Error parsing ").append(file).append(": ").append(match.getError());
@@ -88,10 +94,12 @@ public class JavaTest {
 					e.printStackTrace();
 				}
 				System.err.println(error);
+				success = false;
 			}
 		}
 		for(File file : dir.listFiles())
 			if(file.isDirectory())
-				parseClasses(file);
+				success &= parseClasses(file);
+		return success;
 	}
 }

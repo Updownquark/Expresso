@@ -1,4 +1,4 @@
-package org.expresso.parse.impl;
+package org.expresso.parse.matchers;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -10,6 +10,7 @@ import org.expresso.parse.ExpressoParser;
 import org.expresso.parse.ParseMatch;
 import org.expresso.parse.ParseMatcher;
 import org.expresso.parse.ParseSession;
+import org.expresso.parse.impl.CharSequenceStream;
 import org.qommons.ex.ExIterable;
 import org.qommons.ex.ExIterator;
 
@@ -60,12 +61,10 @@ public class WhitespaceMatcher<S extends CharSequenceStream> implements ParseMat
 	@Override
 	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser,
 			ParseSession session) {
-		if(!isNextWS(stream))
-			return ExIterable.iterate();
 		return () -> new ExIterator<ParseMatch<SS>, IOException>() {
 			@Override
 			public boolean hasNext() throws IOException {
-				return true;
+				return isNextWS(stream);
 			}
 
 			@Override

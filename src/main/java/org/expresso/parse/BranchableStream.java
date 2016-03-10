@@ -188,9 +188,13 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 		assertUnsealed();
 		if (isDiscovered() && spaces == getDiscoveredLength()) {
 			// doOn will throw an out of bounds exception here, but this is acceptable--makes this stream zero-length
-			advancedPast(theChunk.getData(), thePosition, thePosition + spaces);
-			thePosition += spaces;
-			return this;
+			while (theChunk.getNext() != null) {
+				int newEnd = thePosition + spaces;
+				if (newEnd > theChunk.length())
+					newEnd = theChunk.length();
+				advancedPast(theChunk.getData(), thePosition, newEnd);
+			}
+			thePosition = theChunk.length();
 		} else {
 			doOn(spaces, (chunk, idx) -> {
 				theChunk = chunk;

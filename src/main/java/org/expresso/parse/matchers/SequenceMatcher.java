@@ -1,10 +1,15 @@
-package org.expresso.parse.impl;
+package org.expresso.parse.matchers;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.expresso.parse.*;
+import org.expresso.parse.BranchableStream;
+import org.expresso.parse.ExpressoParser;
+import org.expresso.parse.ParseMatch;
+import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.ParseSession;
 import org.qommons.ex.ExIterable;
 
 /**
@@ -46,8 +51,9 @@ public class SequenceMatcher<S extends BranchableStream<?, ?>> extends ComposedM
 	@Override
 	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser,
 			ParseSession session) {
-		return parser.parseMatchPaths(stream, session, (strm, sess, depth) -> getComposed().get(depth).match(strm, parser, sess),
-				getComposed().size(), getComposed().size(), this, depth -> "Expected " + getComposed().get(depth));
+		List<ParseMatcher<? super S>> composed = getComposed();
+		return parser.parseMatchPaths(stream, session, (strm, sess, depth) -> parser.parseWith(strm, sess, composed.get(depth)),
+				composed.size(), composed.size(), this, depth -> "Expected " + composed.get(depth));
 	}
 
 	/**

@@ -1,7 +1,12 @@
 package org.expresso.parse;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 import org.expresso.parse.debug.ExpressoParsingDebugger;
@@ -177,14 +182,13 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	}
 
 	/**
-	 * Typically an internal method, not called from external or matcher implementation code. Parses a match from the stream using one of
-	 * the given matchers only. If calling externally, {@link #parseWith(BranchableStream, ParseSession, ParseMatcher...)} is probably wha
-	 * you want.
+	 * Typically an internal method, not called from external or matcher implementation code. Parses matches from the stream using the given
+	 * matchers only. If calling externally, {@link #parseWith(BranchableStream, ParseSession, ParseMatcher...)} is probably what you want.
 	 *
 	 * @param <SS> The type of the stream
 	 * @param stream The stream to parse
 	 * @param session The parsing session
-	 * @param matchers The matchers to use. Need not be known by this parser.
+	 * @param matchers The potential matchers to use. Need not be known by this parser.
 	 * @return The possible matches parsed from the stream.
 	 */
 	<SS extends S> ExIterable<ParseMatch<SS>, IOException> parse(SS stream, ParseSession session,
@@ -207,7 +211,7 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 * @param error Creates an error message for a match that does not meet the minimum depth
 	 * @return The iterable to iterate through the matches
 	 */
-	<SS extends BranchableStream<?, ?>> ExIterable<ParseMatch<SS>, IOException> parseMatchPaths(SS stream, ParseSession session,
+	<SS extends S> ExIterable<ParseMatch<SS>, IOException> parseMatchPaths(SS stream, ParseSession session,
 			SimpleMatchParser<SS> parser, int minDepth, int maxDepth, ParseMatcher<? super SS> matcher, Function<Integer, String> error);
 
 	/**

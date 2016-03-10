@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 
 import org.expresso.parse.*;
 import org.expresso.parse.debug.ExpressoParsingDebugger;
+import org.expresso.parse.matchers.BaseMatcher;
 import org.qommons.ex.ExIterable;
 import org.qommons.ex.ExIterator;
 

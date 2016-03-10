@@ -1,6 +1,8 @@
 package org.expresso.parse.debug;
 
-import org.expresso.parse.*;
+import org.expresso.parse.BranchableStream;
+import org.expresso.parse.ExpressoParser;
+import org.expresso.parse.ParseMatch;
 
 /**
  * An interface for a debugger to be notified of parsing events
@@ -25,9 +27,9 @@ public interface ExpressoParsingDebugger<S extends BranchableStream<?, ?>> {
 	/**
 	 * Called when the parsing of a sequence has finished successfully
 	 *
-	 * @param matches The matches parsed from the sequence
+	 * @param bestMatch The best match parsed from the sequence
 	 */
-	void end(ParseMatch<? extends S>... matches);
+	void end(ParseMatch<? extends S> bestMatch);
 
 	/**
 	 * Called when the parsing of a sequence fails
@@ -45,7 +47,7 @@ public interface ExpressoParsingDebugger<S extends BranchableStream<?, ?>> {
 	 * @param matcher The parsing matcher that will attempt to match the beginning of the stream
 	 * @param session The session to use to parse next piece of the stream
 	 */
-	void preParse(S stream, ParseMatcher<?> matcher, ParseSession session);
+	void preParse(S stream, MatchData<? extends S> match);
 
 	/**
 	 * Called after attempting to parse a subsequence
@@ -54,21 +56,8 @@ public interface ExpressoParsingDebugger<S extends BranchableStream<?, ?>> {
 	 * @param matcher The matcher that parsing attempted to use
 	 * @param match The match resulting from the parsing, or null if the match could not be made
 	 */
-	void postParse(S stream, ParseMatcher<?> matcher, ParseMatch<? extends S> match);
+	void postParse(S stream, MatchData<? extends S> match);
 
-	/**
-	 * Called when a match is discarded in favor of a better one
-	 *
-	 * @param matcher The matcher that parsing attempted to use
-	 * @param match The discarded match
-	 */
-	void matchDiscarded(ParseMatcher<?> matcher, ParseMatch<? extends S> match);
-
-	/**
-	 * Called when a match from the cache is used
-	 *
-	 * @param matcher The matcher that the match was cached for
-	 * @param match The cached match
-	 */
-	void usedCache(ParseMatcher<?> matcher, ParseMatch<? extends S> match);
+	/** Causes any UI of this debugger to be displayed. Helpful for use from java breakpoints. */
+	void display();
 }

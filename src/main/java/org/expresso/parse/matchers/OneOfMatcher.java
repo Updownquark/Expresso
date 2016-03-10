@@ -1,4 +1,4 @@
-package org.expresso.parse.impl;
+package org.expresso.parse.matchers;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -6,7 +6,11 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 
-import org.expresso.parse.*;
+import org.expresso.parse.BranchableStream;
+import org.expresso.parse.ExpressoParser;
+import org.expresso.parse.ParseMatch;
+import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.ParseSession;
 import org.qommons.ex.ExFunction;
 import org.qommons.ex.ExIterable;
 
@@ -45,8 +49,9 @@ public class OneOfMatcher<S extends BranchableStream<?, ?>> extends ComposedMatc
 		ExFunction<ParseMatcher<? super S>, ExIterable<ParseMatch<SS>, IOException>, IOException> map = element -> parser
 				.parseWith((SS) stream.branch(), session, element);
 		ExIterable<ExIterable<ParseMatch<SS>, IOException>, IOException> deep = ExIterable
-				.<ParseMatcher<? super S>, IOException> iterate(getComposed()).map(map);
-		return ExIterable.flatten(deep).map(match -> new ParseMatch<>(this, stream, match.getLength(), Arrays.asList(match), null, true));
+				.<ParseMatcher<? super S>, IOException> fromIterable(getComposed()).mapEx(map);
+		return ExIterable.flatten(deep)
+				.map(match -> match == null ? null : new ParseMatch<>(this, stream, match.getLength(), Arrays.asList(match), null, true));
 	}
 
 	/**

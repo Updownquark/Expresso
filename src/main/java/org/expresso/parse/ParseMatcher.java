@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.qommons.ex.ExIterable;
+import org.qommons.ex.ExIterator;
 
 /**
  * Parses a defined set of content from a stream
@@ -58,11 +59,14 @@ public interface ParseMatcher<S extends BranchableStream<?, ?>> {
 
 	/**
 	 * <p>
-	 * Parses this matcher's content from the beginning of stream. The position of the stream should not be affected.
+	 * Returns an iterator that parses possible matches for this matcher from the beginning of a stream. All the work of parsing should be
+	 * done inside the iterator, not in this method itself or in the {@link ExIterable#iterator()} method. {@link ExIterable#iterator()} may
+	 * perform initialization, but may not inspect the stream or invoke the parser.
 	 * </p>
 	 * <p>
-	 * The work to parse each possible match should be done in the {@link java.util.Iterator#next()} method of the iterator, not in this
-	 * call itself. The iterator's next method may return null if a possible match didn't pan out at all.
+	 * The {@link ExIterator#hasNext()} method may inspect the stream, but should never invoke the parser. If it is not possible to be
+	 * certain whether a next match exists without invoking the parser, {@link ExIterator#hasNext()} may return true and then
+	 * {@link ExIterator#next()} may return null if the match doesn't exist.
 	 * </p>
 	 *
 	 * @param <SS> The sub-type of stream to parse

@@ -1,4 +1,4 @@
-package org.expresso.parse.impl;
+package org.expresso.parse.matchers;
 
 import java.io.IOException;
 import java.util.List;
