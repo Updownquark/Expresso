@@ -19,7 +19,6 @@
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="inheritedJdk" />
-    <orderEntry type="module" module-name="ObServe" />
     <orderEntry type="module" module-name="Qommons" />
     <orderEntry type="module-library">
       <library name="guava-18.0.jar">
