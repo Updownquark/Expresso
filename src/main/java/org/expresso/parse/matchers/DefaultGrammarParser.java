@@ -8,13 +8,12 @@ import java.util.stream.Collectors;
 
 import org.expresso.parse.ParseMatcher;
 import org.expresso.parse.impl.CharSequenceStream;
-import org.expresso.parse.impl.DefaultExpressoParser;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
 
-/** Contains methods to initialize a {@link DefaultExpressoParser} from XML documents obeying the default grammar schema */
+/** Contains methods to initialize a default parser from XML documents obeying the default grammar schema */
 public class DefaultGrammarParser {
-	/** A structure containing a matcher and metadata needed to insert the matcher into a {@link DefaultExpressoParser} correctly */
+	/** A structure containing a matcher and metadata needed to insert the matcher into a default parser correctly */
 	public static class PrioritizedMatcher implements Comparable<PrioritizedMatcher> {
 		/** The matcher to parse a section of streamed data */
 		public final ParseMatcher<CharSequenceStream> matcher;
