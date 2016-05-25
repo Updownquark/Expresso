@@ -36,24 +36,34 @@ public abstract class BaseMatcher<S extends BranchableStream<?, ?>> implements P
 
 	@Override
 	public String toString() {
+		StringBuilder ret = shortStringBuilder();
+		for(ParseMatcher<? super S> composed : getComposed())
+			ret.append("\n\t").append(composed.toString().replaceAll("\n", "\n\t"));
+		return ret.toString();
+	}
+
+	@Override
+	public String toShortString() {
+		return shortStringBuilder().toString();
+	}
+
+	protected StringBuilder shortStringBuilder() {
 		StringBuilder ret = new StringBuilder(getTypeName());
-		if(theName != null)
+		if (theName != null)
 			ret.append(" name=\"").append(theName).append('"');
-		for(java.util.Map.Entry<String, String> attr : getAttributes().entrySet())
+		for (java.util.Map.Entry<String, String> attr : getAttributes().entrySet())
 			ret.append(' ').append(attr.getKey()).append("=\"").append(attr.getValue()).append('"');
-		if(!theTags.isEmpty()) {
+		if (!theTags.isEmpty()) {
 			ret.append(" tag=\"");
 			boolean first = true;
-			for(String tag : theTags) {
-				if(!first)
+			for (String tag : theTags) {
+				if (!first)
 					ret.append(',');
 				first = false;
 				ret.append(tag);
 			}
 			ret.append('"');
 		}
-		for(ParseMatcher<? super S> composed : getComposed())
-			ret.append("\n\t").append(composed.toString().replaceAll("\n", "\n\t"));
-		return ret.toString();
+		return ret;
 	}
 }

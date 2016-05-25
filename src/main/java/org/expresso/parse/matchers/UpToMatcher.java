@@ -35,11 +35,6 @@ public class UpToMatcher<S extends BranchableStream<?, ?>> extends BaseMatcher<S
 		return java.util.Collections.EMPTY_MAP;
 	}
 
-	@Override
-	public Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
-		return java.util.Collections.EMPTY_SET;
-	}
-
 	/** @return The matcher that this matcher searches for */
 	public ParseMatcher<? super S> getMatcher() {
 		return theMatcher;
@@ -53,8 +48,8 @@ public class UpToMatcher<S extends BranchableStream<?, ?>> extends BaseMatcher<S
 	@Override
 	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser,
 			ParseSession session) {
-		SS copy = (SS) stream.branch();
 		return () -> new ExIterator<ParseMatch<SS>, IOException>() {
+			private SS copy = (SS) stream.clone();
 			private boolean found;
 
 			@Override
@@ -68,12 +63,12 @@ public class UpToMatcher<S extends BranchableStream<?, ?>> extends BaseMatcher<S
 					throw new java.util.NoSuchElementException();
 				ExIterator<ParseMatch<SS>, IOException> contentIter = parser.parseWith(copy, session, theMatcher).iterator();
 				if (!contentIter.hasNext()) {
-					copy.advance(1);
+					copy = (SS) copy.advance(1);
 					return null;
 				}
 				ParseMatch<SS> contentNext = contentIter.next();
 				if (contentNext == null || !contentNext.isComplete() || contentNext.getError() != null) {
-					copy.advance(1);
+					copy = (SS) copy.advance(1);
 					return null;
 				}
 				found = true;

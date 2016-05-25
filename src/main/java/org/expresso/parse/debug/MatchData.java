@@ -39,11 +39,19 @@ public class MatchData<S extends BranchableStream<?, ?>> {
 	public boolean addMatch(ParseMatch<S> match) {
 		if (theCurrentMatches == null)
 			throw new IllegalStateException("Call nextRound() before addMatch(ParseMatch)");
+		if(match!=null)
+			match=filter(match);
 		theCurrentMatches.add(match);
 		boolean newBest = match != null && match.isBetter(theBestMatch);
 		if (newBest)
 			theBestMatch = match;
 		return newBest;
+	}
+
+	private ParseMatch<S> filter(ParseMatch<S> match) {
+		if(match.getLength()==0)
+			return null;
+		return match;
 	}
 
 	public ParseMatch<S> getBestMatch() {

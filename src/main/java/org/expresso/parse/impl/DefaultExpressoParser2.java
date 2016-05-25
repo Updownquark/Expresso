@@ -110,28 +110,33 @@ public class DefaultExpressoParser2<S extends BranchableStream<?, ?>> extends Ba
 	@Override
 	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> parseMatchPaths(SS stream, ParseSession session,
 			SimpleMatchParser<SS> parser, int minDepth, int maxDepth, ParseMatcher<? super SS> matcher, Function<Integer, String> error) {
-		return oldParseMatchPaths(stream, session, parser, minDepth, maxDepth, matcher, error);
+		return newParseMatchPaths(stream, session, parser, minDepth, maxDepth, matcher, error);
 	}
 
 	private <SS extends S> ExIterable<ParseMatch<SS>, IOException> newParseMatchPaths(SS stream, ParseSession session,
 			SimpleMatchParser<SS> parser, int minDepth, int maxDepth, ParseMatcher<? super SS> matcher, Function<Integer, String> error) {
-		return () -> new CompoundMatchIterator<SS>(stream, (ParseSessionImpl<SS>) session, parser, minDepth, maxDepth, matcher, error);
+		PathElementIterable<SS> elementIterable = new PathElementIterable<>(stream, (ParseSessionImpl<SS>) session, parser, minDepth,
+			maxDepth, matcher, error);
+		ExIterable<List<ParseMatch<SS>>, IOException> pathIterable=ExIterable.combine(elementIterable);
+		MatchData<SS> matchData=new MatchData<>(matcher, session);
+		return pathIterable.map(path -> {
+			int length = 0;
+			List<ParseMatch<SS>> pathCopy=new ArrayList<>(path);
+			if(!pathCopy.isEmpty() && pathCopy.get(pathCopy.size()-1)==null)
+				pathCopy.remove(pathCopy.size()-1);
+			for (ParseMatch<SS> el : pathCopy)
+				length += el.getLength();
+			ParseMatch<SS> pathMatch = new ParseMatch<>(matcher, stream, length, pathCopy, null, true);
+			return pathMatch;
+		}).beforeEach(() -> {
+			PathElementIterable elIter = elementIterable;
+			theDebugger.preParse(stream, matchData);
+		}).onEach(value -> {
+			theDebugger.postParse(stream, matchData);
+		});
 	}
 
-	private class CompoundMatchIterator<SS extends S> implements ExIterator<ParseMatch<SS>, IOException> {
-		private class CompoundParseState {
-			private final SS stream;
-			private final ExIterator<ParseMatch<SS>, IOException> matches;
-			private ParseMatch<SS> lastGoodMatch;
-			private final List<ParseMatch<SS>> errorMatches;
-
-			CompoundParseState(SS stream, ExIterator<ParseMatch<SS>, IOException> matches) {
-				this.stream = stream;
-				this.matches = matches;
-				errorMatches = new ArrayList<>();
-			}
-		}
-
+	private class PathElementIterable<SS extends S> implements ExIterator<ExIterable<ParseMatch<SS>, IOException>, IOException> {
 		private final SS theStream;
 		private final ParseSessionImpl<SS> theSession;
 		private final SimpleMatchParser<SS> theParser;
@@ -140,11 +145,13 @@ public class DefaultExpressoParser2<S extends BranchableStream<?, ?>> extends Ba
 		private final ParseMatcher<? super SS> theMatcher;
 		private final Function<Integer, String> theError;
 
-		private final List<CompoundParseState> theComposed;
-		private boolean hasStarted;
+		//State
+		private SS theCumulativeStream;
+		private int theClearPathDepth;
+		private int theDepth;
 
-		CompoundMatchIterator(SS stream, ParseSessionImpl<SS> session, SimpleMatchParser<SS> parser, int minDepth, int maxDepth,
-				ParseMatcher<? super SS> matcher, Function<Integer, String> error) {
+		PathElementIterable(SS stream, ParseSessionImpl<SS> session, SimpleMatchParser<SS> parser, int minDepth, int maxDepth,
+			ParseMatcher<? super SS> matcher, Function<Integer, String> error) {
 			theStream = stream;
 			theSession = session;
 			theParser = parser;
@@ -152,34 +159,90 @@ public class DefaultExpressoParser2<S extends BranchableStream<?, ?>> extends Ba
 			theMaxDepth = maxDepth;
 			theMatcher = matcher;
 			theError = error;
-			theComposed = new ArrayList<>();
+
+			theCumulativeStream = theStream;
+			theClearPathDepth = -1;
 		}
 
-		@Override
-		public boolean hasNext() throws IOException {
-			return !hasStarted || !theComposed.isEmpty();
+		@Override public boolean hasNext() throws IOException {
+			return theMaxDepth <= 0 || theDepth < theMaxDepth;
 		}
 
-		@Override
-		public ParseMatch<SS> next() throws IOException {
-			if (theComposed.isEmpty()) {
-				if (hasStarted)
-					throw new NoSuchElementException();
-				hasStarted = true;
-				boolean okForNow = true;
-				while (okForNow) {
-					ExIterator<ParseMatch<SS>, IOException> matches = theParser.parse(theStream, theSession, 0).iterator();
+		@Override public ExIterable<ParseMatch<SS>, IOException> next() throws IOException {
+			int depth = theDepth;
+			theDepth++;
+			System.out.println(theMatcher.toShortString() + " creating element iterator @" + depth);
+			return new ExIterable<ParseMatch<SS>, IOException>(){
+				@Override public ExIterator<ParseMatch<SS>, IOException> iterator() {
+					return new ExIterator<ParseMatch<SS>, IOException>(){
+						private final SS theElementStream = theCumulativeStream;
+						private final ExIterator<ParseMatch<SS>, IOException> theMatchIterator = theParser
+							.parse(theElementStream, theSession, depth).iterator();
+						private boolean checkedHasNext = false;
+						private boolean hasNext = false;
+						private boolean hasNextMatch = false;
 
+						@Override
+						public boolean hasNext() throws IOException {
+							if (checkedHasNext)
+								return hasNext;
+							checkedHasNext = true;
+							hasNextMatch = false;
+							if (theClearPathDepth < depth - 1)
+								hasNext = false;
+							else if (theMatchIterator.hasNext())
+								hasNext = hasNextMatch = true;
+							else if (depth < theMinDepth)
+								hasNext = true; //Add an error match for possible incomplete match
+							System.out.println(theMatcher.toShortString() + " @" + depth + ": hasNext()=" + hasNext);
+							return hasNext;
+						}
+
+						@Override
+						public ParseMatch<SS> next() throws IOException {
+							if (!checkedHasNext && !hasNext())
+								throw new NoSuchElementException();
+							else if (!hasNext)
+								throw new NoSuchElementException();
+							else if (hasNextMatch) {
+								checkedHasNext = false;
+								ParseMatch<SS> nextMatch = theMatchIterator.next();
+								System.out.println(theMatcher.toShortString() + " @" + depth + ": next()="
+										+ (nextMatch == null ? "null" : "\"" + nextMatch + "\" (" + nextMatch.isComplete() + ")"));
+								if (nextMatch != null) {
+									if(!nextMatch.isComplete()) {
+										theClearPathDepth = depth - 1;
+									} else{
+										theClearPathDepth = depth;
+									}
+									theCumulativeStream = (SS) theElementStream.advance(nextMatch.getLength());
+									return nextMatch;
+								} else {
+									theClearPathDepth = depth - 1;
+									return null;
+								}
+							} else {
+								hasNext = false;
+								theClearPathDepth = depth - 1;
+								return errorMatch();
+							}
+						}
+
+						private ParseMatch<SS> errorMatch() {
+							if (theError == null)
+								return null;
+							String errorMsg = theError.apply(depth);
+							return new ParseMatch<>(theMatcher, theElementStream, 0, null, errorMsg, false);
+						}
+					};
 				}
-			}
-			// TODO Auto-generated method stub
-			return null;
+			};
 		}
 	}
 
 	private <SS extends S> ExIterable<ParseMatch<SS>, IOException> oldParseMatchPaths(SS stream, ParseSession session,
 			SimpleMatchParser<SS> parser, int minDepth, int maxDepth, ParseMatcher<? super SS> matcher, Function<Integer, String> error) {
-		SS copy = (SS) stream.branch();
+		SS copy = (SS) stream.clone();
 		return () -> new ExIterator<ParseMatch<SS>, IOException>() {
 			private final ExIterator<LinkedList<ParseMatch<SS>>, IOException> pathParser = parseBranch(new LinkedList<>(), copy, session,
 					parser, 0, minDepth, maxDepth).iterator();
@@ -251,7 +314,7 @@ public class DefaultExpressoParser2<S extends BranchableStream<?, ?>> extends Ba
 						return path;
 					} else {
 						hasReturnedPath = false;
-						SS advanced = (SS) stream.branch().advance(match.getLength());
+						SS advanced = (SS) stream.clone().advance(match.getLength());
 						subIterator = parseBranch(path, advanced, session, parser, depth + 1, minDepth, maxDepth).iterator();
 					}
 				}
@@ -274,8 +337,7 @@ public class DefaultExpressoParser2<S extends BranchableStream<?, ?>> extends Ba
 	@Override
 	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> parse(SS stream, ParseSession session,
 			Collection<? extends ParseMatcher<? super SS>> matchers) {
-		SS copy = (SS) stream.branch();
-		copy.seal();
+		SS copy = (SS) stream.clone();
 		return new MatchResultIterable<>(copy, (ParseSessionImpl<SS>) session, matchers);
 	}
 
@@ -321,7 +383,7 @@ public class DefaultExpressoParser2<S extends BranchableStream<?, ?>> extends Ba
 						if (foriegnMatchIterator.hasNext()) {
 							ParseMatcher<? super SS> matcher = foriegnMatchIterator.next();
 							theCurrentMatch = new MatchData<>(matcher, theSession);
-							theCurrentMatches = matcher.match((SS) theStream.branch(), DefaultExpressoParser2.this, theSession).iterator();
+							theCurrentMatches = matcher.match((SS) theStream.clone(), DefaultExpressoParser2.this, theSession).iterator();
 							theCurrentMatch.nextRound();
 						} else if (memberMatchIterator.hasNext()) {
 							ParseMatchState<SS> state = memberMatchIterator.next();
@@ -436,7 +498,7 @@ public class DefaultExpressoParser2<S extends BranchableStream<?, ?>> extends Ba
 					if (matchCache.evaluatingSession == theSubSession) {
 						// These matches have not been calculated yet
 						List<ParseMatch<SS>> accumulated = new ArrayList<>();
-						matches = matcher.match((SS) theStream.branch(), DefaultExpressoParser2.this, theSubSession);
+						matches = matcher.match(theStream, DefaultExpressoParser2.this, theSubSession);
 						ParseMatch<SS> previousBest = matchData.getBestMatch();
 						matches = matches.onEach(match -> accumulated.add(match)).onFinish(() -> {
 							// When the matches have been exhausted, see what we need to do about looping and caching
@@ -475,7 +537,7 @@ public class DefaultExpressoParser2<S extends BranchableStream<?, ?>> extends Ba
 							// These matches are verified
 						}
 						// return the cached matches and don't ask for them again
-						matches = ExIterable.fromIterable(matchCache.matches);
+						matches = ExIterable.forEx(ExIterable.fromIterable(matchCache.matches));
 						matchIter.remove();
 					}
 					return new ParseMatchState<SS>(matchData, matches);
@@ -683,14 +745,14 @@ public class DefaultExpressoParser2<S extends BranchableStream<?, ?>> extends Ba
 	/**
 	 * @param <S> The type of stream to parse
 	 * @param name The name for the parser
-	 * @return A builder capable of constructing a {@link DefaultExpressoParser}
+	 * @return A builder capable of constructing a {@link DefaultExpressoParser2}
 	 */
 	public static <S extends BranchableStream<?, ?>> Builder<S> build(String name) {
 		return new Builder<>(name);
 	}
 
 	/**
-	 * Builds {@link DefaultExpressoParser}s. See {@link DefaultExpressoParser#build(String)}.
+	 * Builds {@link DefaultExpressoParser2}s. See {@link DefaultExpressoParser2#build(String)}.
 	 *
 	 * @param <S> The type of stream for the builder to parse
 	 */

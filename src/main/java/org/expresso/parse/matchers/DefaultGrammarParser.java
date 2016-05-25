@@ -2,13 +2,16 @@ package org.expresso.parse.matchers;
 
 import java.io.IOException;
 import java.io.Reader;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.expresso.parse.ParseMatcher;
 import org.expresso.parse.impl.CharSequenceStream;
-import org.expresso.parse.impl.DefaultExpressoParser;
 import org.jdom2.Element;
 import org.jdom2.JDOMException;
 

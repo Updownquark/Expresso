@@ -81,7 +81,7 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 			};
 		} else
 			try {
-				return ((CharSequenceStream) branch().advance(start)).subSequence(0, end - start);
+				return ((CharSequenceStream) advance(start)).subSequence(0, end - start);
 			} catch(IOException e) {
 				throw new IllegalStateException("Could not retrieve data for subsequence", e);
 			}
@@ -112,7 +112,7 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 	}
 
 	@Override
-	protected CharSequenceStream clone() {
+	public CharSequenceStream clone() {
 		CharSequenceStream ret = (CharSequenceStream) super.clone();
 		ret.theCurrentLine = new StringBuilder(theCurrentLine);
 		return ret;
@@ -139,6 +139,16 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 		}
 		ret.append('^');
 		return ret.toString();
+	}
+
+	/**
+	 * @param spaces The number of characters to get
+	 * @return A CharSequence containing the next <code>spaces</code> characters in this stream, or the rest of this stream, whichever is smaller.
+	 * @throws IOException If an error occurs retrieving the data
+	 */
+	public CharSequence getNext(int spaces) throws IOException{
+		int len=discoverTo(spaces);
+		return subSequence(0, len);
 	}
 
 	/**

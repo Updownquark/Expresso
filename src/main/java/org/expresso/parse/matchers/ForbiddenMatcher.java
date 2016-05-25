@@ -38,11 +38,6 @@ public class ForbiddenMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 	}
 
 	@Override
-	public Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
-		return theContent.getPotentialBeginningTypeReferences(parser, session);
-	}
-
-	@Override
 	public List<ParseMatcher<? super S>> getComposed() {
 		return java.util.Collections.unmodifiableList(Arrays.asList(theContent));
 	}

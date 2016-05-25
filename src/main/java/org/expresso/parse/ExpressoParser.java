@@ -44,11 +44,6 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 		return Collections.EMPTY_SET; // A parser is typically self-contained
 	}
 
-	@Override
-	default Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
-		return java.util.Collections.EMPTY_SET;
-	}
-
 	/**
 	 * @param session The currently executing session. May be null.
 	 * @param types The matcher names and tags to get matchers for
@@ -93,7 +88,7 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 * @throws IOException If an error occurs while retrieving the data to parse
 	 */
 	default <SS extends S> ParseMatch<SS> parseBest(SS stream) throws IOException {
-		SS copy = (SS) stream.branch();
+		SS copy = (SS) stream.clone();
 		ExIterator<ParseMatch<SS>, IOException> matches = parse(copy).iterator();
 		ParseMatch<SS> best = null;
 		while (matches.hasNext()) {
@@ -102,7 +97,7 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 				best = m;
 		}
 		if (best != null)
-			stream.advance(best.getLength());
+			stream = (SS) stream.advance(best.getLength());
 		return best;
 	}
 
@@ -122,7 +117,7 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 	 * @throws IOException If an error occurs while retrieving the data to parse
 	 */
 	default <SS extends S> ParseMatch<SS> parseBestByType(SS stream, String... types) throws IOException {
-		SS copy = (SS) stream.branch();
+		SS copy = stream;
 		ExIterator<ParseMatch<SS>, IOException> matches = parseByType(copy, null, types).iterator();
 		ParseMatch<SS> best = null;
 		while (matches.hasNext()) {
@@ -131,7 +126,7 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 				best = m;
 		}
 		if (best != null)
-			stream.advance(best.getLength());
+			stream = (SS) stream.advance(best.getLength());
 		return best;
 	}
 

@@ -1,10 +1,15 @@
 package org.expresso.parse.matchers;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 
-import org.expresso.parse.*;
+import org.expresso.parse.BranchableStream;
+import org.expresso.parse.ExpressoParser;
+import org.expresso.parse.ParseMatch;
+import org.expresso.parse.ParseMatcher;
+import org.expresso.parse.ParseSession;
 import org.qommons.ex.ExIterable;
 
 /**
@@ -49,9 +54,9 @@ public class RepeatingSequenceMatcher<S extends BranchableStream<?, ?>> extends 
 	@Override
 	public Map<String, String> getAttributes() {
 		if(theMinRepeat == 0 && theMaxRepeat == 1)
-			return java.util.Collections.EMPTY_MAP;
+			return Collections.emptyMap();
 		else if(theMinRepeat == 0 && theMaxRepeat == Integer.MAX_VALUE)
-			return java.util.Collections.EMPTY_MAP;
+			return Collections.emptyMap();
 		java.util.LinkedHashMap<String, String> ret = new java.util.LinkedHashMap<>();
 		if(theMinRepeat > 0)
 			ret.put("min", "" + theMinRepeat);

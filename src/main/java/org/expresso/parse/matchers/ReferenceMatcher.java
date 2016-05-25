@@ -75,11 +75,6 @@ public class ReferenceMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 	}
 
 	@Override
-	public Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
-		return getReference(parser, session).stream().map(m -> m.getName()).collect(Collectors.toSet());
-	}
-
-	@Override
 	public List<ParseMatcher<? super S>> getComposed() {
 		return Collections.EMPTY_LIST;
 	}
@@ -90,7 +85,7 @@ public class ReferenceMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 	 * @param session The parsing session
 	 * @return The matchers that may be used to parse matches of this type
 	 */
-	public <SS extends S> Collection<ParseMatcher<? super SS>> getReference(ExpressoParser<? super SS> parser, ParseSession session) {
+	public <SS extends S> Collection<ParseMatcher<? super SS>> getReference(ExpressoParser<SS> parser, ParseSession session) {
 		Collection<ParseMatcher<? super SS>> matchers = new ArrayList<>(parser.getMatchersFor(session, theTypes));
 		ExpressoParser.removeTypes(matchers, theExcludedTypes);
 		return matchers;
@@ -99,9 +94,10 @@ public class ReferenceMatcher<S extends BranchableStream<?, ?>> extends BaseMatc
 	@Override
 	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser,
 			ParseSession session) {
-		SS streamCopy = (SS) stream.branch();
+		SS streamCopy = (SS) stream.clone();
 		ExFunction<ParseMatch<SS>, ParseMatch<SS>, IOException> map = refMatch -> refMatch == null ? null
 				: new ParseMatch<>(this, streamCopy, refMatch.getLength(), Arrays.asList(refMatch), null, true);
-		return parser.<SS> parseWith(stream, session, getReference(parser, session)).mapEx(map);
+		Collection<ParseMatcher<? super SS>> refs = getReference((ExpressoParser<SS>) parser, session);
+		return parser.<SS>parseWith(stream, session, refs).mapEx(map);
 	}
 }

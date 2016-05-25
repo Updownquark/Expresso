@@ -35,13 +35,6 @@ public interface ParseMatcher<S extends BranchableStream<?, ?>> {
 	}
 
 	/**
-	 * @param parser The parser to parse the stream
-	 * @param session The parsing session
-	 * @return The names of all matchers that may match the first deep component of this matcher
-	 */
-	Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session);
-
-	/**
 	 * @param types The types to check
 	 * @return Whether this matcher's name or one of its tags is contained in the given set of type names
 	 */
@@ -76,4 +69,6 @@ public interface ParseMatcher<S extends BranchableStream<?, ?>> {
 	 * @return All matches that may be intended by the input for this matcher. Will be empty if this matcher does not recognize the content
 	 */
 	<SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser, ParseSession session);
+
+	String toShortString();
 }

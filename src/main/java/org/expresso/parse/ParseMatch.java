@@ -2,6 +2,7 @@ package org.expresso.parse;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Predicate;
 
@@ -37,14 +38,13 @@ public class ParseMatch<S extends BranchableStream<?, ?>> implements Iterable<Pa
 	 */
 	public ParseMatch(ParseMatcher<? super S> matcher, S stream, int length, List<ParseMatch<S>> children, String error, boolean complete) {
 		theMatcher = matcher;
-		theStream = (S) stream.branch();
-		theStream.seal();
+		theStream = stream;
 		theLength = length;
-		theChildren = java.util.Collections.unmodifiableList(children);
+		theChildren = (children==null || children.isEmpty()) ? Collections.EMPTY_LIST : Collections.unmodifiableList(children);
 		theError = error;
 		isThisComplete = complete;
 		int childLen = 0;
-		for (ParseMatch<S> child : children) {
+		for (ParseMatch<S> child : theChildren) {
 			if (child == null)
 				throw new IllegalArgumentException("Null child");
 			childLen += child.theLength;

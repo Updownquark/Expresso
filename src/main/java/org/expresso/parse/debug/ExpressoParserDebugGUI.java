@@ -750,6 +750,10 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		List<MatcherObject> newModel = new ArrayList<>();
 		if (op == null) {
 		} else if (op.theParent != null && op.theParent.theMatch.getMatcher() instanceof ReferenceMatcher) {
+			ReferenceMatcher<?> refMatcher=(ReferenceMatcher<?>) op.theParent.theMatch.getMatcher();
+			@SuppressWarnings("rawtypes")
+			java.util.Collection<? extends ParseMatcher<?>> refs = ((ReferenceMatcher) refMatcher)
+				.getReference(theParser, op.theParent.theMatch.getSession());
 			int pastCursor = -1;
 			boolean allCached = true;
 			Set<String> cached = new java.util.LinkedHashSet<>();
@@ -764,8 +768,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 			if (!sameParent) {
 				allCached = false;
 			} else {
-				for (ParseMatcher<?> m : ((ReferenceMatcher<?>) op.theParent.theMatch.getMatcher()).getReference(theParser,
-						op.theParent.theMatch.getSession())) {
+				for (ParseMatcher<?> m : refs) {
 					if (pastCursor < 0 && m == cursor.theMatch.getMatcher())
 						pastCursor = 0;
 					boolean mCached;
@@ -792,8 +795,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 				}
 			}
 			MatcherObject refObj = addToModel(newModel, null, op.theParent.theMatch.getMatcher(), 0, false, allCached);
-			for (ParseMatcher<?> matcher : ((ReferenceMatcher<?>) op.theParent.theMatch.getMatcher()).getReference(theParser,
-					op.theParent.theMatch.getSession()))
+			for (ParseMatcher<?> matcher : refs)
 				addToModel(newModel, refObj, matcher, 1, false, cached.contains(matcher.getName()));
 			addEndToModel(newModel, null, op.theParent.theMatch.getMatcher(), 0);
 		} else {
@@ -1196,7 +1198,7 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		private ParseNode add(MatchData<? extends S> match, S stream) {
 			if(theCursor != null && theCursor.isFinished)
 				ascend();
-			ParseNode newNode = new ParseNode(theCursor, match, stream == null ? null : (S) stream.branch());
+			ParseNode newNode = new ParseNode(theCursor, match, stream);
 			boolean newRoot = theCursor == null;
 			if(newRoot)
 				theRoot = newNode;
@@ -1462,11 +1464,6 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		}
 
 		@Override
-		public Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
-			return Collections.EMPTY_SET;
-		}
-
-		@Override
 		public List<ParseMatcher<? super BranchableStream<?, ?>>> getComposed() {
 			return Collections.EMPTY_LIST;
 		}
@@ -1475,6 +1472,11 @@ implements org.expresso.parse.debug.ExpressoParsingDebugger<S> {
 		public <SS extends BranchableStream<?, ?>> ExIterable<ParseMatch<SS>, IOException> match(SS stream,
 				ExpressoParser<? super SS> parser, ParseSession session) {
 			throw new IllegalStateException("This placeholder does not do any parsing");
+		}
+
+		@Override
+		public String toShortString() {
+			return getTypeName();
 		}
 	}
 

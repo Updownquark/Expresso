@@ -37,11 +37,6 @@ public class WhitespacedGroupMatcher implements ParseMatcher<BranchableStream<?,
 	}
 
 	@Override
-	public Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
-		return java.util.Collections.EMPTY_SET;
-	}
-
-	@Override
 	public List<ParseMatcher<? super BranchableStream<?, ?>>> getComposed() {
 		return java.util.Collections.EMPTY_LIST;
 	}
@@ -50,5 +45,10 @@ public class WhitespacedGroupMatcher implements ParseMatcher<BranchableStream<?,
 	public <SS extends BranchableStream<?, ?>> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser,
 			ParseSession session) {
 		throw new IllegalStateException("Group parser does not actually parse.  It cannot be added to a parser");
+	}
+
+	@Override
+	public String toShortString() {
+		return getTypeName();
 	}
 }

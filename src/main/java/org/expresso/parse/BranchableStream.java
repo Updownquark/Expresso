@@ -7,12 +7,13 @@ import org.qommons.Sealable;
 import org.qommons.TriFunction;
 
 /**
- * Provides stream iteration over some kind of data
+ * Provides stream iteration over some kind of data.  Instances of this type are immutable--an instance always points to the same position
+ * in the stream.  To point to a different position, a new instance is created.
  *
  * @param <D> The type of individual data values that this stream provides
  * @param <C> The type of data chunk that this stream handles
  */
-public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
+public abstract class BranchableStream<D, C> implements Cloneable {
 	/** A chunk of streamed data */
 	protected class Chunk {
 		private final int theChunkIndex;
@@ -68,8 +69,6 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 	/** This stream's position within the current chunk */
 	private int thePosition;
 
-	private boolean isSealed;
-
 	/** @param chunkSize The chunk size for this stream's cache */
 	protected BranchableStream(int chunkSize) {
 		if(chunkSize <= 0)
@@ -79,44 +78,19 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 		thePosition = 0;
 	}
 
-	/** Throws an exception if this stream is sealed */
-	protected void assertUnsealed() {
-		if(isSealed)
-			throw new SealedException(this);
-	}
-
-	@Override
-	public boolean isSealed() {
-		return isSealed;
-	}
-
-	@Override
-	public void seal() {
-		isSealed = true;
-	}
-
 	/** @return The current position in this stream */
 	public int getPosition() {
 		return theChunk.theChunkIndex * theChunkSize + thePosition;
 	}
 
-	/**
-	 * @return Another stream at the same position as this stream, but independently {@link #advance(int) advanceable}. This method uses
-	 *         {@link #clone()}, so the type of the branched stream will be exactly the same as this type.
-	 */
-	public BranchableStream<D, C> branch() {
-		return clone();
-	}
-
 	@Override
-	protected BranchableStream<D, C> clone() {
+	public BranchableStream<D, C> clone() {
 		BranchableStream<D, C> ret;
 		try {
 			ret = (BranchableStream<D, C>) super.clone();
 		} catch(CloneNotSupportedException e) {
 			throw new IllegalStateException(e);
 		}
-		ret.isSealed = false;
 		return ret;
 	}
 
@@ -133,9 +107,10 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 	}
 
 	/**
-	 * Discovers at least a certain portion of this stream. If present in the data source, the stream will discovered its content up to the
+	 * <p>Discovers at least a certain portion of this stream. If present in the data source, the stream will discovered its content up to the
 	 * given number of spaces past the current position and <code>length</code>will be returned. If the stream is exhausted before that
-	 * number, then the stream will be fully discovered and the remaining length of the stream will be returned.
+	 * number, then the stream will be fully discovered and the remaining length of the stream will be returned.</p>
+	 * <p>This method does not affect the position of this stream</p>
 	 *
 	 * @param length The number of places from this position to discover up to
 	 * @return The number of places that have been discovered after this operation, or <code>length</code>, whichever is smaller.
@@ -178,14 +153,21 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 	}
 
 	/**
-	 * Moves this stream's position forward
+	 * Creates a new stream instance pointing to a position some number of data points beyond this stream's position.
 	 *
-	 * @param spaces The number of value spaces to advance this stream's position by
-	 * @return This stream
+	 * @param spaces The number of value spaces to advance the position by
+	 * @return The advanced stream
 	 * @throws IOException If the data cannot be retrieved
 	 */
 	public BranchableStream<D, C> advance(int spaces) throws IOException {
-		assertUnsealed();
+		if(spaces==0)
+			return this;
+		BranchableStream<D, C> advanced=clone();
+		advanced._advance(spaces);
+		return advanced;
+	}
+
+	private void _advance(int spaces) throws IOException{
 		if (isDiscovered() && spaces == getDiscoveredLength()) {
 			// doOn will throw an out of bounds exception here, but this is acceptable--makes this stream zero-length
 			while (theChunk.getNext() != null) {
@@ -205,7 +187,6 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 				return null;
 			});
 		}
-		return this;
 	}
 
 	/**
@@ -266,6 +247,14 @@ public abstract class BranchableStream<D, C> implements Cloneable, Sealable {
 		while(!c.isLast && c.theNextChunk != null)
 			c = c.theNextChunk;
 		return c.isLast;
+	}
+
+	/**
+	 * @param spaces The number of data points to check
+	 * @return Whether this stream contains at least the given number of data points past this position
+	 */
+	public boolean hasMoreData(int spaces) throws IOException {
+		return discoverTo(spaces)>=spaces;
 	}
 
 	/**

@@ -40,11 +40,6 @@ public class WithMatcher<S extends BranchableStream<?, ?>> extends SequenceMatch
 	}
 
 	@Override
-	public Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
-		return doInSession(session, () -> super.getPotentialBeginningTypeReferences(parser, session));
-	}
-
-	@Override
 	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser,
 			ParseSession session) {
 		return doInSession(session, () -> super.match(stream, parser, session));

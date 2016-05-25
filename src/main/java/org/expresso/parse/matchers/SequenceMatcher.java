@@ -34,21 +34,6 @@ public class SequenceMatcher<S extends BranchableStream<?, ?>> extends ComposedM
 	}
 
 	@Override
-	public Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
-		Set<String> ret = new java.util.LinkedHashSet<>();
-		for(ParseMatcher<?> sub : getComposed()) {
-			ret.addAll(sub.getPotentialBeginningTypeReferences(parser, session));
-			if(sub instanceof ForbiddenMatcher)
-				continue;
-			else if(sub instanceof RepeatingSequenceMatcher && ((RepeatingSequenceMatcher<?>) sub).getMin() == 0)
-				continue;
-			else
-				break;
-		}
-		return ret;
-	}
-
-	@Override
 	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser,
 			ParseSession session) {
 		List<ParseMatcher<? super S>> composed = getComposed();

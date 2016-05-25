@@ -28,12 +28,7 @@ public abstract class SimpleValueMatcher<S extends BranchableStream<?, ?>> exten
 
 	@Override
 	public List<ParseMatcher<? super S>> getComposed() {
-		return Collections.EMPTY_LIST;
-	}
-
-	@Override
-	public Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
-		return Collections.EMPTY_SET;
+		return Collections.emptyList();
 	}
 
 	/** @return A string representation of the value this matcher is looking for */
@@ -53,7 +48,7 @@ public abstract class SimpleValueMatcher<S extends BranchableStream<?, ?>> exten
 		matches = matches.mapEx(m -> {
 			if (m == null || !m.isComplete())
 				return null;
-			SS advanced = (SS) stream.branch().advance(m.getLength());
+			SS advanced = (SS) stream.advance(m.getLength());
 			ParseMatch<SS> valueMatch = parseValue(advanced);
 			if (valueMatch == null)
 				return null;

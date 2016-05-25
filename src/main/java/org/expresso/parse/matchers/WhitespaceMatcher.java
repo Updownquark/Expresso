@@ -49,11 +49,6 @@ public class WhitespaceMatcher<S extends CharSequenceStream> implements ParseMat
 	}
 
 	@Override
-	public Set<String> getPotentialBeginningTypeReferences(ExpressoParser<?> parser, ParseSession session) {
-		return java.util.Collections.EMPTY_SET;
-	}
-
-	@Override
 	public List<ParseMatcher<? super S>> getComposed() {
 		return Collections.EMPTY_LIST;
 	}
@@ -62,18 +57,19 @@ public class WhitespaceMatcher<S extends CharSequenceStream> implements ParseMat
 	public <SS extends S> ExIterable<ParseMatch<SS>, IOException> match(SS stream, ExpressoParser<? super SS> parser,
 			ParseSession session) {
 		return () -> new ExIterator<ParseMatch<SS>, IOException>() {
+			private SS theStream=stream;
 			@Override
 			public boolean hasNext() throws IOException {
-				return isNextWS(stream);
+				return isNextWS(theStream);
 			}
 
 			@Override
 			public ParseMatch<SS> next() throws IOException {
-				SS streamCopy = (SS) stream.branch();
+				SS streamCopy = theStream;
 				do {
-					stream.advance(1);
-				} while (isNextWS(stream));
-				return new ParseMatch<>(WhitespaceMatcher.this, streamCopy, stream.getPosition() - streamCopy.getPosition(),
+					theStream = (SS) theStream.advance(1);
+				} while (isNextWS(theStream));
+				return new ParseMatch<>(WhitespaceMatcher.this, streamCopy, theStream.getPosition() - streamCopy.getPosition(),
 						Collections.EMPTY_LIST, null, true);
 			}
 		};
@@ -96,5 +92,10 @@ public class WhitespaceMatcher<S extends CharSequenceStream> implements ParseMat
 	@Override
 	public String toString() {
 		return "whitespace";
+	}
+
+	@Override
+	public String toShortString() {
+		return getTypeName();
 	}
 }

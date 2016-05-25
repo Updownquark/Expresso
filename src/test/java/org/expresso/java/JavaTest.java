@@ -86,9 +86,9 @@ public class JavaTest {
 			else if (match.getError() != null) {
 				StringBuilder error = new StringBuilder();
 				error.append("Error parsing ").append(file).append(": ").append(match.getError());
-				CharSequenceStream stream = (CharSequenceStream) match.getStream().branch();
+				CharSequenceStream stream = (CharSequenceStream) match.getStream().clone();
 				try {
-					stream.advance(match.getLength());
+					stream=(CharSequenceStream) stream.advance(match.getLength());
 					error.append(' ').append(stream.printPosition());
 				} catch (IOException e) {
 					e.printStackTrace();
