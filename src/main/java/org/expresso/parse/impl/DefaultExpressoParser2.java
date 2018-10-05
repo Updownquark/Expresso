@@ -653,7 +653,7 @@ public class DefaultExpressoParser2<S extends BranchableStream<?, ?>> extends Ba
 				if (removeType != null) {
 					if (!matcher.getName().equals(IGNORABLE) && !matcher.getTags().contains(IGNORABLE)) {
 						if (!warnedOnlyExcludeIgnore) {
-							System.err.println("Session-excluded type \"" + removeType + "\" would exclude non-ignorable type \""
+							System.err.println("ExpressoParser-excluded type \"" + removeType + "\" would exclude non-ignorable type \""
 									+ matcher.getName() + "\". Only ignorable types may be session-excluded (e.g. via <without>).");
 							warnedOnlyExcludeIgnore = true;
 						}
