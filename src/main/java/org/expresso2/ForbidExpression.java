@@ -8,36 +8,37 @@ import org.expresso.parse.BranchableStream;
 public class ForbidExpression<S extends BranchableStream<?, ?>> extends ExpressionComponent<S> {
 	private final ExpressionComponent<S> theForbidden;
 
-	public ForbidExpression(ExpressionComponent<S> forbidden) {
+	public ForbidExpression(int id, ExpressionComponent<S> forbidden) {
+		super(id);
 		theForbidden = forbidden;
 	}
 
 	@Override
-	public <S2 extends S> PossibilitySequence<? extends Expression<S2>> tryParse(ExpressoParser<S2> session) {
-		PossibilitySequence<? extends Expression<S2>> forbidden = session.parseWith(theForbidden);
+	public <S2 extends S> ExpressionPossibilitySequence<S2> tryParse(ExpressoParser<S2> session) {
+		ExpressionPossibilitySequence<S2> forbidden = session.parseWith(theForbidden);
 		return new ForbiddenPossibilities<>(this, session, forbidden);
 	}
 
-	private static class ForbiddenPossibilities<S extends BranchableStream<?, ?>> implements PossibilitySequence<Expression<S>> {
+	private static class ForbiddenPossibilities<S extends BranchableStream<?, ?>> implements ExpressionPossibilitySequence<S> {
 		private final ForbidExpression<? super S> theType;
 		private final ExpressoParser<S> theSession;
-		private final PossibilitySequence<? extends Expression<S>> theForbidden;
+		private final ExpressionPossibilitySequence<S> theForbidden;
 
 		public ForbiddenPossibilities(ForbidExpression<? super S> type, ExpressoParser<S> session,
-			PossibilitySequence<? extends Expression<S>> forbidden) {
+			ExpressionPossibilitySequence<S> forbidden) {
 			theType = type;
 			theSession = session;
 			theForbidden = forbidden;
 		}
 
 		@Override
-		public Expression<S> getNextPossibility() throws IOException {
-			Expression<S> forbidden;
+		public ExpressionPossibility<S> getNextPossibility() throws IOException {
+			ExpressionPossibility<S> forbidden;
 			do {
 				forbidden = theForbidden.getNextPossibility();
-			} while (forbidden != null && forbidden.getFirstError() != null);
+			} while (forbidden != null && forbidden.getErrorCount() > 0);
 			if (forbidden == null)
-				return Expression.empty(theSession.getStream(), theType);
+				return ExpressionPossibility.empty(theSession.getStream(), theType);
 			else
 				return new ForbiddenExpression<>(theSession.getStream(), theType, forbidden);
 		}

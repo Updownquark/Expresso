@@ -8,9 +8,14 @@ import java.util.List;
 import org.expresso.parse.BranchableStream;
 
 public class RepeatExpression<S extends BranchableStream<?, ?>> extends ExpressionComponent<S> {
-	private final ExpressionComponent<? super S> theComponent;
+	private final int theMinCount;
+	private final int theMaxCount;
+	private final ExpressionComponent<S> theComponent;
 
-	public RepeatExpression(ExpressionComponent<? super S> component) {
+	public RepeatExpression(int id, int min, int max, ExpressionComponent<S> component) {
+		super(id);
+		theMinCount = min;
+		theMaxCount = max;
 		theComponent = component;
 	}
 

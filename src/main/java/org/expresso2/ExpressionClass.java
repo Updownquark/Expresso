@@ -12,6 +12,10 @@ public class ExpressionClass<S extends BranchableStream<?, ?>> extends OneOfExpr
 		theName = name;
 	}
 
+	public String getName() {
+		return theName;
+	}
+
 	@Override
 	public List<? extends ExpressionType<S>> getComponents() {
 		return (List<? extends ExpressionType<S>>) super.getComponents();

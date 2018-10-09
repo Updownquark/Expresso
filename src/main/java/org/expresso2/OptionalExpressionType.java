@@ -7,9 +7,10 @@ import java.util.Collections;
 import org.expresso.parse.BranchableStream;
 
 public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends ExpressionComponent<S> {
-	private final ExpressionComponent<? super S> theComponent;
+	private final ExpressionComponent<S> theComponent;
 
-	public OptionalExpressionType(ExpressionComponent<? super S> component) {
+	public OptionalExpressionType(int id, ExpressionComponent<S> component) {
+		super(id);
 		theComponent = component;
 	}
 

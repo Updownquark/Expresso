@@ -2,19 +2,19 @@ package org.expresso2;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import org.expresso.parse.BranchableStream;
 import org.expresso2.impl.ParseSession;
-import org.qommons.collect.ParameterSet.ParameterMap;
 
 public class ExpressoGrammar<S extends BranchableStream<?, ?>> {
 	private final String theName;
 	private final List<ExpressionType<S>> theExpressions;
-	private final ParameterMap<ExpressionType<S>> theExpressionsByName;
-	private final ParameterMap<ExpressionClass<S>> theExpressionClasses;
+	private final Map<String, ExpressionType<S>> theExpressionsByName;
+	private final Map<String, ExpressionClass<S>> theExpressionClasses;
 	
-	public ExpressoGrammar(String name, List<ExpressionType<S>> expressions, ParameterMap<ExpressionType<S>> expressionsByName,
-		ParameterMap<ExpressionClass<S>> expressionClasses) {
+	public ExpressoGrammar(String name, List<ExpressionType<S>> expressions, Map<String, ExpressionType<S>> expressionsByName,
+		Map<String, ExpressionClass<S>> expressionClasses) {
 		theName = name;
 		theExpressions = expressions;
 		theExpressionsByName = expressionsByName;
@@ -25,11 +25,11 @@ public class ExpressoGrammar<S extends BranchableStream<?, ?>> {
 		return theExpressions;
 	}
 
-	public ParameterMap<ExpressionType<S>> getExpressionsByName() {
+	public Map<String, ExpressionType<S>> getExpressionsByName() {
 		return theExpressionsByName;
 	}
 
-	public ParameterMap<ExpressionClass<S>> getExpressionClasses() {
+	public Map<String, ExpressionClass<S>> getExpressionClasses() {
 		return theExpressionClasses;
 	}
 
