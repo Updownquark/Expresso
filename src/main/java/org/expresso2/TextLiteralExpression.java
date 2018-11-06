@@ -5,8 +5,8 @@ import org.expresso.parse.impl.CharSequenceStream;
 public class TextLiteralExpression<S extends CharSequenceStream> extends LiteralExpressionType<char[], S> {
 	private final String theText;
 
-	public TextLiteralExpression(String text) {
-		super(text.toCharArray());
+	public TextLiteralExpression(int id, String text) {
+		super(id, text.toCharArray());
 		theText = text;
 	}
 

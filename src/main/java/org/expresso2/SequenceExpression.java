@@ -21,7 +21,7 @@ public class SequenceExpression<S extends BranchableStream<?, ?>> extends Expres
 	}
 
 	@Override
-	public <S2 extends S> ExpressionPossibilitySequence<S2> tryParse(ExpressoParser<S2> session) {
+	public <S2 extends S> ExpressionPossibility<S2> tryParse(ExpressoParser<S2> session) {
 		return new SequencePossibilities<>(this, theComponents, session);
 	}
 

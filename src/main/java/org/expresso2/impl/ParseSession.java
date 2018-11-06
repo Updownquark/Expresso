@@ -6,7 +6,6 @@ import org.expresso.parse.BranchableStream;
 import org.expresso2.Expression;
 import org.expresso2.ExpressionComponent;
 import org.expresso2.ExpressionPossibility;
-import org.expresso2.ExpressionPossibilitySequence;
 import org.expresso2.ExpressoGrammar;
 import org.expresso2.ExpressoParser;
 import org.qommons.collect.BetterSortedSet;
@@ -23,7 +22,7 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 
 	public Expression<S> parse(S stream, ExpressionComponent<? super S> component, boolean bestError)
 		throws IOException {
-		ExpressionPossibilitySequence<S> sequence = getParser(stream, 0, new int[0]).parseWith(component);
+		ExpressionPossibility<S> sequence = getParser(stream, 0, new int[0]).parseWith(component);
 		BetterSortedSet<ExpressionPossibility<S>> possibilities = new BetterTreeSet<>(false, ParseSession::comparePossibilities);
 		ExpressionPossibility<S> bestComplete = null;
 		boolean rootPossibilitiesExhausted = false;

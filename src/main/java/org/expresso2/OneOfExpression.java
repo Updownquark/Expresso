@@ -19,9 +19,58 @@ public class OneOfExpression<S extends BranchableStream<?, ?>> extends Expressio
 	}
 
 	@Override
-	public <S2 extends S> PossibilitySequence<? extends Expression<S2>> tryParse(ExpressoParser<S2> session) {
+	public <S2 extends S> ExpressionPossibility<S2> tryParse(ExpressoParser<S2> session) throws IOException {
 		Iterator<? extends ExpressionComponent<? super S>> iter = theComponents.iterator();
 		return new IteratedPossibilitySequence<>(iter, session);
+	}
+
+	private static class OneOfPossibility<S extends BranchableStream<?, ?>> implements ExpressionPossibility<S> {
+		private final OneOfExpression<? super S> theType;
+		private final ExpressoParser<S> theParser;
+		private final ExpressionPossibility<S> theComponent;
+		private final Iterator<? super ExpressionComponent<? super S>> theIterator;
+
+		OneOfPossibility(OneOfExpression<? super S> type, ExpressoParser<S> parser, ExpressionPossibility<S> component,
+			Iterator<? super ExpressionComponent<? super S>> iterator) {
+			theType = type;
+			theParser = parser;
+			theComponent = component;
+			theIterator = iterator;
+		}
+
+		@Override
+		public S getStream() {
+			return theParser.getStream();
+		}
+
+		@Override
+		public int length() {
+			return theComponent.length();
+		}
+
+		@Override
+		public ExpressionPossibility<S> next() throws IOException {
+			// TODO Auto-generated method stub
+			return null;
+		}
+
+		@Override
+		public int getErrorCount() {
+			// TODO Auto-generated method stub
+			return 0;
+		}
+
+		@Override
+		public boolean isComplete() {
+			// TODO Auto-generated method stub
+			return false;
+		}
+
+		@Override
+		public Expression<S> getExpression() {
+			// TODO Auto-generated method stub
+			return null;
+		}
 	}
 
 	private static class IteratedPossibilitySequence<S extends BranchableStream<?, ?>> implements PossibilitySequence<Expression<S>> {

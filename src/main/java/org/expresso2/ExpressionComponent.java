@@ -1,5 +1,7 @@
 package org.expresso2;
 
+import java.io.IOException;
+
 import org.expresso.parse.BranchableStream;
 
 public abstract class ExpressionComponent<S extends BranchableStream<?, ?>> {
@@ -9,5 +11,5 @@ public abstract class ExpressionComponent<S extends BranchableStream<?, ?>> {
 		this.id = id;
 	}
 
-	public abstract <S2 extends S> ExpressionPossibilitySequence<S2> tryParse(ExpressoParser<S2> session);
+	public abstract <S2 extends S> ExpressionPossibility<S2> tryParse(ExpressoParser<S2> parser) throws IOException;
 }

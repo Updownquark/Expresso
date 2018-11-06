@@ -270,7 +270,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements G
 			else if (value != null)
 				throw new IllegalArgumentException("Forbid declared with text content: " + value);
 			else
-				return new ForbidExpression<>(id, children.get(0));
+				return new ForbidExpressionComponent<>(id, children.get(0));
 		});
 		components.put("up-to", (id, config, value, children, grammar) -> {
 			if (children.isEmpty())
@@ -280,7 +280,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements G
 			else if (value != null)
 				throw new IllegalArgumentException("Up-to declared with text content: " + value);
 			else
-				return new LeadUpExpression<>(id, children.get(0));
+				return new LeadUpExpressionComponent<>(id, children.get(0));
 		});
 		components.put("without", (id, config, value, children, grammar) -> {
 			String typeStr = config.remove("types");
@@ -305,7 +305,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements G
 				for (String type : grammar.getClassMembers(clazz))
 					excludedIds.add(grammar.getTypeId(type));
 			}
-			return new ExcludeExpression<>(id, excludedIds.toArray(), children.get(0));
+			return new ExcludeExpressionComponent<>(id, excludedIds.toArray(), children.get(0));
 		});
 		return components;
 	}
@@ -328,7 +328,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements G
 		}
 
 		@Override
-		public <S2 extends S> ExpressionPossibilitySequence<S2> tryParse(ExpressoParser<S2> session) {
+		public <S2 extends S> ExpressionPossibility<S2> tryParse(ExpressoParser<S2> session) {
 			return type.tryParse(session);
 		}
 	}

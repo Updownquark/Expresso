@@ -24,9 +24,11 @@ public abstract class Expression<S extends BranchableStream<?, ?>> {
 
 	public abstract List<? extends Expression<S>> getChildren();
 
-	public abstract ErrorExpression<S> getFirstError();
+	public abstract Expression<S> getFirstError();
 
 	public abstract int getErrorCount();
+
+	public abstract String getErrorMessage();
 
 	public abstract boolean isComplete();
 
@@ -47,13 +49,18 @@ public abstract class Expression<S extends BranchableStream<?, ?>> {
 		}
 
 		@Override
-		public ErrorExpression<S> getFirstError() {
+		public Expression<S> getFirstError() {
 			return null;
 		}
 
 		@Override
 		public int getErrorCount() {
 			return 0;
+		}
+
+		@Override
+		public String getErrorMessage() {
+			return null;
 		}
 
 		@Override

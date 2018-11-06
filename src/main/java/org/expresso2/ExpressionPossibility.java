@@ -5,9 +5,15 @@ import java.io.IOException;
 import org.expresso.parse.BranchableStream;
 
 public interface ExpressionPossibility<S extends BranchableStream<?, ?>> {
+	S getStream();
+
 	int length();
 
-	int advanceInStream() throws IOException;
+	ExpressionPossibility<S> advance() throws IOException;
+
+	boolean hasFork();
+
+	ExpressionPossibility<S> fork() throws IOException;
 
 	int getErrorCount();
 
@@ -15,16 +21,21 @@ public interface ExpressionPossibility<S extends BranchableStream<?, ?>> {
 
 	Expression<S> getExpression();
 
-	static <S extends BranchableStream<?, ?>> ExpressionPossibility<S> empty() {
+	static <S extends BranchableStream<?, ?>> ExpressionPossibility<S> empty(S stream, ExpressionComponent<? super S> type) {
 		return new ExpressionPossibility<S>() {
+			@Override
+			public S getStream() {
+				return stream;
+			}
+
 			@Override
 			public int length() {
 				return 0;
 			}
 
 			@Override
-			public int advanceInStream() throws IOException {
-				return 0;
+			public ExpressionPossibility<S> next() throws IOException {
+				return null;
 			}
 
 			@Override
@@ -33,10 +44,14 @@ public interface ExpressionPossibility<S extends BranchableStream<?, ?>> {
 			}
 
 			@Override
-			public boolean isComplete() {}
+			public boolean isComplete() {
+				return true;
+			}
 
 			@Override
-			public Expression<S> getExpression() {}
+			public Expression<S> getExpression() {
+				return Expression.empty(stream, type);
+			}
 		};
 	}
 }

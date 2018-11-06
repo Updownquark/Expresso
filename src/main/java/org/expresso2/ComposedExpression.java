@@ -8,23 +8,23 @@ import org.expresso.parse.BranchableStream;
 public class ComposedExpression<S extends BranchableStream<?, ?>> extends Expression<S> {
 	private final List<? extends Expression<S>> theChildren;
 	private final int theLength;
-	private final ErrorExpression<S> theFirstError;
+	private final Expression<S> theFirstError;
 	private final int theErrorCount;
 
 	public ComposedExpression(S stream, ExpressionComponent<? super S> type, List<? extends Expression<S>> children) {
 		super(stream, type);
 		theChildren = Collections.unmodifiableList(children);
-		ErrorExpression<S> firstError = null;
+		Expression<S> firstError = null;
 		int errorCount = 0;
-		int length = 0;
+		int lastPos = 0;
 		for (Expression<S> child : children) {
-			length += child.length();
 			errorCount += child.getErrorCount();
-			if (firstError == null)
+			if (errorCount > 0 && firstError == null)
 				firstError = child.getFirstError();
+			lastPos = child.getStream().getPosition() + child.length();
 		}
 		theFirstError = firstError;
-		theLength = length;
+		theLength = lastPos - stream.getPosition();
 		theErrorCount = errorCount;
 	}
 
@@ -39,13 +39,18 @@ public class ComposedExpression<S extends BranchableStream<?, ?>> extends Expres
 	}
 
 	@Override
-	public ErrorExpression<S> getFirstError() {
+	public Expression<S> getFirstError() {
 		return theFirstError;
 	}
 
 	@Override
 	public int getErrorCount() {
 		return theErrorCount;
+	}
+
+	@Override
+	public String getErrorMessage() {
+		return null;
 	}
 
 	@Override

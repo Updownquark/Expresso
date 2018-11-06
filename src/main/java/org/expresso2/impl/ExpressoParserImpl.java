@@ -14,7 +14,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	private final ParseSession<S> theSession;
 	private final S theStream;
 	private final int[] theExcludedTypes;
-	private final Map<Integer, CachedParseElement<S>> theCache;
+	private final Map<Integer, CachedExpressionPossibility<S>> theCache;
 
 	public ExpressoParserImpl(ParseSession<S> session, S stream, int[] excludedTypes) {
 		theSession = session;
@@ -54,9 +54,9 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	@Override
 	public ExpressionPossibilitySequence<S> parseWith(ExpressionComponent<? super S> component) {
 		boolean[] newCache = new boolean[1];
-		CachedParseElement<S> cached = theCache.computeIfAbsent(component.id, k -> {
+		CachedExpressionPossibility<S> cached = theCache.computeIfAbsent(component.id, k -> {
 			newCache[0] = true;
-			return new CachedParseElement<>();
+			return new CachedExpressionPossibility<>();
 		});
 		if (newCache[0])
 			cached.setSequence(component.tryParse(this));
