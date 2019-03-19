@@ -1,5 +1,7 @@
 package org.expresso2;
 
+import java.io.IOException;
+
 import org.expresso.parse.impl.CharSequenceStream;
 
 public class TextLiteralExpression<S extends CharSequenceStream> extends LiteralExpressionType<char[], S> {
@@ -16,11 +18,16 @@ public class TextLiteralExpression<S extends CharSequenceStream> extends Literal
 	}
 
 	@Override
-	protected boolean startsWithValue(S stream) {
+	protected int getMatchUntil(S stream) throws IOException {
 		for (int i = 0; i < theText.length(); i++) {
 			if (theText.charAt(i) != stream.charAt(i))
-				return false;
+				return i;
 		}
-		return true;
+		return theText.length();
+	}
+
+	@Override
+	public String toString() {
+		return theText;
 	}
 }

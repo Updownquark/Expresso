@@ -1,7 +1,7 @@
 package org.expresso2;
 
 import java.io.IOException;
-import java.util.Iterator;
+import java.util.Arrays;
 import java.util.List;
 
 import org.expresso.parse.BranchableStream;
@@ -19,23 +19,30 @@ public class OneOfExpression<S extends BranchableStream<?, ?>> extends Expressio
 	}
 
 	@Override
-	public <S2 extends S> ExpressionPossibility<S2> tryParse(ExpressoParser<S2> session) throws IOException {
-		Iterator<? extends ExpressionComponent<? super S>> iter = theComponents.iterator();
-		return new IteratedPossibilitySequence<>(iter, session);
+	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> session) throws IOException {
+		ExpressionComponent<? super S> first = theComponents.get(0);
+		List<? extends ExpressionComponent<? super S>> remaining = theComponents.subList(1, theComponents.size());
+		ExpressionPossibility<S2> firstPossibility = session.parseWith(first);
+		return new OneOfPossibility<>(this, session, firstPossibility, remaining);
+	}
+
+	@Override
+	public String toString() {
+		return "OneOf" + theComponents;
 	}
 
 	private static class OneOfPossibility<S extends BranchableStream<?, ?>> implements ExpressionPossibility<S> {
 		private final OneOfExpression<? super S> theType;
 		private final ExpressoParser<S> theParser;
 		private final ExpressionPossibility<S> theComponent;
-		private final Iterator<? super ExpressionComponent<? super S>> theIterator;
+		private final List<? extends ExpressionComponent<? super S>> theRemaining;
 
 		OneOfPossibility(OneOfExpression<? super S> type, ExpressoParser<S> parser, ExpressionPossibility<S> component,
-			Iterator<? super ExpressionComponent<? super S>> iterator) {
+			List<? extends ExpressionComponent<? super S>> remaining) {
 			theType = type;
 			theParser = parser;
 			theComponent = component;
-			theIterator = iterator;
+			theRemaining = remaining;
 		}
 
 		@Override
@@ -49,54 +56,85 @@ public class OneOfExpression<S extends BranchableStream<?, ?>> extends Expressio
 		}
 
 		@Override
-		public ExpressionPossibility<S> next() throws IOException {
-			// TODO Auto-generated method stub
+		public ExpressionPossibility<S> advance() throws IOException {
+			ExpressionPossibility<S> componentAdv = theComponent.advance();
+			if (componentAdv == null)
+				return null;
+			return new OneOfPossibility<>(theType, theParser, componentAdv, theRemaining);
+		}
+
+		@Override
+		public ExpressionPossibility<S> leftFork() throws IOException {
 			return null;
+		}
+
+		@Override
+		public ExpressionPossibility<S> rightFork() throws IOException {
+			if (theRemaining.isEmpty())
+				return null;
+			ExpressionComponent<? super S> next = theRemaining.get(0);
+			List<? extends ExpressionComponent<? super S>> remaining = theRemaining.subList(1, theRemaining.size());
+			ExpressionPossibility<S> nextPossibility = theParser.parseWith(next);
+			return new OneOfPossibility<>(theType, theParser, nextPossibility, remaining);
 		}
 
 		@Override
 		public int getErrorCount() {
-			// TODO Auto-generated method stub
-			return 0;
+			return theComponent.getErrorCount();
 		}
 
 		@Override
 		public boolean isComplete() {
-			// TODO Auto-generated method stub
-			return false;
+			return theComponent.isComplete();
 		}
 
 		@Override
 		public Expression<S> getExpression() {
-			// TODO Auto-generated method stub
-			return null;
+			return new OneOfExpr<>(theType, theComponent.getExpression());
 		}
 	}
 
-	private static class IteratedPossibilitySequence<S extends BranchableStream<?, ?>> implements PossibilitySequence<Expression<S>> {
-		private final Iterator<? extends ExpressionComponent<? super S>> theComponents;
-		private final ExpressoParser<S> theSession;
-		private PossibilitySequence<? extends Expression<S>> theCurrentSequence;
+	public static class OneOfExpr<S extends BranchableStream<?, ?>> extends Expression<S> {
+		private final Expression<S> theComponent;
 
-		IteratedPossibilitySequence(Iterator<? extends ExpressionComponent<? super S>> components, ExpressoParser<S> session) {
-			theComponents = components;
-			theSession = session;
-			if (theComponents.hasNext())
-				theCurrentSequence = theSession.parseWith(theComponents.next());
+		public OneOfExpr(OneOfExpression<? super S> type, Expression<S> component) {
+			super(component.getStream(), type);
+			theComponent = component;
 		}
 
 		@Override
-		public Expression<S> getNextPossibility() throws IOException {
-			while (theCurrentSequence != null) {
-				Expression<S> ex = theCurrentSequence.getNextPossibility();
-				if (ex != null)
-					return ex;
-				else if (theComponents.hasNext())
-					theCurrentSequence = theSession.parseWith(theComponents.next());
-				else
-					theCurrentSequence = null;
-			}
+		public OneOfExpression<? super S> getType() {
+			return (OneOfExpression<? super S>) super.getType();
+		}
+
+		@Override
+		public List<? extends Expression<S>> getChildren() {
+			return Arrays.asList(theComponent);
+		}
+
+		@Override
+		public Expression<S> getFirstError() {
+			return theComponent.getFirstError();
+		}
+
+		@Override
+		public int getErrorCount() {
+			return theComponent.getErrorCount();
+		}
+
+		@Override
+		public int getLocalErrorRelativePosition() {
+			return -1;
+		}
+
+		@Override
+		public String getLocalErrorMessage() {
 			return null;
+		}
+
+		@Override
+		public int length() {
+			return theComponent.length();
 		}
 	}
 }

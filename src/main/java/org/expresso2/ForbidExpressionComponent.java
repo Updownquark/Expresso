@@ -14,7 +14,7 @@ public class ForbidExpressionComponent<S extends BranchableStream<?, ?>> extends
 	}
 
 	@Override
-	public <S2 extends S> ExpressionPossibility<S2> tryParse(ExpressoParser<S2> parser) throws IOException {
+	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException {
 		ExpressionPossibility<S2> forbidden = parser.parseWith(theForbidden);
 		return new ForbiddenPossibility<>(this, parser, forbidden);
 	}
@@ -41,8 +41,20 @@ public class ForbidExpressionComponent<S extends BranchableStream<?, ?>> extends
 		}
 
 		@Override
-		public ExpressionPossibility<S> next() throws IOException {
-			ExpressionPossibility<S> forbidden = theForbidden.next();
+		public ExpressionPossibility<S> advance() throws IOException {
+			ExpressionPossibility<S> forbidden = theForbidden.advance();
+			return forbidden == null ? null : new ForbiddenPossibility<>(theType, theParser, forbidden);
+		}
+
+		@Override
+		public ExpressionPossibility<S> leftFork() throws IOException {
+			ExpressionPossibility<S> forbidden = theForbidden.leftFork();
+			return forbidden == null ? null : new ForbiddenPossibility<>(theType, theParser, forbidden);
+		}
+
+		@Override
+		public ExpressionPossibility<S> rightFork() throws IOException {
+			ExpressionPossibility<S> forbidden = theForbidden.rightFork();
 			return forbidden == null ? null : new ForbiddenPossibility<>(theType, theParser, forbidden);
 		}
 
@@ -96,7 +108,7 @@ public class ForbidExpressionComponent<S extends BranchableStream<?, ?>> extends
 		}
 
 		@Override
-		public String getErrorMessage() {
+		public String getLocalErrorMessage() {
 			int ec = super.getErrorCount();
 			if (ec != 0)
 				return null;

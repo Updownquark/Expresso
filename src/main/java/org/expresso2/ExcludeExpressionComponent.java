@@ -1,25 +1,20 @@
 package org.expresso2;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.expresso.parse.BranchableStream;
 
-public class ExcludeExpressionComponent<S extends BranchableStream<?, ?>> extends ExpressionComponent<S> {
-	private int[] theExcludedIds;
-	private final ExpressionComponent<S> theComponent;
+public class ExcludeExpressionComponent<S extends BranchableStream<?, ?>> extends SequenceExpression<S> {
+	private final int[] theExcludedIds;
 
-	public ExcludeExpressionComponent(int id, int[] excludedIds, ExpressionComponent<S> component) {
-		super(id);
+	public ExcludeExpressionComponent(int id, int[] excludedIds, List<ExpressionComponent<S>> components) {
+		super(id, components);
 		theExcludedIds = excludedIds;
-		theComponent = component;
-	}
-
-	public ExpressionComponent<S> getComponent() {
-		return theComponent;
 	}
 
 	@Override
-	public <S2 extends S> ExpressionPossibility<S2> tryParse(ExpressoParser<S2> session) throws IOException {
-		return theComponent.tryParse(session.exclude(theExcludedIds));
+	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> session) throws IOException {
+		return super.parse(session.exclude(theExcludedIds));
 	}
 }

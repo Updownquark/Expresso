@@ -1,658 +1,672 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<grammar>
-	<sequence name="char">
+<expresso>
+	<expression name="char">
 		<option>
-			<ref type="ignorable" name="pre-ignore" />
+			<ignorable field="pre-ignore" />
 		</option>
-		<without type="ignorable">
+		<without classes="ignorable">
 			<literal>&apos;</literal>
 			<one-of>
-				<literal name="value">&quot;</literal>
-				<pattern name="value">[\x20-~]</pattern>
-				<pattern name="value" tag="escaped">\\[&apos;&quot;tnrbf]</pattern>
-				<pattern name="value" tag="escaped,unicode">\\u[0-9a-fA-F]{4}</pattern>
+				<literal field="value">&quot;</literal>
+				<pattern field="value">[\x20-~]</pattern>
+				<pattern field="value" tag="escaped">\\[&apos;&quot;tnrbf]</pattern>
+				<pattern field="value" tag="escaped,unicode">\\u[0-9a-fA-F]{4}</pattern>
 			</one-of>
 			<literal>&apos;</literal>
 		</without>
-	</sequence>
-	<sequence name="string">
+	</expression>
+	<expression name="string">
 		<option>
-			<ref type="ignorable" name="pre-ignore" />
+			<ignorable field="pre-ignore" />
 		</option>
-		<without type="ignorable">
+		<without classes="ignorable">
 			<literal>&quot;</literal>
-			<up-to name="value">
+			<up-to field="value">
 				<one-of>
 					<literal>&quot;</literal>
-					<literal value="&#10;" />
+					<literal>&#10;</literal>
 				</one-of>
 			</up-to>
 			<literal>&quot;</literal>
 		</without>
-	</sequence>
-	<sequence name="number">
+	</expression>
+	<expression name="number">
 		<option>
-			<ref type="ignorable" name="pre-ignore" />
+			<ignorable field="pre-ignore" />
 		</option>
 		<option>
-			<literal name="neg">-</literal>
+			<literal field="neg">-</literal>
 		</option>
-		<without type="ignorable">
+		<without classes="ignorable">
 			<one-of>
 				<sequence tag="decimal">
-					<pattern name="integer">[1-9][_0-9]*</pattern>
+					<pattern field="integer">[1-9][_0-9]*</pattern>
 					<literal>.</literal>
 					<option>
-						<pattern name="fraction">[0-9][_0-9]</pattern>
+						<pattern field="fraction">[0-9][_0-9]</pattern>
 					</option>
 				</sequence>
 				<sequence tag="decimal">
 					<literal>.</literal>
-					<pattern name="fraction">[0-9][_0-9]*</pattern>
+					<pattern field="fraction">[0-9][_0-9]*</pattern>
 				</sequence>
-				<pattern name="integer" tag="int">[1-9][_0-9]*</pattern>
-				<literal name="integer" tag="int">0</literal>
+				<pattern field="integer" tag="int">[1-9][_0-9]*</pattern>
+				<literal field="integer" tag="int">0</literal>
 			</one-of>
 			<option>
 				<pattern>[eE]</pattern>
 				<option>
-					<literal name="exp-neg">-</literal>
+					<literal field="exp-neg">-</literal>
 				</option>
-				<pattern name="exp">[1-9][_0-9]*</pattern>
+				<pattern field="exp">[1-9][_0-9]*</pattern>
 			</option>
 			<option>
-				<pattern name="float-type">[fF]</pattern>
+				<pattern field="float-type">[fF]</pattern>
 				<forbid>
 					<pattern>[_a-zA-Z0-9]</pattern>
 				</forbid>
 			</option>
 			<option>
-				<pattern name="double-type">[dD]</pattern>
+				<pattern field="double-type">[dD]</pattern>
 				<forbid>
 					<pattern>[_a-zA-Z0-9]</pattern>
 				</forbid>
 			</option>
 			<option>
-				<pattern name="long-type">[lL]</pattern>
+				<pattern field="long-type">[lL]</pattern>
 				<forbid>
 					<pattern>[_a-zA-Z0-9]</pattern>
 				</forbid>
 			</option>
 		</without>
-	</sequence>
-	<sequence name="hex-int">
+	</expression>
+	<expression name="hex-int">
 		<option>
-			<ref type="ignorable" name="pre-ignore" />
+			<ignorable field="pre-ignore" />
 		</option>
-		<without type="ignorable">
-			<literal name="hex">0x</literal>
-			<pattern name="value">[_0-9a-fA-F]+</pattern>
+		<without classes="ignorable">
+			<literal field="hex">0x</literal>
+			<pattern field="value">[_0-9a-fA-F]+</pattern>
 			<option>
-				<pattern name="long-type">[lL]</pattern>
+				<pattern field="long-type">[lL]</pattern>
 			</option>
 			<forbid>
 				<pattern>[_a-zA-Z0-9]</pattern>
 			</forbid>
 		</without>
-	</sequence>
-	<sequence name="octal-int">
+	</expression>
+	<expression name="octal-int">
 		<option>
-			<ref type="ignorable" name="pre-ignore" />
+			<ignorable field="pre-ignore" />
 		</option>
-		<without type="ignorable">
-			<literal name="oct">0</literal>
-			<pattern name="value">[_0-9]+</pattern>
+		<without classes="ignorable">
+			<literal field="oct">0</literal>
+			<pattern field="value">[_0-9]+</pattern>
 			<option>
-				<pattern name="long-type">[lL]</pattern>
+				<pattern field="long-type">[lL]</pattern>
 				<forbid>
 					<pattern>[_a-zA-Z0-9]</pattern>
 				</forbid>
 			</option>
 		</without>
-	</sequence>
-	<sequence name="binary-int">
+	</expression>
+	<expression name="binary-int">
 		<option>
-			<ref type="ignorable" name="pre-ignore" />
+			<ignorable field="pre-ignore" />
 		</option>
-		<without type="ignorable">
-			<literal name="binary">0b</literal>
-			<pattern name="value">[_0-9]*</pattern>
+		<without classes="ignorable">
+			<literal field="binary">0b</literal>
+			<pattern field="value">[_0-9]*</pattern>
 			<option>
-				<pattern name="long-type">[lL]</pattern>
+				<pattern field="long-type">[lL]</pattern>
 				<forbid>
 					<pattern>[_a-zA-Z0-9]</pattern>
 				</forbid>
 			</option>
 		</without>
-	</sequence>
-	<one-of name="boolean">
-		<literal>true</literal>
-		<literal>false</literal>
-	</one-of>
-	<literal name="null" value="null" />
+	</expression>
+	<expression name="boolean">
+		<one-of>
+			<literal>true</literal>
+			<literal>false</literal>
+		</one-of>
+	</expression>
+	<expression name="null">
+		<literal>null</literal>
+	</expression>
 
 	<!-- Ignorables -->
-	<sequence name="line-comment" tag="ignorable">
-		<without type="ignorable">
+	<expression name="whitespace" class="ignorable">
+		<pattern>\s+</pattern>
+	</expression>
+	<expression name="line-comment" class="ignorable">
+		<without classes="ignorable">
 			<literal>//</literal>
-			<up-to name="content">
-				<literal value="&#10;" />
+			<up-to field="content">
+				<literal>&#10;</literal>
 			</up-to>
-			<literal value="&#10;" />
+			<literal>&#10;</literal>
 		</without>
-	</sequence>
-	<sequence name="block-comment" tag="ignorable">
+	</expression>
+	<expression name="block-comment" class="ignorable">
 		<literal>/*</literal>
-		<without type="ignorable">
-			<up-to name="content">
+		<without classes="ignorable">
+			<up-to field="content">
 				<literal>*/</literal>
 			</up-to>
 			<literal>*/</literal>
 		</without>
-	</sequence>
+	</expression>
 	
 	<!-- Blocks and block structures -->
-	<sequence name="block">
+	<expression name="block">
 		<literal>{</literal>
 		<repeat>
-			<ref type="default,statement" name="content" />
+			<statement field="content" />
 		</repeat>
 		<literal>}</literal>
-	</sequence>
-	<sequence name="synchronized-block">
+	</expression>
+	<expression name="synchronized-block">
 		<literal>synchronized</literal>
 		<literal>(</literal>
-		<ref name="sync-item" />
+		<result-producer field="sync-item" />
 		<literal>)</literal>
-		<ref type="block" name="content" />
-	</sequence>
-	<sequence name="try-catch-finally">
+		<block field="content" />
+	</expression>
+	<expression name="try-catch-finally">
 		<literal>try</literal>
 		<option>
 			<literal>(</literal>
-			<ref name="resource" />
+			<result-producer field="resource" />
 			<repeat>
 				<literal>;</literal>
-				<ref name="resource" />
+				<result-producer field="resource" />
 			</repeat>
 			<option>
 				<literal>;</literal>
 			</option>
 			<literal>)</literal>
 		</option>
-		<ref type="block" name="try" />
+		<block field="try" />
 		<repeat>
 			<literal>catch</literal>
 			<literal>(</literal>
-			<ref type="default,statement" name="catch-type" />
+			<statement field="catch-type" />
 			<literal>)</literal>
-			<ref type="block" name="catch" />
+			<block field="catch" />
 		</repeat>
 		<option>
 			<literal>finally</literal>
-			<ref type="block" name="finally" />
+			<block field="finally" />
 		</option>
-	</sequence>
-	<sequence name="while-loop">
-		<literal name="name">while</literal>
+	</expression>
+	<expression name="while-loop">
+		<literal field="name">while</literal>
 		<literal>(</literal>
-		<ref name="condition" />
+		<result-producer field="condition" />
 		<literal>)</literal>
 		<one-of>
-			<literal>;</literal>
-			<ref type="default,statement" name="content" tag="post-condition" />
+			<statement field="content" tag="post-condition" />
+			<block field="content" tag="post-condition" />
 		</one-of>
-	</sequence>
-	<sequence name="do-while-loop">
-		<literal name="name">do</literal>
-		<ref type="block" name="content" tag="pre-condition" />
+	</expression>
+	<expression name="do-while-loop">
+		<literal field="name">do</literal>
+		<block field="content" tag="pre-condition" />
 		<literal>while</literal>
 		<literal>(</literal>
-		<ref name="condition" />
+		<result-producer field="condition" />
 		<literal>)</literal>
-	</sequence>
-	<sequence name="for-loop">
-		<literal name="name">for</literal>
+		<literal>;</literal>
+	</expression>
+	<expression name="for-loop">
+		<literal field="name">for</literal>
 		<literal>(</literal>
 		<option>
-			<ref name="init" />
+			<statement-content field="init" />
 			<repeat>
 				<literal>,</literal>
-				<ref name="init" />
+				<statement-content field="init" />
 			</repeat>
 		</option>
 		<literal>;</literal>
 		<option>
-			<ref name="condition" />
+			<result-producer field="condition" />
 		</option>
 		<literal>;</literal>
 		<option>
-			<ref name="increment" />
+			<assignable field="increment" />
 			<repeat>
 				<literal>,</literal>
-				<ref name="increment" />
+				<statement-content field="increment" />
 			</repeat>
 		</option>
 		<literal>)</literal>
 		<one-of>
-			<literal name="terminal">;</literal>
-			<ref type="default,statement" name="content" tag="post-condition" />
+			<literal field="terminal">;</literal>
+			<statement field="content" tag="post-condition" />
+			<block field="content" tag="post-condition" />
 		</one-of>
-	</sequence>
-	<sequence name="enhanced-for-loop">
+	</expression>
+	<expression name="enhanced-for-loop">
 		<literal>for</literal>
 		<literal>(</literal>
-		<ref name="variable" />
+		<type field="type" />
+		<identifier field="variable" />
 		<literal>:</literal>
-		<ref name="iterable" />
+		<result-producer field="iterable" />
 		<literal>)</literal>
 		<one-of>
-			<literal>;</literal>
-			<ref type="default,statement" name="content" tag="post-condition"/>
+			<statement field="content" tag="post-condition" />
+			<block field="content" tag="post-condition" />
 		</one-of>
-	</sequence>
-	<sequence name="if">
+	</expression>
+	<expression name="if">
 		<literal>if</literal>
 		<literal>(</literal>
-		<ref name="condition" />
+		<result-producer field="condition" />
 		<literal>)</literal>
 		<one-of>
-			<literal>;</literal>
-			<ref name="content" />
+			<statement field="content" />
+			<block field="content" />
 		</one-of>
 		<repeat>
 			<literal>else</literal>
 			<literal>if</literal>
 			<literal>(</literal>
-			<ref name="condition" />
+			<result-producer field="condition" />
 			<literal>)</literal>
 			<one-of>
-				<literal>;</literal>
-				<ref name="content" />
+				<statement field="content" />
+				<block field="content" />
 			</one-of>
 		</repeat>
 		<option>
-			<literal name="terminal">else</literal>
-			<ref type="default,statement" name="content" />
+			<literal field="terminal">else</literal>
+			<one-of>
+				<statement field="content" />
+				<block field="content" />
+			</one-of>
 		</option>
-	</sequence>
-	<sequence name="switch">
+	</expression>
+	<expression name="switch">
 		<literal>switch</literal>
 		<literal>(</literal>
-		<ref name="variable" />
+		<result-producer field="variable" />
 		<literal>)</literal>
 		<literal>{</literal>
 		<repeat>
 			<one-of>
 				<option>
 					<literal>case</literal>
-					<ref name="case" />
+					<result-producer field="case" />
 				</option>
 				<option>
-					<literal name="default">default</literal>
+					<literal field="default">default</literal>
 				</option>
 			</one-of>
 			<literal>:</literal>
-			<repeat>
-				<forbid>
-					<one-of>
-						<literal>case</literal>
-						<literal>default</literal>
-					</one-of>
-				</forbid>
-				<ref type="default,statement" />
-			</repeat>
+			<one-of>
+				<block />
+				<repeat>
+					<statement />
+				</repeat>
+			</one-of>
 		</repeat>
 		<literal>}</literal>
-	</sequence>
+	</expression>
 	
 	<!-- Types -->
-	<sequence name="identifier" tag="assignable">
-		<pattern name="name">[_a-zA-Z][_a-zA-Z0-9]*</pattern>
-	</sequence>
-	<one-of name="primitive" tag="type">
-		<literal>void</literal>
-		<literal>boolean</literal>
-		<literal>true</literal>
-		<literal>false</literal>
-		<literal>char</literal>
-		<literal>byte</literal>
-		<literal>short</literal>
-		<literal>int</literal>
-		<literal>long</literal>
-		<literal>float</literal>
-		<literal>double</literal>
-	</one-of>
-	<sequence name="basic-type" priority="998" default="false" tag="type">
+	<expression name="identifier" class="assignable,result-producer">
+		<pattern field="name">[_a-zA-Z][_a-zA-Z0-9]*</pattern>
+	</expression>
+	<expression name="primitive">
+		<one-of field="primitive" tag="type">
+			<literal>void</literal>
+			<literal>boolean</literal>
+			<literal>true</literal>
+			<literal>false</literal>
+			<literal>char</literal>
+			<literal>byte</literal>
+			<literal>short</literal>
+			<literal>int</literal>
+			<literal>long</literal>
+			<literal>float</literal>
+			<literal>double</literal>
+		</one-of>
+	</expression>
+	<expression name="basic-type" priority="998" class="type">
 		<!-- Just documenting, this is in this order as opposed to having the repeat first because of var-args.  With the repeat first,
 			var arg parameters were parsed with the repeat successful (identifier, then '.'), but the next identifier wasn't there, so the
 			parsing failed.  This ordering fixes this problem. -->
-		<ref type="identifier" name="name" tag="final-name" />
+		<identifier field="name" tag="final-name" />
 		<repeat>
 			<literal>.</literal>
-			<ref type="identifier" name="name" />
+			<identifier field="name" />
 		</repeat>
-	</sequence>
-	<sequence name="array-type" priority="998" default="false" tag="type">
-		<ref type="type" name="component" />
-		<repeat min="1" name="dimension">
+	</expression>
+	<expression name="array-type" priority="998" class="type">
+		<type />
+		<repeat min="1" field="dimension">
 			<literal>[</literal>
 			<literal>]</literal>
 		</repeat>
-	</sequence>
-	<sequence name="type-bound" default="false">
+	</expression>
+	<expression name="type-bound">
 		<one-of>
 			<literal>extends</literal>
 			<literal>super</literal>
 		</one-of>
-		<ref type="type" name="bound"/>
-	</sequence>
-	<sequence name="wildcard-type" priority="998" default="false" tag="type">
-		<literal name="wild-card">?</literal>
+		<type field="bound" />
+	</expression>
+	<expression name="wildcard-type" priority="998" class="type">
+		<literal field="wild-card">?</literal>
 		<option>
-			<ref type="type-bound" name="bound" />
+			<type-bound field="bound" />
 		</option>
-	</sequence>
-	<sequence name="bounded-type" priority="998" default="false" tag="type">
-		<ref type="identifier" name="name" />
-		<ref type="type-bound" name="bound" />
-	</sequence>
-	<sequence name="type-parameters" default="false">
+	</expression>
+	<expression name="bounded-type" priority="998" class="type">
+		<identifier field="name" />
+		<type-bound field="bound" />
+	</expression>
+	<expression name="type-parameters">
 		<literal>&lt;</literal>
 		<option> <!-- This is optional for the diamond operator -->
-			<ref type="type" name="parameter" />
+			<type field="parameter" />
 			<repeat>
 				<literal>,</literal>
-				<ref type="type" name="parameter" />
+				<type field="parameter" />
 			</repeat>
 		</option>
 		<literal>&gt;</literal>
-	</sequence>
-	<sequence name="generic-type" priority="998" default="false" tag="type">
-		<ref type="basic-type" name="base" />
-		<ref type="type-parameters" name="parameters" />
-	</sequence>
+	</expression>
+	<expression name="generic-type" priority="998" class="type">
+		<basic-type field="base" />
+		<type-parameters field="parameters" />
+	</expression>
 
 	<!-- Control statements -->
-	<sequence name="statement" default="false">
+	<expression name="statement">
 		<option>
-			<ref type="statement-content" name="content" />
+			<statement-content field="content" />
 		</option>
 		<literal>;</literal>
-	</sequence>
-	<sequence name="return">
+	</expression>
+	<expression name="return">
 		<literal>return</literal>
 		<option>
-			<ref name="value" />
+			<result-producer field="value" />
 		</option>
-	</sequence>
-	<sequence name="throw">
+	</expression>
+	<expression name="throw">
 		<literal>throw</literal>
-		<ref name="value" />
-	</sequence>
+		<result-producer field="value" />
+	</expression>
 	
 	<!-- Declarations -->
-	<one-of name="annotation-value" default="false">
-		<ref name="value" />
-		<sequence>
-			<literal>{</literal>
-				<ref type="annotation-value" name="value-element" />
-				<repeat>
-					<literal>,</literal>
-					<ref type="annotation-value" name="value-element" />
-				</repeat>
-			<literal>}</literal>
-		</sequence>
-	</one-of>
-	<repeat min="1" name="annotations" default="false">
-		<literal>@</literal>
-		<ref type="basic-type" name="type" />
-		<option>
-			<literal>(</literal>
-			<one-of>
-				<ref type="annotation-value" name="parameter-value" />
-				<sequence>
-					<ref type="identifier" name="parameter-name" />
-					<literal>=</literal>
-					<ref type="annotation-value" name="parameter-value" />
-				</sequence>
-				<repeat>
-					<literal>,</literal>
-					<ref type="annotation-value" name="parameter-value" />
+	<expression name="annotation-value">
+		<one-of>
+			<result-producer field="value" />
+			<sequence>
+				<literal>{</literal>
+					<annotation-value field="value-element" />
+					<repeat>
+						<literal>,</literal>
+						<annotation-value field="value-element" />
+					</repeat>
+				<literal>}</literal>
+			</sequence>
+		</one-of>
+	</expression>
+	<expression name="annotations">
+		<repeat min="1">
+			<literal>@</literal>
+			<basic-type field="type" />
+			<option>
+				<literal>(</literal>
+				<one-of>
+					<annotation-value field="parameter-value" />
 					<sequence>
-						<ref type="identifier" name="parameter-name" />
+						<identifier field="parameter-name" />
 						<literal>=</literal>
-						<ref type="annotation-value" name="parameter-value" />
+						<annotation-value field="parameter-value" />
 					</sequence>
-				</repeat>
-			</one-of>
-			<literal>)</literal>
-		</option>
-	</repeat>
-	<one-of name="qualifier" default="false">
-		<literal>public</literal>
-		<literal>protected</literal>
-		<literal>private</literal>
-		<literal>default</literal>
-		<literal>abstract</literal>
-		<literal>static</literal>
-		<literal>final</literal>
-		<literal>synchronized</literal>
-	</one-of>
-	<sequence name="variable-declaration" tag="declaration,assignable,statement-content">
+					<repeat>
+						<literal>,</literal>
+						<annotation-value field="parameter-value" />
+						<sequence>
+							<identifier field="parameter-name" />
+							<literal>=</literal>
+							<annotation-value field="parameter-value" />
+						</sequence>
+					</repeat>
+				</one-of>
+				<literal>)</literal>
+			</option>
+		</repeat>
+	</expression>
+	<expression name="qualifier">
+		<one-of>
+			<literal>public</literal>
+			<literal>protected</literal>
+			<literal>private</literal>
+			<literal>default</literal>
+			<literal>abstract</literal>
+			<literal>static</literal>
+			<literal>final</literal>
+			<literal>synchronized</literal>
+		</one-of>
+	</expression>
+	<expression name="variable-declaration" class="declaration,assignable,statement-content">
 		<option>
-			<ref type="annotations" name="annotations" />
+			<annotations field="annotations" />
 		</option>
 		<repeat>
-			<ref type="qualifier" name="qualifier" />
+			<qualifier field="qualifier" />
 		</repeat>
-		<ref type="type" name="type" />
+		<type field="type" />
 		<option>
-			<literal name="var-args">...</literal>
+			<literal field="var-args">...</literal>
 		</option>
 		<whitespace />
-		<ref type="identifier" name="name" />
-	</sequence>
-	<sequence name="method-declaration" tag="declaration,statement-content">
+		<identifier field="name" />
+	</expression>
+	<expression name="method-declaration" class="declaration,statement-content">
 		<option>
-			<ref type="annotations" name="annotations" />
+			<annotations field="annotations" />
 		</option>
 		<repeat>
-			<ref type="qualifier" name="qualifier" />
+			<qualifier field="qualifier" />
 		</repeat>
 		<option>
-			<ref type="type-parameters" name="type-parameters" />
+			<type-parameters field="type-parameters" />
 		</option>
 		<option>
-			<ref type="type" name="type" />
+			<type field="type" />
 			<whitespace />
 		</option>
-		<ref type="identifier" name="name" />
+		<identifier field="name" />
 		<literal>(</literal>
 			<option>
-				<ref type="variable-declaration" name="parameter" />
+				<variable-declaration field="parameter" />
 				<repeat>
 					<literal>,</literal>
-					<ref type="variable-declaration" name="parameter" />
+					<variable-declaration field="parameter" />
 				</repeat>
 			</option>
 		<literal>)</literal>
 		<option>
 			<literal>throws</literal>
-			<ref type="type" name="thrown" />
+			<type field="thrown" />
 			<repeat>
 				<literal>,</literal>
-				<ref type="type" name="thrown" />
+				<type field="thrown" />
 			</repeat>
 		</option>
 		<option>
-			<ref type="block" name="body" />
+			<block field="body" />
 		</option>
-	</sequence>
-	<sequence name="class-declaration" tag="declaration,statement-content">
+	</expression>
+	<expression name="class-declaration" class="declaration,statement-content">
 		<option>
-			<ref type="annotations" name="annotations" />
+			<annotations field="annotations" />
 		</option>
 		<repeat>
-			<ref type="qualifier" name="qualifier" />
+			<qualifier field="qualifier" />
 		</repeat>
 		<one-of>
 			<literal>class</literal>
 			<literal>interface</literal>
 		</one-of>
 		<whitespace />
-		<ref type="identifier" name="name" />
+		<identifier field="name" />
 		<option>
-			<ref type="type-parameters" name="type-parameters" />
+			<type-parameters field="type-parameters" />
 		</option>
 		<option>
 			<literal>extends</literal>
 			<repeat>
-				<ref type="type" name="extends" />
+				<type field="extends" />
 				<literal>,</literal>
 			</repeat>
-			<ref type="type" name="extends" />
+			<type field="extends" />
 		</option>
 		<option>
 			<literal>implements</literal>
 			<repeat>
-				<ref type="type" name="implements" />
+				<type field="implements" />
 				<literal>,</literal>
 			</repeat>
-			<ref type="type" name="implements" />
+			<type field="implements" />
 		</option>
 		<literal>{</literal>
 			<repeat>
-				<ref type="default,statement" name="body-content" />
+				<statement field="body-content" />
 			</repeat>
 		<literal>}</literal>
-	</sequence>
-	<sequence name="enum-declaration" tag="declaration,statement-content">
+	</expression>
+	<expression name="enum-declaration" class="declaration,statement-content">
 		<option>
-			<ref type="annotations" name="annotations" />
+			<annotations field="annotations" />
 		</option>
 		<repeat>
-			<ref type="qualifier" name="qualifier" />
+			<qualifier field="qualifier" />
 		</repeat>
 		<literal>enum</literal>
 		<whitespace />
-		<ref type="identifier" name="name" />
+		<identifier field="name" />
 		<option>
-			<ref type="type-parameters" name="type-parameters" />
+			<type-parameters field="type-parameters" />
 		</option>
 		<option>
 			<literal>extends</literal> <!-- Not really valid on an enum, but we'll catch it in validation -->
 			<repeat>
-				<ref type="type" name="extends" />
+				<type field="extends" />
 				<literal>,</literal>
 			</repeat>
-			<ref type="type" name="extends" />
+			<type field="extends" />
 		</option>
 		<option>
 			<literal>implements</literal>
 			<repeat>
-				<ref type="type" name="implements" />
+				<type field="implements" />
 				<literal>,</literal>
 			</repeat>
-			<ref type="type" name="implements" />
+			<type field="implements" />
 		</option>
 		<literal>{</literal>
 			<repeat>
-				<ref type="identifier" name="enum-constant" />
+				<identifier field="enum-constant" />
 			</repeat>
 			<option>
 				<literal>;</literal>
 			</option>
 			<repeat>
-				<ref type="default,statement" name="body-content" />
+				<statement field="body-content" />
 			</repeat>
 		<literal>}</literal>
-	</sequence>
-	<sequence name="type-import" default="false" tag="import">
+	</expression>
+	<expression name="type-import" class="import">
 		<literal>import</literal>
 		<whitespace />
-		<ref type="basic-type" name="type" />
+		<basic-type field="type" />
 		<option>
-			<literal name="wildcard">.*</literal>
+			<literal field="wildcard">.*</literal>
 		</option>
 		<literal>;</literal>
-	</sequence>
-	<sequence name="static-import" default="false" tag="import">
+	</expression>
+	<expression name="static-import" class="import">
 		<literal>import</literal>
 		<whitespace />
 		<literal>static</literal>
 		<whitespace />
-		<ref type="basic-type" name="type" />
+		<basic-type field="type" />
 		<option>
-			<literal name="wildcard">.*</literal>
+			<literal field="wildcard">.*</literal>
 		</option>
 		<literal>;</literal>
-	</sequence>
-	<sequence name="java-file" default="false">
+	</expression>
+	<expression name="java-file">
 		<option>
 			<literal>package</literal>
-			<sequence name="package">
+			<sequence field="package">
 				<repeat>
-					<ref type="identifier" />
+					<identifier />
 					<literal>.</literal>
 				</repeat>
-					<ref type="identifier" />
+					<identifier />
 			</sequence>
 			<literal>;</literal>
 		</option>
 		<repeat>
-			<ref type="import" name="import" />
+			<import field="import" />
 		</repeat>
 		<repeat min="1">
-			<ref type="class-declaration" name="class" />
+			<class-declaration field="class" />
 		</repeat>
-	</sequence>
+	</expression>
 	
 	<!-- Normal operators -->
-	<sequence name="constructor" tag="statement-content"> <!-- Invocation, not declaration -->
+	<expression name="constructor" class="statement-content,result-producer"> <!-- Invocation, not declaration -->
 		<literal>new</literal>
 		<whitespace />
-		<ref type="type" name="type" />
+		<type field="type" />
 		<literal>(</literal>
 			<option>
 				<repeat>
-					<ref name="parameter" />
+					<result-producer field="parameter" />
 					<literal>,</literal>
 				</repeat>
-				<ref name="parameter" />
+				<result-producer field="parameter" />
 			</option>
 		<literal>)</literal>
 		<option>
-			<literal name="anonymous-body">{</literal>
-			<repeat>
-				<ref name="body-content" />
-			</repeat>
-			<literal>}</literal>
+			<block field="anonymous-body" />
 		</option>
-	</sequence>
-	<sequence name="lambda" tag="statement-content">
+	</expression>
+	<expression name="lambda" class="statement-content,result-producer">
 		<one-of>
-			<ref type="identifier" name="parameter-name" />
+			<identifier field="parameter-name" />
 			<sequence>
 				<literal>(</literal>
 				<option>
 					<one-of>
 						<sequence>
 							<repeat>
-								<ref type="type" name="parameter-type" />
-								<ref type="identifier" name="parameter-name" />
+								<type field="parameter-type" />
+								<identifier field="parameter-name" />
 								<literal>,</literal>
 							</repeat>
-							<ref type="type" name="parameter-type" />
-							<ref type="identifier" name="parameter-name" />
+							<type field="parameter-type" />
+							<identifier field="parameter-name" />
 						</sequence>
 						<sequence>
 							<repeat>
-								<ref type="identifier" name="parameter-name" />
+								<identifier field="parameter-name" />
 								<literal>,</literal>
 							</repeat>
-							<ref type="identifier" name="parameter-name" />
+							<identifier field="parameter-name" />
 						</sequence>
 					</one-of>
 				</option>
@@ -661,278 +675,278 @@
 		</one-of>
 		<literal>-&gt;</literal>
 		<one-of>
-			<ref type="block" name="body" />
-			<ref name="value" />
+			<block field="body" />
+			<result-producer field="value" />
 		</one-of>
-	</sequence>
-	<sequence name="array-initializer" tag="statement-content">
+	</expression>
+	<expression name="array-initializer" class="statement-content,result-producer">
 		<literal>new</literal>
 		<whitespace />
-		<ref type="type" name="type" />
+		<type field="type" />
 		<repeat min="1">
 			<literal>[</literal>
-			<ref name="size" />
+			<result-producer field="size" />
 			<literal>]</literal>
 		</repeat>
 		<option>
-			<literal name="valueSet">{</literal>
+			<literal field="valueSet">{</literal>
 			<option>
 				<repeat>
-					<ref name="element" />
+					<result-producer field="element" />
 					<literal>,</literal>
 				</repeat>
-				<ref name="element" />
+				<result-producer field="element" />
 			</option>
 			<literal>}</literal>
 		</option>
-	</sequence>
-	<sequence name="assign" priority="100" tag="assignment,binary,statement-content">
-		<ref type="assignable" name="variable" />
-		<literal name="name">=</literal>
-		<ref name="operand" />
-	</sequence>
-	<sequence name="add-assign" priority="100" tag="assignment,binary,statement-content">
-		<ref type="assignable" name="variable" />
-		<literal name="name">+=</literal>
-		<ref name="operand" />
-	</sequence>
-	<sequence name="subtract-assign" priority="100" tag="assignment,binary,statement-content">
-		<ref type="assignable" name="variable" />
-		<literal name="name">-=</literal>
-		<ref name="operand" />
-	</sequence>
-	<sequence name="multiply-assign" priority="100" tag="assignment,binary,statement-content">
-		<ref type="assignable" name="variable" />
-		<literal name="name">*=</literal>
-		<ref name="operand" />
-	</sequence>
-	<sequence name="divide-assign" priority="100" tag="assignment,binary,statement-content">
-		<ref type="assignable" name="variable" />
-		<literal name="name">/=</literal>
-		<ref name="operand" />
-	</sequence>
-	<sequence name="modulo-assign" priority="100" tag="assignment,binary,statement-content">
-		<ref type="assignable" name="variable" />
-		<literal name="name">%=</literal>
-		<ref name="operand" />
-	</sequence>
-	<sequence name="or-assign" priority="100" tag="assignment,binary,statement-content">
-		<ref type="assignable" name="variable" />
-		<literal name="name">|=</literal>
-		<ref name="operand" />
-	</sequence>
-	<sequence name="and-assign" priority="100" tag="assignment,binary,statement-content">
-		<ref type="assignable" name="variable" />
-		<literal name="name">&amp;=</literal>
-		<ref name="operand" />
-	</sequence>
-	<sequence name="xor-assign" priority="100" tag="assignment,binary,statement-content">
-		<ref type="assignable" name="variable" />
-		<literal name="name">^=</literal>
-		<ref name="operand" />
-	</sequence>
-	<sequence name="left-shift-assign" priority="100" tag="assignment,binary,statement-content">
-		<ref type="assignable" name="variable" />
-		<literal name="name">&lt;&lt;=</literal>
-		<ref name="operand" />
-	</sequence>
-	<sequence name="right-shift-assign" priority="100" tag="assignment,binary,statement-content">
-		<ref type="assignable" name="variable" />
-		<literal name="name">&gt;&gt;=</literal>
-		<ref name="operand" />
-	</sequence>
-	<sequence name="unsigned-right-shift-assign" priority="100" tag="assignment,binary,statement-content">
-		<ref type="assignable" name="variable" />
-		<literal name="name">&gt;&gt;&gt;=</literal>
-		<ref name="operand" />
-	</sequence>
-	<sequence name="conditional" priority="110" tag="ternary,statement-content">
-		<ref name="condition" />
+	</expression>
+	<expression name="assign" priority="100" class="assignment,binary,statement-content,result-producer">
+		<assignable field="variable" />
+		<literal field="name">=</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="add-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+		<assignable field="variable" />
+		<literal field="name">+=</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="subtract-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+		<assignable field="variable" />
+		<literal field="name">-=</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="multiply-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+		<assignable field="variable" />
+		<literal field="name">*=</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="divide-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+		<assignable field="variable" />
+		<literal field="name">/=</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="modulo-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+		<assignable field="variable" />
+		<literal field="name">%=</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="or-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+		<assignable field="variable" />
+		<literal field="name">|=</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="and-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+		<assignable field="variable" />
+		<literal field="name">&amp;=</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="xor-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+		<assignable field="variable" />
+		<literal field="name">^=</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="left-shift-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+		<assignable field="variable" />
+		<literal field="name">&lt;&lt;=</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="right-shift-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+		<assignable field="variable" />
+		<literal field="name">&gt;&gt;=</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="unsigned-right-shift-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+		<assignable field="variable" />
+		<literal field="name">&gt;&gt;&gt;=</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="conditional" priority="110" class="ternary,statement-content,result-producer">
+		<result-producer field="condition" />
 		<literal>?</literal>
-		<ref name="affirmative" />
+		<result-producer field="affirmative" />
 		<literal>:</literal>
-		<ref name="negative" />
-	</sequence>
-	<sequence name="or2" priority="120" tag="logical,binary">
-		<ref name="left" />
-		<literal name="name">||</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="and2" priority="130" tag="logical,binary">
-		<ref name="left" />
-		<literal name="name">&amp;&amp;</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="or1" priority="140" tag="binary">
-		<ref name="left" />
-		<literal name="name">|</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="xor" priority="150" tag="logical,binary">
-		<ref name="left" />
-		<literal name="name">^</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="and1" priority="160" tag="binary">
-		<ref name="left" />
-		<literal name="name">&amp;</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="equal" priority="170" tag="logical,binary">
-		<ref name="left" />
-		<literal name="name">==</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="not-equal" priority="170" tag="logical,binary">
-		<ref name="left" />
-		<literal name="name">!=</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="instanceof" priority="180" tag="binary">
-		<ref name="left" />
-		<literal name="name">instanceof</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="less-equal" priority="180" tag="binary">
-		<ref name="left" />
-		<literal name="name">&lt;=</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="less" priority="180" tag="binary">
-		<ref name="left" />
-		<literal name="name">&lt;</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="greater-equal" priority="180" tag="binary">
-		<ref name="left" />
-		<literal name="name">&gt;=</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="greater" priority="180" tag="binary">
-		<ref name="left" />
-		<literal name="name">&gt;</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="left-shift" priority="190" tag="binary">
-		<ref name="left" />
-		<literal name="name">&lt;&lt;</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="right-shift" priority="190" tag="binary">
-		<ref name="left" />
-		<literal name="name">&gt;&gt;</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="unsigned-right-shift" priority="190" tag="binary">
-		<ref name="left" />
-		<literal name="name">&gt;&gt;&gt;</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="add" priority="200" tag="binary">
-		<ref name="left" />
-		<literal name="name">+</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="subtract" priority="200" tag="binary">
-		<ref name="left" />
-		<literal name="name">-</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="multiply" priority="210" tag="binary">
-		<ref name="left" />
-		<literal name="name">*</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="divide" priority="210" tag="binary">
-		<ref name="left" />
-		<literal name="name">/</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="modulo" priority="210" tag="binary">
-		<ref name="left" />
-		<literal name="name">%</literal>
-		<ref name="right" />
-	</sequence>
-	<sequence name="posit" priority="220" tag="unary">
-		<literal name="name">+</literal>
-		<ref name="operand" />
-	</sequence>
-	<sequence name="negate" priority="220" tag="unary">
-		<literal name="name">-</literal>
-		<ref name="operand" />
-	</sequence>
-	<sequence name="not" priority="220" tag="unary">
-		<literal name="name">!</literal>
-		<ref name="operand" />
-	</sequence>
-	<sequence name="bitwise-not" priority="220" tag="unary">
-		<literal name="name">~</literal>
-		<ref name="operand" />
-	</sequence>
-	<sequence name="pre-increment" priority="220" tag="unary,statement-content">
-		<literal name="name">++</literal>
-		<ref name="operand" />
-	</sequence>
-	<sequence name="pre-decrement" priority="220" tag="unary,statement-content">
-		<literal name="name">--</literal>
-		<ref name="operand" />
-	</sequence>
-	<sequence name="post-increment" priority="230" tag="unary,statement-content">
-		<ref name="operand" />
-		<literal name="name">++</literal>
-	</sequence>
-	<sequence name="post-decrement" priority="230" tag="unary,statement-content">
-		<ref name="operand" />
-		<literal name="name">--</literal>
-	</sequence>
-	<sequence name="cast" priority="220" tag="binary,statement-content">
+		<result-producer field="negative" />
+	</expression>
+	<expression name="or2" priority="120" class="logical,binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">||</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="and2" priority="130" class="logical,binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">&amp;&amp;</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="or1" priority="140" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">|</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="xor" priority="150" class="logical,binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">^</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="and1" priority="160" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">&amp;</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="equal" priority="170" class="logical,binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">==</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="not-equal" priority="170" class="logical,binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">!=</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="instanceof" priority="180" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">instanceof</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="less-equal" priority="180" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">&lt;=</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="less" priority="180" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">&lt;</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="greater-equal" priority="180" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">&gt;=</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="greater" priority="180" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">&gt;</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="left-shift" priority="190" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">&lt;&lt;</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="right-shift" priority="190" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">&gt;&gt;</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="unsigned-right-shift" priority="190" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">&gt;&gt;&gt;</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="add" priority="200" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">+</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="subtract" priority="200" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">-</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="multiply" priority="210" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">*</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="divide" priority="210" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">/</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="modulo" priority="210" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">%</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="posit" priority="220" class="unary,result-producer">
+		<literal field="name">+</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="negate" priority="220" class="unary,result-producer">
+		<literal field="name">-</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="not" priority="220" class="unary,result-producer">
+		<literal field="name">!</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="bitwise-not" priority="220" class="unary,result-producer">
+		<literal field="name">~</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="pre-increment" priority="220" class="unary,statement-content,result-producer">
+		<literal field="name">++</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="pre-decrement" priority="220" class="unary,statement-content,result-producer">
+		<literal field="name">--</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="post-increment" priority="230" class="unary,statement-content,result-producer">
+		<result-producer field="operand" />
+		<literal field="name">++</literal>
+	</expression>
+	<expression name="post-decrement" priority="230" class="unary,statement-content,result-producer">
+		<result-producer field="operand" />
+		<literal field="name">--</literal>
+	</expression>
+	<expression name="cast" priority="220" class="binary,statement-content,result-producer">
 		<literal>(</literal>
-		<ref name="type" type="type" />
+		<type field="type" />
 		<literal>)</literal>
-		<ref name="value" />
-	</sequence>
-	<sequence name="parenthetic" priority="250">
+		<expression-value field="value" />
+	</expression>
+	<expression name="parenthetic" priority="250" class="expression-value,result-producer">
 		<literal>(</literal>
-		<ref name="content" />
+		<result-producer field="content" />
 		<literal>)</literal>
-	</sequence>
-	<sequence name="array index" priority="250" tag="binary,assignable">
-		<ref name="array" />
-		<literal name="open-bracket">[</literal>
-		<ref name="index" />
+	</expression>
+	<expression name="array index" priority="250" class="binary,assignable,result-producer">
+		<result-producer field="array" />
+		<literal field="open-bracket">[</literal>
+		<result-producer field="index" />
 		<literal>]</literal>
-	</sequence>
-	<sequence name="member" priority="250" tag="assignable,statement-content">
-		<ref name="name" />
-		<literal name="dot">.</literal>
-		<ref type="identifier" name="name" />
+	</expression>
+	<expression name="member" priority="250" class="assignable,statement-content,result-producer">
+		<result-producer field="target" />
+		<literal field="dot">.</literal>
+		<identifier field="name" />
 		<option>
-			<literal name="method">(</literal>
+			<literal field="method">(</literal>
 			<option>
-				<ref name="parameter" />
+				<result-producer field="parameter" />
 				<repeat>
 					<literal>,</literal>
-					<ref name="parameter" />
+					<result-producer field="parameter" />
 				</repeat>
 			</option>
 			<literal>)</literal>
 		</option>
-	</sequence>
-	<sequence name="function-invocation,statement-content" priority="250">
-		<ref type="identifier" name="name" />
-		<literal name="method">(</literal>
+	</expression>
+	<expression name="function-invocation" priority="250" class="statement-content,result-producer">
+		<identifier field="name" />
+		<literal field="method">(</literal>
 		<option>
-			<ref name="parameter" />
+			<result-producer field="parameter" />
 			<repeat>
 				<literal>,</literal>
-				<ref name="parameter" />
+				<result-producer field="parameter" />
 			</repeat>
 		</option>
 		<literal>)</literal>
-	</sequence>
-	<sequence name="resolution" priority="240">
-		<ref name="value" />
+	</expression>
+	<expression name="resolution" priority="240" class="result-producer">
+		<result-producer field="value" />
 		<literal>::</literal>
-		<ref type="identifier" name="member" />
-	</sequence>
-</grammar>
+		<identifier field="member" />
+	</expression>
+</expresso>

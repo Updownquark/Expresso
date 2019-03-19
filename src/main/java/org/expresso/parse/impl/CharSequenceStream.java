@@ -160,11 +160,6 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 	public static CharSequenceStream from(char [] array) {
 		return new CharSequenceStream(array.length) {
 			@Override
-			public boolean isDiscovered() {
-				return true;
-			}
-
-			@Override
 			protected char [] createChunk(int length) {
 				return array;
 			}

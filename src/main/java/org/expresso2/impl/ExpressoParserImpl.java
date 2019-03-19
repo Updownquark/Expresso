@@ -7,7 +7,7 @@ import java.util.Map;
 
 import org.expresso.parse.BranchableStream;
 import org.expresso2.ExpressionComponent;
-import org.expresso2.ExpressionPossibilitySequence;
+import org.expresso2.ExpressionPossibility;
 import org.expresso2.ExpressoParser;
 
 public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements ExpressoParser<S> {
@@ -52,15 +52,17 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	}
 
 	@Override
-	public ExpressionPossibilitySequence<S> parseWith(ExpressionComponent<? super S> component) {
+	public ExpressionPossibility<S> parseWith(ExpressionComponent<? super S> component) throws IOException {
+		if (theExcludedTypes != null && Arrays.binarySearch(theExcludedTypes, component.id) >= 0)
+			return null;
 		boolean[] newCache = new boolean[1];
 		CachedExpressionPossibility<S> cached = theCache.computeIfAbsent(component.id, k -> {
 			newCache[0] = true;
 			return new CachedExpressionPossibility<>();
 		});
 		if (newCache[0])
-			cached.setSequence(component.tryParse(this));
-		return cached.asNewSequence();
+			cached.setPossibility(component.parse(this));
+		return cached.asPossibility();
 	}
 
 	private static int[] union(int[] i1, int[] i2) {

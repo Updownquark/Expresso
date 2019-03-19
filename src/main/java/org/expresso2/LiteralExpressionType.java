@@ -23,38 +23,36 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 
 	/**
 	 * @param stream The stream to check
-	 * @return Whether the given stream starts with this matcher's value
+	 * @return The character position in the stream up to the point where the stream no longer matches this matcher's value
 	 */
-	protected abstract boolean startsWithValue(S stream) throws IOException;
+	protected abstract int getMatchUntil(S stream) throws IOException;
 
 	@Override
-	public <S2 extends S> ExpressionPossibility<S2> tryParse(ExpressoParser<S2> parser) throws IOException {
-		return new LiteralPossibility<>(this, parser, getLength(), true, true);
+	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException {
+		return new LiteralPossibility<>(this, parser, getLength());
+	}
+
+	@Override
+	public String toString() {
+		return String.valueOf(theValue);
 	}
 
 	private static class LiteralPossibility<C, S extends BranchableStream<?, ? super C>> implements ExpressionPossibility<S> {
 		private final LiteralExpressionType<C, ? super S> theType;
 		private final ExpressoParser<S> theParser;
 		private final int theLength;
-		private final boolean isMatched;
-		private boolean allowMore;
-		private boolean allowLess;
+		private final int matchedUntil;
 
-		LiteralPossibility(LiteralExpressionType<C, ? super S> type, ExpressoParser<S> parser, int length, boolean allowMore,
-			boolean allowLess) throws IOException {
+		LiteralPossibility(LiteralExpressionType<C, ? super S> type, ExpressoParser<S> parser, int length) throws IOException {
 			theType = type;
 			theParser = parser;
-			if (parser.getStream().discoverTo(length) < length) {
-				theLength = parser.getStream().discoverTo(length);
-				this.allowMore = false;
-				isMatched = false;
+			int discovered = parser.getStream().discoverTo(length);
+			if (discovered < length) {
+				theLength = discovered;
 			} else {
 				theLength = length;
-				this.allowMore = allowMore;
-				isMatched = length == theType.getLength() && theType.startsWithValue(parser.getStream());
 			}
-			this.allowMore = allowMore;
-			this.allowLess = length > 0 && allowLess;
+			matchedUntil = type.getMatchUntil(parser.getStream());
 		}
 
 		@Override
@@ -73,25 +71,21 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 		}
 
 		@Override
-		public boolean hasFork() {
-			return allowLess || allowMore;
-		}
-
-		@Override
-		public ExpressionPossibility<S> fork() throws IOException {
-			if (allowLess) {
-				allowLess = false;
-				return new LiteralPossibility<>(theType, theParser, theLength - 1, true, false);
-			} else if (allowMore) {
-				allowMore = false;
-				return new LiteralPossibility<>(theType, theParser, theLength + 1, false, true);
-			} else
+		public ExpressionPossibility<S> leftFork() throws IOException {
+			if (theLength > 1)
+				return new LiteralPossibility<>(theType, theParser, theLength - 1);
+			else
 				return null;
 		}
 
 		@Override
+		public ExpressionPossibility<S> rightFork() throws IOException {
+			return null;
+		}
+
+		@Override
 		public int getErrorCount() {
-			return isMatched ? 0 : 1;
+			return matchedUntil == theType.getLength() ? 0 : 1;
 		}
 
 		@Override
@@ -101,18 +95,18 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 
 		@Override
 		public Expression<S> getExpression() {
-			return new LiteralExpression<>(theType, theParser.getStream(), theLength, isMatched);
+			return new LiteralExpression<>(theType, theParser.getStream(), theLength, matchedUntil);
 		}
 	}
 
 	private static class LiteralExpression<C, S extends BranchableStream<?, ? super C>> extends Expression<S> {
 		private final int theLength;
-		private final boolean isMatched;
+		private final int matchedUntil;
 
-		LiteralExpression(LiteralExpressionType<C, ? super S> type, S stream, int length, boolean match) {
+		LiteralExpression(LiteralExpressionType<C, ? super S> type, S stream, int length, int matchedUntil) {
 			super(stream, type);
 			theLength = length;
-			isMatched = match;
+			this.matchedUntil = matchedUntil;
 		}
 
 		@Override
@@ -127,25 +121,25 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 
 		@Override
 		public Expression<S> getFirstError() {
-			return isMatched ? null : this;
+			return matchedUntil == getType().getLength() ? null : this;
 		}
 
 		@Override
 		public int getErrorCount() {
-			return isMatched ? 0 : 1;
+			return matchedUntil == getType().getLength() ? 0 : 1;
 		}
 
 		@Override
-		public String getErrorMessage() {
-			if(isMatched)
+		public int getLocalErrorRelativePosition() {
+			return matchedUntil == getType().getLength() ? -1 : matchedUntil;
+		}
+
+		@Override
+		public String getLocalErrorMessage() {
+			if (matchedUntil == getType().getLength())
 				return null;
 			else
 				return "\"" + getType().getValue() + "\" expected";
-		}
-
-		@Override
-		public boolean isComplete() {
-			return true;
 		}
 
 		@Override

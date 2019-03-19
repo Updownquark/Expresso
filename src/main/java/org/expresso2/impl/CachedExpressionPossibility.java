@@ -6,107 +6,67 @@ import org.expresso.parse.BranchableStream;
 import org.expresso2.Expression;
 import org.expresso2.ExpressionPossibility;
 
-class CachedExpressionPossibility<S extends BranchableStream<?, ?>> {
-	private LinkedElement<S> theFirstFork;
-	private LinkedElement<S> theLastFork;
-	private ExpressionPossibility<S> theAdvanced;
-	private boolean hasAdvanced;
+class CachedExpressionPossibility<S extends BranchableStream<?, ?>> implements ExpressionPossibility<S> {
+	private ExpressionPossibility<S> thePossibility;
+	private CachedExpressionPossibility<S> theLeftFork;
+	private CachedExpressionPossibility<S> theRightFork;
+	private CachedExpressionPossibility<S> theAdvanced;
 
 	CachedExpressionPossibility() {
 	}
 
-	void setSequence(ExpressionPossibility<S> possibility) {
-		if (possibility == null)
-			theFirstFork = null;
-		else
-			theFirstFork = theLastFork = new LinkedElement<>(possibility);
+	CachedExpressionPossibility<S> setPossibility(ExpressionPossibility<S> possibility) {
+		thePossibility = possibility;
+		return this;
 	}
 
-	ExpressionPossibility<S> asPossibility() {
-		if (theFirstFork == null)
-			return null;
-		return new ExposedCachedPossibility(theFirstFork);
+	public ExpressionPossibility<S> asPossibility() {
+		return thePossibility == null ? null : this;
 	}
 
-	ExpressionPossibility<S> advance() throws IOException {
-		if (!hasAdvanced)
-			theAdvanced = theFirstFork.possibility.advance();
-		return theAdvanced;
+	@Override
+	public S getStream() {
+		return thePossibility.getStream();
 	}
 
-	boolean hasNext(LinkedElement<S> possibility) {
-		return possibility.next != null || theFirstFork.possibility.hasFork();
+	@Override
+	public int length() {
+		return thePossibility.length();
 	}
 
-	LinkedElement<S> getNext(LinkedElement<S> possibility) throws IOException {
-		if (possibility.next != null)
-			return possibility.next;
-		else if (theFirstFork.possibility.hasFork()) {
-			theLastFork.next = new LinkedElement<>(theFirstFork.possibility.fork());
-			return theLastFork;
-		} else
-			return null;
+	@Override
+	public ExpressionPossibility<S> advance() throws IOException {
+		if (theAdvanced == null)
+			theAdvanced = new CachedExpressionPossibility<S>().setPossibility(thePossibility.advance());
+		return theAdvanced.asPossibility();
 	}
 
-	private static class LinkedElement<S extends BranchableStream<?, ?>> {
-		final ExpressionPossibility<S> possibility;
-		LinkedElement<S> next;
-
-		LinkedElement(ExpressionPossibility<S> possibility) {
-			this.possibility = possibility;
-		}
+	@Override
+	public ExpressionPossibility<S> leftFork() throws IOException {
+		if (theLeftFork == null)
+			theLeftFork = new CachedExpressionPossibility<S>().setPossibility(thePossibility.leftFork());
+		return theLeftFork.asPossibility();
 	}
 
-	private class ExposedCachedPossibility implements ExpressionPossibility<S> {
-		private LinkedElement<S> thePossibility;
+	@Override
+	public ExpressionPossibility<S> rightFork() throws IOException {
+		if (theRightFork == null)
+			theRightFork = new CachedExpressionPossibility<S>().setPossibility(thePossibility.rightFork());
+		return theRightFork.asPossibility();
+	}
 
-		ExposedCachedPossibility(LinkedElement<S> possibility) {
-			thePossibility = possibility;
-		}
+	@Override
+	public int getErrorCount() {
+		return thePossibility.getErrorCount();
+	}
 
-		@Override
-		public S getStream() {
-			return thePossibility.possibility.getStream();
-		}
+	@Override
+	public boolean isComplete() {
+		return thePossibility.isComplete();
+	}
 
-		@Override
-		public int length() {
-			return thePossibility.possibility.length();
-		}
-
-		@Override
-		public ExpressionPossibility<S> advance() throws IOException {
-			return thePossibility.possibility.advance();
-		}
-
-		@Override
-		public boolean hasFork() {
-			return hasNext(thePossibility);
-		}
-
-		@Override
-		public ExpressionPossibility<S> fork() throws IOException {
-			LinkedElement<S> next = getNext(thePossibility);
-			if (next != null) {
-				ExposedCachedPossibility fork = new ExposedCachedPossibility(next);
-				return fork;
-			} else
-				return null;
-		}
-
-		@Override
-		public int getErrorCount() {
-			return thePossibility.possibility.getErrorCount();
-		}
-
-		@Override
-		public boolean isComplete() {
-			return thePossibility.possibility.isComplete();
-		}
-
-		@Override
-		public Expression<S> getExpression() {
-			return thePossibility.possibility.getExpression();
-		}
+	@Override
+	public Expression<S> getExpression() {
+		return thePossibility.getExpression();
 	}
 }

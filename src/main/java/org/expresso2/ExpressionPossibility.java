@@ -11,9 +11,9 @@ public interface ExpressionPossibility<S extends BranchableStream<?, ?>> {
 
 	ExpressionPossibility<S> advance() throws IOException;
 
-	boolean hasFork();
+	ExpressionPossibility<S> leftFork() throws IOException;
 
-	ExpressionPossibility<S> fork() throws IOException;
+	ExpressionPossibility<S> rightFork() throws IOException;
 
 	int getErrorCount();
 
@@ -34,7 +34,17 @@ public interface ExpressionPossibility<S extends BranchableStream<?, ?>> {
 			}
 
 			@Override
-			public ExpressionPossibility<S> next() throws IOException {
+			public ExpressionPossibility<S> advance() throws IOException {
+				return null;
+			}
+
+			@Override
+			public ExpressionPossibility<S> leftFork() throws IOException {
+				return null;
+			}
+
+			@Override
+			public ExpressionPossibility<S> rightFork() throws IOException {
 				return null;
 			}
 

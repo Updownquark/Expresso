@@ -4,33 +4,48 @@ import java.util.Collections;
 import java.util.List;
 
 import org.expresso.parse.BranchableStream;
+import org.qommons.BiTuple;
 
 public class ComposedExpression<S extends BranchableStream<?, ?>> extends Expression<S> {
 	private final List<? extends Expression<S>> theChildren;
 	private final int theLength;
 	private final Expression<S> theFirstError;
 	private final int theErrorCount;
+	private final BiTuple<Integer, String> theSelfError;
 
 	public ComposedExpression(S stream, ExpressionComponent<? super S> type, List<? extends Expression<S>> children) {
 		super(stream, type);
 		theChildren = Collections.unmodifiableList(children);
+		theLength = computeLength();
 		Expression<S> firstError = null;
 		int errorCount = 0;
-		int lastPos = 0;
+		theSelfError = getSelfError();
 		for (Expression<S> child : children) {
 			errorCount += child.getErrorCount();
 			if (errorCount > 0 && firstError == null)
 				firstError = child.getFirstError();
-			lastPos = child.getStream().getPosition() + child.length();
 		}
+		if (theSelfError != null
+			&& (firstError == null || firstError.getStream().getPosition() + firstError.length() > theSelfError.getValue1()))
+			firstError = this;
 		theFirstError = firstError;
-		theLength = lastPos - stream.getPosition();
 		theErrorCount = errorCount;
 	}
 
 	@Override
 	public List<? extends Expression<S>> getChildren() {
 		return theChildren;
+	}
+
+	protected int computeLength() {
+		if (getChildren().isEmpty())
+			return 0;
+		Expression<S> last = getChildren().get(getChildren().size() - 1);
+		return last.length() + last.getStream().getPosition() - getStream().getPosition();
+	}
+
+	protected BiTuple<Integer, String> getSelfError() {
+		return null;
 	}
 
 	@Override
@@ -49,12 +64,12 @@ public class ComposedExpression<S extends BranchableStream<?, ?>> extends Expres
 	}
 
 	@Override
-	public String getErrorMessage() {
-		return null;
+	public int getLocalErrorRelativePosition() {
+		return theSelfError == null ? -1 : theSelfError.getValue1();
 	}
 
 	@Override
-	public boolean isComplete() {
-		return theChildren.isEmpty() || theChildren.get(theChildren.size() - 1).isComplete();
+	public String getLocalErrorMessage() {
+		return theSelfError == null ? null : theSelfError.getValue2();
 	}
 }

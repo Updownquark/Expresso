@@ -26,11 +26,11 @@ public abstract class Expression<S extends BranchableStream<?, ?>> {
 
 	public abstract Expression<S> getFirstError();
 
+	public abstract int getLocalErrorRelativePosition();
+
 	public abstract int getErrorCount();
 
-	public abstract String getErrorMessage();
-
-	public abstract boolean isComplete();
+	public abstract String getLocalErrorMessage();
 
 	public abstract int length();
 
@@ -54,18 +54,18 @@ public abstract class Expression<S extends BranchableStream<?, ?>> {
 		}
 
 		@Override
+		public int getLocalErrorRelativePosition() {
+			return -1;
+		}
+
+		@Override
 		public int getErrorCount() {
 			return 0;
 		}
 
 		@Override
-		public String getErrorMessage() {
+		public String getLocalErrorMessage() {
 			return null;
-		}
-
-		@Override
-		public boolean isComplete() {
-			return true;
 		}
 
 		@Override

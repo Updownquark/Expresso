@@ -69,13 +69,20 @@ public abstract class BinarySequenceStream extends BranchableStream<Byte, byte [
 	 *
 	 * @param input The input stream to create the byte stream from
 	 * @param chunkSize The chunk size for the byte stream
+	 * @param onlyAvailable Whether to treat the stream as ending at the last available byte
 	 * @return The byte stream backed by the input stream's data
 	 */
-	public static BinarySequenceStream from(InputStream input, int chunkSize) {
+	public static BinarySequenceStream from(InputStream input, int chunkSize, boolean onlyAvailable) {
 		return new BinarySequenceStream(chunkSize) {
 			@Override
 			protected int getNextData(byte [] chunk, int start) throws IOException {
-				return input.read(chunk, start, chunk.length - start);
+				int length = chunk.length - start;
+				if (onlyAvailable) {
+					length = Math.min(length, input.available());
+					if (length == 0)
+						return -1;
+				}
+				return input.read(chunk, start, length);
 			}
 		};
 	}
@@ -89,6 +96,6 @@ public abstract class BinarySequenceStream extends BranchableStream<Byte, byte [
 	 * @throws java.io.FileNotFoundException If the given file cannot be found
 	 */
 	public static BinarySequenceStream from(File file, int chunkSize) throws java.io.FileNotFoundException {
-		return from(new java.io.FileInputStream(file), chunkSize);
+		return from(new java.io.FileInputStream(file), chunkSize, false);
 	}
 }

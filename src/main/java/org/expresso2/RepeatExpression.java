@@ -1,101 +1,81 @@
 package org.expresso2;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.LinkedList;
+import java.util.Iterator;
 import java.util.List;
 
 import org.expresso.parse.BranchableStream;
 
-public class RepeatExpression<S extends BranchableStream<?, ?>> extends ExpressionComponent<S> {
+public class RepeatExpression<S extends BranchableStream<?, ?>> extends AbstractSequencedExpressionType<S> {
 	private final int theMinCount;
 	private final int theMaxCount;
-	private final ExpressionComponent<S> theComponent;
+	private final org.expresso2.SequenceExpression<S> theSequence;
 
-	public RepeatExpression(int id, int min, int max, ExpressionComponent<S> component) {
-		super(id);
+	public RepeatExpression(int id, int min, int max, List<ExpressionComponent<S>> components) {
+		super(id, new InfiniteSequenceRepeater());
+		if (min > max)
+			throw new IllegalArgumentException("min (" + min + ") must be <= max (" + max + ")");
 		theMinCount = min;
 		theMaxCount = max;
-		theComponent = component;
+		theSequence = new org.expresso2.SequenceExpression<>(id, components);
+		((InfiniteSequenceRepeater<org.expresso2.SequenceExpression<S>>) getSequence()).theValue = theSequence;
+	}
+
+	public int getMinCount() {
+		return theMinCount;
+	}
+
+	public int getMaxCount() {
+		return theMaxCount;
+	}
+
+	public org.expresso2.SequenceExpression<S> getComponent() {
+		return theSequence;
 	}
 
 	@Override
-	public <S2 extends S> PossibilitySequence<? extends Expression<S2>> tryParse(ExpressoParser<S2> session) {
-		return new RepeatingPossibilitySequence<>(this, theComponent, session);
+	protected int getInitComponentCount() {
+		return theMinCount == 0 ? 1 : theMinCount;
 	}
 
-	private static class RepeatingPossibilitySequence<S extends BranchableStream<?, ?>> implements PossibilitySequence<Expression<S>> {
-		private final ExpressionComponent<? super S> theType;
-		private final ExpressionComponent<? super S> theComponent;
-		private final ExpressoParser<S> theSession;
-		private final LinkedList<ParsePoint> theStack;
-		private boolean isStarted;
+	@Override
+	protected boolean isComplete(int componentCount) {
+		return componentCount >= theMinCount;
+	}
 
-		public RepeatingPossibilitySequence(ExpressionComponent<? super S> type, ExpressionComponent<? super S> component,
-			ExpressoParser<S> session) {
-			theType = type;
-			theComponent = component;
-			theSession = session;
-			theStack = new LinkedList<>();
+	@Override
+	protected String getErrorForComponentCount(int componentCount) {
+		if (componentCount < theMinCount)
+			return "At least " + theMinCount + " " + theSequence + (theMinCount > 1 ? "s" : "") + " expected, but found " + componentCount;
+		else if (componentCount > theMaxCount)
+			return "No more than " + theMaxCount + " " + theSequence + (theMaxCount > 1 ? "s" : "") + " expected, but found "
+				+ componentCount;
+		return null;
+	}
+
+	private static class InfiniteSequenceRepeater<E> implements Iterable<E> {
+		private E theValue;
+
+		@Override
+		public Iterator<E> iterator() {
+			return new InifiniteRepeatingIterator<>(theValue);
+		}
+	}
+
+	private static class InifiniteRepeatingIterator<E> implements Iterator<E> {
+		private final E theValue;
+
+		InifiniteRepeatingIterator(E value) {
+			theValue = value;
 		}
 
 		@Override
-		public Expression<S> getNextPossibility() throws IOException {
-			ParsePoint lastPoint = null;
-			if (!isStarted) {
-				isStarted = true;
-				PossibilitySequence<? extends Expression<S>> seq = theSession.parseWith(theComponent);
-				Expression<S> ex = seq.getNextPossibility();
-				if (ex == null) {
-					return null;
-				} else {
-					lastPoint = new ParsePoint(theSession, seq, ex);
-					theStack.push(lastPoint);
-				}
-			} else if (theStack.isEmpty())
-				return null;
-			else
-				lastPoint = theStack.getLast();
-
-			ExpressoParser<S> session = lastPoint == null ? theSession : lastPoint.session.advance(lastPoint.lastResult.length());
-			PossibilitySequence<? extends Expression<S>> seq = session.parseWith(theComponent);
-			Expression<S> ex = seq.getNextPossibility();
-			if (ex != null) {
-				lastPoint = new ParsePoint(session, seq, ex);
-				theStack.push(lastPoint);
-				return createExpression();
-			}
-
-			// No more repeating possibilities along this branch. Try another.
-			while (!theStack.isEmpty()) {
-				lastPoint = theStack.getLast();
-				lastPoint.lastResult = lastPoint.sequence.getNextPossibility();
-				if (lastPoint.lastResult != null) {
-					return createExpression(); // Found a new possibility at this branch in the tree
-				} else {
-					theStack.pop(); // No more possibilities on this branch; move back up toward the root
-				}
-			}
-			return null;
+		public boolean hasNext() {
+			return true;
 		}
 
-		private Expression<S> createExpression() {
-			List<Expression<S>> exCopy = new ArrayList<>(theStack.size());
-			for (ParsePoint pp : theStack)
-				exCopy.add(pp.lastResult);
-			return new ComposedExpression<>(theSession.getStream(), theType, exCopy);
-		}
-
-		private class ParsePoint {
-			final ExpressoParser<S> session;
-			final PossibilitySequence<? extends Expression<S>> sequence;
-			Expression<S> lastResult;
-
-			ParsePoint(ExpressoParser<S> session, PossibilitySequence<? extends Expression<S>> sequence, Expression<S> result) {
-				this.session = session;
-				this.sequence = sequence;
-				lastResult = result;
-			}
+		@Override
+		public E next() {
+			return theValue;
 		}
 	}
 }

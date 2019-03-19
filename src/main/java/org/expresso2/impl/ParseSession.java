@@ -24,40 +24,26 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 		throws IOException {
 		ExpressionPossibility<S> sequence = getParser(stream, 0, new int[0]).parseWith(component);
 		BetterSortedSet<ExpressionPossibility<S>> possibilities = new BetterTreeSet<>(false, ParseSession::comparePossibilities);
+		possibilities.add(sequence);
 		ExpressionPossibility<S> bestComplete = null;
-		boolean rootPossibilitiesExhausted = false;
 		while (true) {
-			ExpressionPossibility<S> bestIncomplete = possibilities.pollFirst();
-			while (!rootPossibilitiesExhausted && (bestIncomplete == null || bestIncomplete.getErrorCount() > 0)) {
-				// See if we can find one without an error
-				ExpressionPossibility<S> possibility = sequence.getNextPossibility();
-				if (possibility == null) {
-					rootPossibilitiesExhausted = true;
-					break; // No more possibilities, i.e. the best result will have an error
-				}
-				if (possibility.getErrorCount() > 0 && possibility.isComplete()) {
-					// See if we even care
-					if (comparePossibilities(possibility, bestComplete) < 0)
-						bestComplete = possibility;
-					else
-						continue; // Don't even hold onto it. We have a better error we can return.
-				}
-				possibilities.add(possibility);
-				if (bestIncomplete == null || comparePossibilities(possibility, bestIncomplete) < 0) {
-					bestIncomplete = possibility;
-				}
+			ExpressionPossibility<S> nextBest = possibilities.pollFirst();
+			if (nextBest == null)
+				break;
+			ExpressionPossibility<S> branch;
+			if (nextBest.isComplete() && (bestError || nextBest.getErrorCount() == 0)) {
+				if (bestComplete == null || comparePossibilities(nextBest, bestComplete) < 0)
+					bestComplete = nextBest;
+				branch = nextBest.advance();
+				if (branch != null)
+					possibilities.add(branch);
 			}
-			if (bestIncomplete == null)
-				break;
-			else if (bestIncomplete.getErrorCount() > 0//
-				&& ((bestComplete != null && bestComplete.getErrorCount() == 0) || !bestError))
-				break;
-			bestIncomplete.advanceInStream();
-			if (bestIncomplete.isComplete()) {
-				if (comparePossibilities(bestIncomplete, bestComplete) < 0)
-					bestComplete = bestIncomplete;
-			} else
-				possibilities.add(bestIncomplete);
+			branch = nextBest.rightFork();
+			if (branch != null)
+				possibilities.add(branch);
+			branch = nextBest.leftFork();
+			if (branch != null)
+				possibilities.add(branch);
 		}
 		if (bestComplete != null)
 			return bestComplete.getExpression();

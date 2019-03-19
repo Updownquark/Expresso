@@ -10,8 +10,11 @@ import org.expresso.parse.impl.CharSequenceStream;
 
 public class TextPatternExpressionType<S extends CharSequenceStream> extends ExpressionComponent<S> {
 	private final Pattern thePattern;
+	private final int theMaxLength;
 
-	public TextPatternExpressionType(Pattern pattern) {
+	public TextPatternExpressionType(Integer id, int maxLength, Pattern pattern) {
+		super(id);
+		theMaxLength = maxLength;
 		if (pattern.pattern().length() == 0)
 			throw new IllegalArgumentException("Text pattern matchers cannot search for empty strings");
 		thePattern = pattern;
@@ -21,56 +24,60 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Exp
 		return thePattern;
 	}
 
+	public int getMaxLength() {
+		return theMaxLength;
+	}
+
 	@Override
-	public <S2 extends S> PossibilitySequence<? extends Expression<S2>> tryParse(ExpressoParser<S2> session) {
-		return new PatternPossibilitySequence<>(this, session);
+	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> session) throws IOException {
+		return new TextPatternPossibility<>(this, session);
 	}
 
-	private static class PatternPossibilitySequence<S extends CharSequenceStream> implements PossibilitySequence<Expression<S>> {
+	@Override
+	public String toString() {
+		return thePattern.toString();
+	}
+
+	private static class TextPatternPossibility<S extends CharSequenceStream> implements ExpressionPossibility<S> {
 		private final TextPatternExpressionType<? super S> theType;
-		private final ExpressoParser<S> theSession;
-		private boolean isDone;
+		private final ExpressoParser<S> theParser;
+		private final Matcher theMatcher;
 
-		PatternPossibilitySequence(TextPatternExpressionType<? super S> type, ExpressoParser<S> session) {
+		private TextPatternPossibility(TextPatternExpressionType<? super S> type, ExpressoParser<S> parser) throws IOException {
 			theType = type;
-			theSession = session;
+			theParser = parser;
+			parser.getStream().discoverTo(theType.getMaxLength());
+			theMatcher = theType.getPattern().matcher(parser.getStream());
 		}
 
 		@Override
-		public Expression<S> getNextPossibility() throws IOException {
-			if (isDone)
-				return null;
-			isDone = true;
-			Matcher matcher = theType.getPattern().matcher(theSession.getStream());
-			if (matcher.lookingAt())
-				return new TextPatternExpression<>(theSession.getStream(), theType, matcher.end());
-			else
-				return new ErrorExpression<>(theSession.getStream(), theType, Collections.emptyList(),
-					"Text matching " + theType.getPattern() + " expected");
-		}
-	}
-
-	private static class TextPatternExpression<S extends CharSequenceStream> extends Expression<S> {
-		private final int theLength;
-
-		public TextPatternExpression(S stream, TextPatternExpressionType<? super S> type, int length) {
-			super(stream, type);
-			theLength = length;
+		public S getStream() {
+			return theParser.getStream();
 		}
 
 		@Override
-		public List<? extends Expression<S>> getChildren() {
-			return Collections.emptyList();
+		public int length() {
+			return theMatcher.lookingAt() ? theMatcher.end() : 0;
 		}
 
 		@Override
-		public ErrorExpression<S> getFirstError() {
+		public ExpressionPossibility<S> advance() throws IOException {
+			return null;
+		}
+
+		@Override
+		public ExpressionPossibility<S> leftFork() throws IOException {
+			return null;
+		}
+
+		@Override
+		public ExpressionPossibility<S> rightFork() throws IOException {
 			return null;
 		}
 
 		@Override
 		public int getErrorCount() {
-			return 0;
+			return theMatcher.lookingAt() ? 0 : 1;
 		}
 
 		@Override
@@ -79,8 +86,52 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Exp
 		}
 
 		@Override
+		public Expression<S> getExpression() {
+			return new TextPatternExpression<>(getStream(), theType, theMatcher);
+		}
+	}
+
+	private static class TextPatternExpression<S extends CharSequenceStream> extends Expression<S> {
+		private final Matcher theMatcher;
+
+		public TextPatternExpression(S stream, TextPatternExpressionType<? super S> type, Matcher matcher) {
+			super(stream, type);
+			theMatcher = matcher;
+		}
+
+		@Override
+		public TextPatternExpressionType<? super S> getType() {
+			return (TextPatternExpressionType<? super S>) super.getType();
+		}
+
+		@Override
+		public List<? extends Expression<S>> getChildren() {
+			return Collections.emptyList();
+		}
+
+		@Override
+		public Expression<S> getFirstError() {
+			return theMatcher.lookingAt() ? null : this;
+		}
+
+		@Override
+		public int getLocalErrorRelativePosition() {
+			return theMatcher.lookingAt() ? -1 : 0;
+		}
+
+		@Override
+		public String getLocalErrorMessage() {
+			return theMatcher.lookingAt() ? null : "Text matching " + getType().getPattern() + " expected";
+		}
+
+		@Override
+		public int getErrorCount() {
+			return theMatcher.lookingAt() ? 0 : 1;
+		}
+
+		@Override
 		public int length() {
-			return theLength;
+			return theMatcher.lookingAt() ? theMatcher.end() : 0;
 		}
 	}
 }
