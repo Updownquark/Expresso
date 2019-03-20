@@ -5,6 +5,8 @@ import java.io.IOException;
 import org.expresso.parse.BranchableStream;
 
 public interface ExpressionPossibility<S extends BranchableStream<?, ?>> {
+	ExpressionComponent<? super S> getType();
+
 	S getStream();
 
 	int length();
@@ -21,10 +23,17 @@ public interface ExpressionPossibility<S extends BranchableStream<?, ?>> {
 
 	boolean isComplete();
 
+	boolean isEquivalent(ExpressionPossibility<S> o);
+
 	Expression<S> getExpression();
 
 	static <S extends BranchableStream<?, ?>> ExpressionPossibility<S> empty(S stream, ExpressionComponent<? super S> type) {
 		return new ExpressionPossibility<S>() {
+			@Override
+			public ExpressionComponent<? super S> getType() {
+				return type;
+			}
+
 			@Override
 			public S getStream() {
 				return stream;
@@ -63,6 +72,11 @@ public interface ExpressionPossibility<S extends BranchableStream<?, ?>> {
 			@Override
 			public boolean isComplete() {
 				return true;
+			}
+
+			@Override
+			public boolean isEquivalent(ExpressionPossibility<S> o) {
+				return o.getClass() == getClass() && getType().equals(o.getType());
 			}
 
 			@Override

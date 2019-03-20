@@ -14,7 +14,7 @@ public class ExcludeExpressionComponent<S extends BranchableStream<?, ?>> extend
 	}
 
 	@Override
-	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> session) throws IOException {
-		return super.parse(session.exclude(theExcludedIds));
+	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> session, boolean useCache) throws IOException {
+		return super.parse(session.exclude(theExcludedIds), true);
 	}
 }

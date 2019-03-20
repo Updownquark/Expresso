@@ -28,4 +28,9 @@ public class ExpressionType<S extends BranchableStream<?, ?>> extends SequenceEx
 	public NavigableSet<ExpressionClass<S>> getClasses() {
 		return theClasses;
 	}
+
+	@Override
+	public String toString() {
+		return "Expression " + theName;
+	}
 }

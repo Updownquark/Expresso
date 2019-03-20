@@ -21,9 +21,10 @@ import org.expresso.parse.impl.BinarySequenceStream;
 import org.expresso.parse.impl.CharSequenceStream;
 import org.qommons.IntList;
 import org.qommons.config.QommonsConfig;
+import org.qommons.tree.SortedTreeList;
 
 public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements GrammarParser<S> {
-	public static final Set<String> RESERVED_TYPE_NAMES = Collections.unmodifiableSet(new LinkedHashSet<>(//
+	public static final Set<String> RESERVED_EXPRESSION_NAMES = Collections.unmodifiableSet(new LinkedHashSet<>(//
 		Arrays.asList("expresso", "expression", "class", "field", "name")));
 
 	public interface PreGrammar {
@@ -52,16 +53,21 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements G
 		class PreParsedClass {
 			final ExpressionClass<S> clazz;
 			final List<String> memberNames;
-			final List<ExpressionType<S>> types;
+			private final List<ExpressionType<S>> types;
 
 			PreParsedClass(String className) {
-				types = new LinkedList<>();
+				types = new SortedTreeList<>(false, (t1, t2) -> -Integer.compare(t1.priority, t2.priority));
 				memberNames = new LinkedList<>();
 				clazz = new ExpressionClass<>(id[0]++, className, Collections.unmodifiableList(types));
 			}
 
-			ExpressionClass<S> addType(String typeName) {
+			ExpressionClass<S> addTypeName(String typeName) {
 				memberNames.add(typeName);
+				return clazz;
+			}
+
+			ExpressionClass<S> addType(ExpressionType<S> type) {
+				types.add(type);
 				return clazz;
 			}
 		}
@@ -74,8 +80,8 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements G
 			String typeName = type.get("name");
 			if (typeName == null)
 				throw new IllegalArgumentException("expression has no name: " + type);
-			else if (RESERVED_TYPE_NAMES.contains(typeName))
-				throw new IllegalArgumentException(typeName + " is a reserved name in expresso");
+			else if (RESERVED_EXPRESSION_NAMES.contains(typeName))
+				throw new IllegalArgumentException(typeName + " cannot be used as an expression name in expresso");
 			else if (theRecognizedComponents.containsKey(typeName))
 				throw new IllegalArgumentException(typeName + " is a reserved component type name: " + type);
 			else if (declaredTypes.containsKey(typeName))
@@ -94,7 +100,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements G
 						else if (declaredTypes.containsKey(c))
 							throw new IllegalArgumentException(c + " has already been declared as an expression: " + type);
 						return new PreParsedClass(c);
-					}).addType(typeName));
+					}).addTypeName(typeName));
 				}
 				classes = Collections.unmodifiableNavigableSet(classes);
 			} else
@@ -143,19 +149,10 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements G
 					throw new IllegalStateException(e.getMessage() + ":\n" + type, e);
 				}
 				components.add(component);
-				/*String field = componentConfig.get("field");
-				if (field != null) {
-					BetterList<ExpressionComponent<S>> preField = fields.get(field);
-					ExpressionComponent<S>[] preFieldValues = new ExpressionComponent[preField == null ? 1 : preField.size() + 1];
-					for (int i = 0; i < preFieldValues.length - 1; i++)
-						preFieldValues[i] = preField.get(i);
-					preFieldValues[preFieldValues.length - 1] = component;
-					fields.put(field, BetterList.of(preFieldValues));
-				}*/
 			}
 			typeRef.initialize(Collections.unmodifiableList(components));
 			for (ExpressionClass<S> clazz : typeRef.classes)
-				declaredClasses.get(clazz.getName()).types.add(typeRef.type);
+				declaredClasses.get(clazz.getName()).addType(typeRef.type);
 		}
 		List<ExpressionType<S>> types = new ArrayList<>(declaredTypes.size());
 		Map<String, ExpressionType<S>> typesByName = new LinkedHashMap<>(declaredTypes.size() * 4 / 3);
@@ -382,7 +379,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements G
 		ExpressionType<S> type;
 
 		ParsedExpressionType(int id, int priority, String name, NavigableSet<ExpressionClass<S>> classes) {
-			super(id);
+			super(-1);
 			this.priority = priority;
 			this.name = name;
 			this.classes = classes;
@@ -393,8 +390,13 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements G
 		}
 
 		@Override
-		public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> session) throws IOException {
-			return type.parse(session);
+		public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> session, boolean useCache) throws IOException {
+			return type.parse(session, useCache);
+		}
+
+		@Override
+		public String toString() {
+			return type == null ? name : type.toString();
 		}
 	}
 
@@ -408,8 +410,13 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements G
 		}
 
 		@Override
-		public int getId() {
-			return theWrapped.getId();
+		public ExpressionComponent<S> getWrapped() {
+			return theWrapped;
+		}
+
+		@Override
+		public int getCacheId() {
+			return -1;
 		}
 
 		@Override
@@ -418,8 +425,14 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements G
 		}
 
 		@Override
-		public <S2 extends S> ConfiguredExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException {
-			return ConfiguredExpressionType.wrap(this, theWrapped.parse(parser));
+		public <S2 extends S> ConfiguredExpressionPossibility<S2> parse(ExpressoParser<S2> parser, boolean useCache) throws IOException {
+			// TODO The non-cachiness should probably be passed in here
+			return ConfiguredExpressionType.wrap(this, parser.parseWith(theWrapped, useCache));
+		}
+
+		@Override
+		public String toString() {
+			return theWrapped.toString() + " field=" + theFields;
 		}
 	}
 }

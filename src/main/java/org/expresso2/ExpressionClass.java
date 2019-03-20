@@ -26,4 +26,9 @@ public class ExpressionClass<S extends BranchableStream<?, ?>> extends OneOfExpr
 	public int compareTo(ExpressionClass<?> o) {
 		return QommonsUtils.compareNumberTolerant(theName, o.getName(), true, true);
 	}
+
+	@Override
+	public String toString() {
+		return "Class " + theName;
+	}
 }

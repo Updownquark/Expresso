@@ -41,7 +41,8 @@ public class JavaTest {
 
 	@Test
 	public void testVariable() {
-		Expression<CharSequenceStream> result = parse("vbl", "result-producer", true).unwrap();
+		Expression<CharSequenceStream> result = parse("vbl", "result-producer", true);
+		result = result.unwrap();
 		Assert.assertEquals("identifier", ((ExpressionType<?>) result.getType()).getName());
 		Assert.assertEquals("vbl", result.getField("name").getFirst().toString());
 	}

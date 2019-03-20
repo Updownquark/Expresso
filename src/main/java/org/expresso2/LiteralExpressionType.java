@@ -28,7 +28,7 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 	protected abstract int getMatchUntil(S stream) throws IOException;
 
 	@Override
-	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException {
+	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser, boolean useCache) throws IOException {
 		return new LiteralPossibility<>(this, parser, getLength());
 	}
 
@@ -53,6 +53,11 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 				theLength = length;
 			}
 			matchedUntil = type.getMatchUntil(parser.getStream());
+		}
+
+		@Override
+		public ExpressionComponent<? super S> getType() {
+			return theType;
 		}
 
 		@Override
@@ -96,6 +101,16 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 		@Override
 		public boolean isComplete() {
 			return true;
+		}
+
+		@Override
+		public boolean isEquivalent(ExpressionPossibility<S> o) {
+			if (this == o)
+				return true;
+			else if (!(o instanceof LiteralPossibility))
+				return false;
+			LiteralPossibility<C, S> other = (LiteralPossibility<C, S>) o;
+			return getType().equals(other.getType()) && matchedUntil == other.matchedUntil;
 		}
 
 		@Override

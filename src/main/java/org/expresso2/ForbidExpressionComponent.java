@@ -14,8 +14,8 @@ public class ForbidExpressionComponent<S extends BranchableStream<?, ?>> extends
 	}
 
 	@Override
-	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException {
-		ExpressionPossibility<S2> forbidden = parser.parseWith(theForbidden);
+	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser, boolean useCache) throws IOException {
+		ExpressionPossibility<S2> forbidden = parser.parseWith(theForbidden, true);
 		return forbidden == null ? null : new ForbiddenPossibility<>(this, parser, forbidden);
 	}
 
@@ -28,6 +28,11 @@ public class ForbidExpressionComponent<S extends BranchableStream<?, ?>> extends
 			theType = type;
 			theParser = parser;
 			theForbidden = forbidden;
+		}
+
+		@Override
+		public ExpressionComponent<? super S> getType() {
+			return theType;
 		}
 
 		@Override
@@ -80,6 +85,16 @@ public class ForbidExpressionComponent<S extends BranchableStream<?, ?>> extends
 		@Override
 		public boolean isComplete() {
 			return theForbidden.isComplete();
+		}
+
+		@Override
+		public boolean isEquivalent(ExpressionPossibility<S> o) {
+			if (this == o)
+				return true;
+			else if (!(o instanceof ForbiddenPossibility))
+				return false;
+			ForbiddenPossibility<S> other = (ForbiddenPossibility<S>) o;
+			return getType().equals(other.getType()) && theForbidden.isEquivalent(other.theForbidden);
 		}
 
 		@Override

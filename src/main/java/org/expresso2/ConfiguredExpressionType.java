@@ -6,10 +6,12 @@ import java.util.NavigableSet;
 import org.expresso.parse.BranchableStream;
 
 public interface ConfiguredExpressionType<S extends BranchableStream<?, ?>> extends ExpressionComponent<S> {
+	ExpressionComponent<S> getWrapped();
+
 	NavigableSet<String> getFields();
 
 	@Override
-	<S2 extends S> ConfiguredExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException;
+	<S2 extends S> ConfiguredExpressionPossibility<S2> parse(ExpressoParser<S2> parser, boolean useCache) throws IOException;
 
 	static <S extends BranchableStream<?, ?>> ConfiguredExpressionPossibility<S> wrap(ConfiguredExpressionType<? super S> type,
 		ExpressionPossibility<S> possibility) {
@@ -23,6 +25,11 @@ public interface ConfiguredExpressionType<S extends BranchableStream<?, ?>> exte
 		public ConfiguredExpressionPossibility(ConfiguredExpressionType<? super S> type, ExpressionPossibility<S> wrapped) {
 			theType = type;
 			theWrapped = wrapped;
+		}
+
+		@Override
+		public ExpressionComponent<? super S> getType() {
+			return theType;
 		}
 
 		@Override
@@ -63,6 +70,16 @@ public interface ConfiguredExpressionType<S extends BranchableStream<?, ?>> exte
 		@Override
 		public boolean isComplete() {
 			return theWrapped.isComplete();
+		}
+
+		@Override
+		public boolean isEquivalent(ExpressionPossibility<S> o) {
+			if (o == this)
+				return true;
+			else if (!(o instanceof ConfiguredExpressionPossibility))
+				return false;
+			ConfiguredExpressionPossibility<S> other = (ConfiguredExpressionPossibility<S>) o;
+			return theType.equals(other.getType()) && theWrapped.isEquivalent(other.theWrapped);
 		}
 
 		@Override

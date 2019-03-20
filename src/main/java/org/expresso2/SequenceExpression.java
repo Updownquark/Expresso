@@ -29,4 +29,12 @@ public class SequenceExpression<S extends BranchableStream<?, ?>> extends Abstra
 			return getComponents().get(componentCount) + " expected";
 		return null;
 	}
+
+	@Override
+	public String toString() {
+		if (getComponents().size() == 1)
+			return getComponents().get(0).toString();
+		else
+			return getComponents().toString();
+	}
 }

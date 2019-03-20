@@ -14,9 +14,14 @@ public class LeadUpExpressionComponent<S extends BranchableStream<?, ?>> extends
 	}
 
 	@Override
-	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException {
-		ExpressionPossibility<S2> terminal = parser.parseWith(theTerminal);
+	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser, boolean useCache) throws IOException {
+		ExpressionPossibility<S2> terminal = parser.parseWith(theTerminal, true);
 		return terminal == null ? null : new LeadUpPossibility<>(this, parser, theTerminal, terminal);
+	}
+
+	@Override
+	public String toString() {
+		return "..." + theTerminal;
 	}
 
 	private static class LeadUpPossibility<S extends BranchableStream<?, ?>> implements ExpressionPossibility<S> {
@@ -31,6 +36,11 @@ public class LeadUpExpressionComponent<S extends BranchableStream<?, ?>> extends
 			theParser = parser;
 			theTerminal = terminal;
 			theTerminalPossibility = terminalPossibility;
+		}
+
+		@Override
+		public ExpressionComponent<? super S> getType() {
+			return theType;
 		}
 
 		@Override
@@ -49,7 +59,7 @@ public class LeadUpExpressionComponent<S extends BranchableStream<?, ?>> extends
 			ExpressoParser<S> advanced = theParser.advance(1);
 			if (advanced == null)
 				return null;
-			ExpressionPossibility<S> terminal = advanced.parseWith(theTerminal);
+			ExpressionPossibility<S> terminal = advanced.parseWith(theTerminal, true);
 			return terminal == null ? null : new LeadUpPossibility<>(theType, theParser, theTerminal, terminal);
 		}
 
@@ -85,6 +95,16 @@ public class LeadUpExpressionComponent<S extends BranchableStream<?, ?>> extends
 		@Override
 		public boolean isComplete() {
 			return theTerminalPossibility.isComplete();
+		}
+
+		@Override
+		public boolean isEquivalent(ExpressionPossibility<S> o) {
+			if (this == o)
+				return true;
+			else if (!(o instanceof LeadUpPossibility))
+				return false;
+			LeadUpPossibility<S> other = (LeadUpPossibility<S>) o;
+			return getType().equals(other.getType()) && theTerminalPossibility.isEquivalent(other.theTerminalPossibility);
 		}
 
 		@Override

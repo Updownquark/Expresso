@@ -23,7 +23,7 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 	public Expression<S> parse(S stream, ExpressionComponent<? super S> component, boolean bestError)
 		throws IOException {
 		BetterSortedSet<ExpressionPossibility<S>> possibilities = new BetterTreeSet<>(false, ParseSession::comparePossibilities);
-		ExpressionPossibility<S> nextBest = getParser(stream, 0, new int[0]).parseWith(component);
+		ExpressionPossibility<S> nextBest = getParser(stream, 0, new int[0]).parseWith(component, true);
 		ExpressionPossibility<S> bestComplete = null;
 		ExpressionPossibility<S> best = null;
 		while (nextBest != null) {

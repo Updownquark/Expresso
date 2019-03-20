@@ -29,7 +29,7 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 	}
 
 	@Override
-	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> session) throws IOException {
+	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> session, boolean useCache) throws IOException {
 		return new TextPatternPossibility<>(this, session);
 	}
 
@@ -48,6 +48,11 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 			theParser = parser;
 			parser.getStream().discoverTo(theType.getMaxLength());
 			theMatcher = theType.getPattern().matcher(parser.getStream());
+		}
+
+		@Override
+		public ExpressionComponent<? super S> getType() {
+			return theType;
 		}
 
 		@Override
@@ -88,6 +93,15 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 		@Override
 		public boolean isComplete() {
 			return true;
+		}
+
+		@Override
+		public boolean isEquivalent(ExpressionPossibility<S> o) {
+			if (this == o)
+				return true;
+			else if (!(o instanceof TextPatternPossibility))
+				return false;
+			return getType().equals(o.getType()) && getStream().getPosition() == o.getStream().getPosition();
 		}
 
 		@Override

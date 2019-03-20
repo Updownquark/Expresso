@@ -28,14 +28,14 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 	protected abstract String getErrorForComponentCount(int componentCount);
 
 	@Override
-	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException {
+	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser, boolean useCache) throws IOException {
 		int tries = getInitComponentCount();
 		List<ExpressionPossibility<S2>> repetitions = new ArrayList<>(tries);
 		ExpressoParser<S2> branched = parser;
 		Iterator<? extends ExpressionComponent<? super S>> sequenceIter = theSequence.iterator();
 		for (int i = 0; i < tries && sequenceIter.hasNext(); i++) {
 			ExpressionComponent<? super S> component = sequenceIter.next();
-			ExpressionPossibility<S2> repetition = branched.parseWith(component);
+			ExpressionPossibility<S2> repetition = branched.parseWith(component, true);
 			if (repetition == null)
 				return null;
 			repetitions.add(repetition);
@@ -92,6 +92,11 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 			theLength = length;
 			theErrorCount = errorCount;
 			theErrorPos = errorPos;
+		}
+
+		@Override
+		public ExpressionComponent<? super S> getType() {
+			return theType;
 		}
 
 		@Override
@@ -164,7 +169,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 					if (!sequenceIter.hasNext()) {
 						List<ExpressionPossibility<S>> repetitions = new ArrayList<>(theRepetitions.size() + 1);
 						ExpressionComponent<? super S> nextComponent = sequenceIter.next();
-						repetitions.add(theParser.advance(length()).parseWith(nextComponent));
+						repetitions.add(theParser.advance(length()).parseWith(nextComponent, true));
 						return new SequencePossibility<>(theType, theParser, Collections.unmodifiableList(repetitions), true, true, false,
 							true);
 					}
@@ -191,6 +196,27 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 					return false;
 			}
 			return theType.isComplete(theRepetitions.size());
+		}
+
+		@Override
+		public boolean isEquivalent(ExpressionPossibility<S> o) {
+			if (o == this)
+				return true;
+			else if (o == null || o.getClass() != getClass())
+				return false;
+			SequencePossibility<S> other = (SequencePossibility<S>) o;
+			if (!getType().equals(other.getType()))
+				return false;
+			if (getStream().getPosition() != other.getStream().getPosition())
+				return false;
+			if (length() != other.length())
+				return false;
+			if (theRepetitions.size() != other.theRepetitions.size())
+				return false;
+			for (int i = 0; i < theRepetitions.size(); i++)
+				if (!theRepetitions.get(i).isEquivalent(other.theRepetitions.get(i)))
+					return false;
+			return true;
 		}
 
 		@Override

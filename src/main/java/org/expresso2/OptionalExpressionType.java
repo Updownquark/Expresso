@@ -13,8 +13,16 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 	}
 
 	@Override
-	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> session) throws IOException {
-		return new OptionalPossibility<>(this, session, super.parse(session), true);
+	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> session, boolean useCache) throws IOException {
+		ExpressionPossibility<S2> superPossibility = super.parse(session, true);
+		if (superPossibility == null)
+			superPossibility = ExpressionPossibility.empty(session.getStream(), this);
+		return new OptionalPossibility<>(this, session, superPossibility, true);
+	}
+
+	@Override
+	public String toString() {
+		return "?" + super.toString();
 	}
 
 	private static class OptionalPossibility<S extends BranchableStream<?, ?>> implements ExpressionPossibility<S> {
@@ -29,6 +37,11 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 			theParser = parser;
 			theOption = option;
 			isEmpty = empty;
+		}
+
+		@Override
+		public ExpressionComponent<? super S> getType() {
+			return theType;
 		}
 
 		@Override
@@ -78,6 +91,16 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 		@Override
 		public boolean isComplete() {
 			return theOption.isComplete();
+		}
+
+		@Override
+		public boolean isEquivalent(ExpressionPossibility<S> o) {
+			if (this == o)
+				return true;
+			else if (!(o instanceof OptionalPossibility))
+				return false;
+			OptionalPossibility<S> other = (OptionalPossibility<S>) o;
+			return getType().equals(other.getType()) && theOption.isEquivalent(other.theOption);
 		}
 
 		@Override

@@ -10,7 +10,7 @@ public abstract class AbstractExpressionComponent<S extends BranchableStream<?, 
 	}
 
 	@Override
-	public int getId() {
+	public int getCacheId() {
 		return id;
 	}
 }
