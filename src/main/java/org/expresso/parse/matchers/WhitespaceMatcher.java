@@ -76,7 +76,7 @@ public class WhitespaceMatcher<S extends CharSequenceStream> implements ParseMat
 	}
 
 	private boolean isNextWS(CharSequenceStream stream) {
-		if(stream.getDiscoveredLength() == 0 && stream.isDiscovered())
+		if(stream.getDiscoveredLength() == 0 && stream.isFullyDiscovered())
 			return false;
 		return isWhitespace(stream.charAt(0));
 	}

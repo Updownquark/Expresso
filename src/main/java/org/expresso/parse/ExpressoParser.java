@@ -225,7 +225,7 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> extends ParseM
 				return new Iterator<ParseMatch<SS>>() {
 					@Override
 					public boolean hasNext() {
-						return !stream.isDiscovered() || stream.getDiscoveredLength() > 0;
+						return !stream.isFullyDiscovered() || stream.getDiscoveredLength() > 0;
 					}
 
 					@Override

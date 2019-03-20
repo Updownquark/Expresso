@@ -34,12 +34,19 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 			if (theLength == theChunkSize)
 				throw new IllegalStateException("No more data to get for this chunk");
 			int nextLen = getNextData(theData, theLength);
+			while (nextLen == 0) {
+				// Wait for more data
+				try {
+					Thread.sleep(10);
+				} catch (InterruptedException e) {
+				}
+			}
 			if (nextLen < 0) {
 				isLast = true;
 				return;
-			} else if (nextLen < theChunkSize - theLength) {
-				isLast = true;
 			}
+			if (nextLen < theChunkSize - theLength)
+				isLast = true;
 			theLength += nextLen;
 			if (theLength == theChunkSize)
 				theNextChunk = new Chunk(theChunkIndex + 1);
@@ -61,6 +68,8 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 		}
 	}
 
+	private final BranchableStream<D, C> theRoot;
+
 	private final int theChunkSize;
 
 	private Chunk theChunk;
@@ -72,6 +81,7 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 	protected BranchableStream(int chunkSize) {
 		if (chunkSize <= 0)
 			throw new IllegalArgumentException("Positive chunk size expected, not " + chunkSize);
+		theRoot = this;
 		theChunkSize = chunkSize;
 		theChunk = new Chunk(0);
 		thePosition = 0;
@@ -122,7 +132,7 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 	public int discoverTo(int length) throws IOException {
 		if (length < 0)
 			throw new IndexOutOfBoundsException("" + length);
-		if (isDiscovered()) {
+		if (isFullyDiscovered()) {
 			int realLength = getDiscoveredLength();
 			if (realLength > length)
 				realLength = length;
@@ -130,18 +140,16 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 		}
 		Chunk chunk = theChunk;
 		int realLength = -thePosition;
-		while (chunk != null && length >= realLength + chunk.length()) {
+		while (length >= realLength + chunk.length()) {
 			if (chunk.length() == theChunkSize) {
 				realLength += chunk.length();
 				chunk = chunk.getNext();
-			} else if (isDiscovered())
+			} else if (chunk.isLast)
 				break;
 			else
 				chunk.getMore();
 		}
-		if (chunk == null)
-			return realLength;
-		return length;
+		return realLength + chunk.length() - thePosition;
 	}
 
 	/**
@@ -171,12 +179,13 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 	}
 
 	private void _advance(int spaces) throws IOException {
-		if (isDiscovered() && spaces == getDiscoveredLength()) {
+		if (isFullyDiscovered() && spaces == getDiscoveredLength()) {
 			// doOn will throw an out of bounds exception here, but this is acceptable--makes this stream zero-length
 			while (theChunk.getNext() != null) {
 				int newEnd = thePosition + spaces;
 				if (newEnd > theChunk.length())
 					newEnd = theChunk.length();
+				theChunk = theChunk.getNext();
 				advancedPast(theChunk.getData(), thePosition, newEnd);
 			}
 			thePosition = theChunk.length();
@@ -245,7 +254,7 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 	}
 
 	/** @return Whether this stream has discovered all its available content or not */
-	public boolean isDiscovered() {
+	public boolean isFullyDiscovered() {
 		Chunk c = theChunk;
 		while (!c.isLast && c.theNextChunk != null)
 			c = c.theNextChunk;
@@ -273,9 +282,9 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 	 * <ul>
 	 * <li>If there is enough data available to satisfy the request, the chunk will be filled with data to its capacity</li>
 	 * <li>If there is some data available, but not enough to satisfy the request, the available data will be put in the chunk. If it can be
-	 * determined that the data source has been exhausted, the {@link #isDiscovered() discovered} flag will be set to true.</li>
+	 * determined that the data source has been exhausted, the {@link #isFullyDiscovered() discovered} flag will be set to true.</li>
 	 * <li>If no data is available, this request will block until data is available (which will be filled in the chunk) and/or it is
-	 * determined that the data source has been exhausted, in which case the {@link #isDiscovered() discovered} flag will be set to true.
+	 * determined that the data source has been exhausted, in which case the {@link #isFullyDiscovered() discovered} flag will be set to true.
 	 * </li>
 	 * </ul>
 	 *
@@ -293,6 +302,38 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 	 * @return The data value at the given index in the given chunk
 	 */
 	protected abstract D get(C data, int index);
+
+	protected abstract StringBuilder printChunk(C chunk, int start, int end, StringBuilder printTo);
+
+	public StringBuilder printContent(int start, int end, StringBuilder printTo) {
+		if (printTo == null)
+			printTo = new StringBuilder(Math.min(end - start, getDiscoveredLength()));
+		int chunkStart = thePosition + start;
+		int chunkEnd = thePosition + end;
+		Chunk chunk = theChunk;
+		while (chunk != null && chunkStart < chunkEnd) {
+			printChunk(chunk.getData(), chunkStart, Math.min(chunkEnd, chunk.length()), printTo);
+			chunkStart += chunk.length();
+			chunk = chunk.getNext();
+		}
+		return printTo;
+	}
+
+	@Override
+	public String toString() {
+		StringBuilder str = theRoot.printContent(0, theChunk.theChunkIndex * theChunkSize + thePosition, null);
+		Chunk chunk = theChunk;
+		str.append('\u2021'); // Double-dagger for the position
+		if (thePosition != chunk.length())
+			printChunk(chunk.getData(), thePosition, chunk.length(), str);
+		while (!chunk.isLast && chunk.getNext() != null) {
+			chunk = chunk.getNext();
+			printChunk(chunk.getData(), 0, chunk.length(), str);
+		}
+		if (!chunk.isLast)
+			str.append('\u2026'); // Ellipsis to show that there's more data
+		return str.toString();
+	}
 
 	/** @return A representation of this stream's position */
 	public abstract String printPosition();

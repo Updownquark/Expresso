@@ -6,7 +6,7 @@ import java.util.List;
 
 import org.expresso.parse.BranchableStream;
 
-public class OneOfExpression<S extends BranchableStream<?, ?>> extends ExpressionComponent<S> {
+public class OneOfExpression<S extends BranchableStream<?, ?>> extends AbstractExpressionComponent<S> {
 	private final List<? extends ExpressionComponent<? super S>> theComponents;
 
 	public OneOfExpression(int id, List<? extends ExpressionComponent<? super S>> components) {
@@ -23,7 +23,7 @@ public class OneOfExpression<S extends BranchableStream<?, ?>> extends Expressio
 		ExpressionComponent<? super S> first = theComponents.get(0);
 		List<? extends ExpressionComponent<? super S>> remaining = theComponents.subList(1, theComponents.size());
 		ExpressionPossibility<S2> firstPossibility = session.parseWith(first);
-		return new OneOfPossibility<>(this, session, firstPossibility, remaining);
+		return firstPossibility == null ? null : new OneOfPossibility<>(this, session, firstPossibility, remaining);
 	}
 
 	@Override
@@ -58,9 +58,7 @@ public class OneOfExpression<S extends BranchableStream<?, ?>> extends Expressio
 		@Override
 		public ExpressionPossibility<S> advance() throws IOException {
 			ExpressionPossibility<S> componentAdv = theComponent.advance();
-			if (componentAdv == null)
-				return null;
-			return new OneOfPossibility<>(theType, theParser, componentAdv, theRemaining);
+			return componentAdv == null ? null : new OneOfPossibility<>(theType, theParser, componentAdv, theRemaining);
 		}
 
 		@Override
@@ -75,12 +73,17 @@ public class OneOfExpression<S extends BranchableStream<?, ?>> extends Expressio
 			ExpressionComponent<? super S> next = theRemaining.get(0);
 			List<? extends ExpressionComponent<? super S>> remaining = theRemaining.subList(1, theRemaining.size());
 			ExpressionPossibility<S> nextPossibility = theParser.parseWith(next);
-			return new OneOfPossibility<>(theType, theParser, nextPossibility, remaining);
+			return nextPossibility == null ? null : new OneOfPossibility<>(theType, theParser, nextPossibility, remaining);
 		}
 
 		@Override
 		public int getErrorCount() {
 			return theComponent.getErrorCount();
+		}
+
+		@Override
+		public int getFirstErrorPosition() {
+			return theComponent.getFirstErrorPosition();
 		}
 
 		@Override
@@ -94,7 +97,7 @@ public class OneOfExpression<S extends BranchableStream<?, ?>> extends Expressio
 		}
 	}
 
-	public static class OneOfExpr<S extends BranchableStream<?, ?>> extends Expression<S> {
+	public static class OneOfExpr<S extends BranchableStream<?, ?>> extends AbstractExpression<S> {
 		private final Expression<S> theComponent;
 
 		public OneOfExpr(OneOfExpression<? super S> type, Expression<S> component) {
@@ -135,6 +138,11 @@ public class OneOfExpression<S extends BranchableStream<?, ?>> extends Expressio
 		@Override
 		public int length() {
 			return theComponent.length();
+		}
+
+		@Override
+		public Expression<S> unwrap() {
+			return theComponent.unwrap();
 		}
 	}
 }

@@ -4,12 +4,8 @@ import java.io.IOException;
 
 import org.expresso.parse.BranchableStream;
 
-public abstract class ExpressionComponent<S extends BranchableStream<?, ?>> {
-	public final Integer id;
+public interface ExpressionComponent<S extends BranchableStream<?, ?>> {
+	int getId();
 
-	public ExpressionComponent(int id) {
-		this.id = id;
-	}
-
-	public abstract <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException;
+	<S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException;
 }

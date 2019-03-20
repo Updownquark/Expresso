@@ -6,7 +6,7 @@ import java.util.List;
 
 import org.expresso.parse.BranchableStream;
 
-public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? super C>> extends ExpressionComponent<S> {
+public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? super C>> extends AbstractExpressionComponent<S> {
 	private final C theValue;
 
 	public LiteralExpressionType(int id, C value) {
@@ -89,6 +89,11 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 		}
 
 		@Override
+		public int getFirstErrorPosition() {
+			return matchedUntil == theType.getLength() ? -1 : matchedUntil;
+		}
+
+		@Override
 		public boolean isComplete() {
 			return true;
 		}
@@ -99,7 +104,7 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 		}
 	}
 
-	private static class LiteralExpression<C, S extends BranchableStream<?, ? super C>> extends Expression<S> {
+	private static class LiteralExpression<C, S extends BranchableStream<?, ? super C>> extends AbstractExpression<S> {
 		private final int theLength;
 		private final int matchedUntil;
 
@@ -145,6 +150,11 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 		@Override
 		public int length() {
 			return theLength;
+		}
+
+		@Override
+		public Expression<S> unwrap() {
+			return this;
 		}
 	}
 }

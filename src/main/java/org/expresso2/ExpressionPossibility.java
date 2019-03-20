@@ -17,6 +17,8 @@ public interface ExpressionPossibility<S extends BranchableStream<?, ?>> {
 
 	int getErrorCount();
 
+	int getFirstErrorPosition();
+
 	boolean isComplete();
 
 	Expression<S> getExpression();
@@ -51,6 +53,11 @@ public interface ExpressionPossibility<S extends BranchableStream<?, ?>> {
 			@Override
 			public int getErrorCount() {
 				return 0;
+			}
+
+			@Override
+			public int getFirstErrorPosition() {
+				return -1;
 			}
 
 			@Override

@@ -22,35 +22,44 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 
 	public Expression<S> parse(S stream, ExpressionComponent<? super S> component, boolean bestError)
 		throws IOException {
-		ExpressionPossibility<S> sequence = getParser(stream, 0, new int[0]).parseWith(component);
 		BetterSortedSet<ExpressionPossibility<S>> possibilities = new BetterTreeSet<>(false, ParseSession::comparePossibilities);
-		possibilities.add(sequence);
+		ExpressionPossibility<S> nextBest = getParser(stream, 0, new int[0]).parseWith(component);
 		ExpressionPossibility<S> bestComplete = null;
-		while (true) {
-			ExpressionPossibility<S> nextBest = possibilities.pollFirst();
-			if (nextBest == null)
-				break;
+		ExpressionPossibility<S> best = null;
+		while (nextBest != null) {
 			ExpressionPossibility<S> branch;
-			if (nextBest.isComplete() && (bestError || nextBest.getErrorCount() == 0)) {
-				if (bestComplete == null || comparePossibilities(nextBest, bestComplete) < 0)
-					bestComplete = nextBest;
+			if (best == null || comparePossibilities(nextBest, best) < 0)
+				best = nextBest;
+			if (nextBest.isComplete() && nextBest.getErrorCount() == 0
+				&& (bestComplete == null || comparePossibilities(nextBest, bestComplete) < 0))
+				bestComplete = nextBest;
+			if (!bestError) {
+				int errorPos = nextBest.getFirstErrorPosition();
+				if (errorPos < 0 || errorPos == nextBest.length())
+					branch = nextBest.advance();
+				else
+					branch = null;
+			} else
 				branch = nextBest.advance();
-				if (branch != null)
-					possibilities.add(branch);
-			}
+			if (branch != null)
+				possibilities.add(branch);
 			branch = nextBest.rightFork();
 			if (branch != null)
 				possibilities.add(branch);
 			branch = nextBest.leftFork();
 			if (branch != null)
 				possibilities.add(branch);
+
+			nextBest = possibilities.pollFirst();
 		}
 		if (bestComplete != null)
 			return bestComplete.getExpression();
-		else if (possibilities.isEmpty())
+		else if (best == null)
 			throw new IllegalStateException("No possibilities?!");
+		else if (bestError)
+			return best.getExpression();
 		else
-			return possibilities.getFirst().getExpression();
+			return null;
 	}
 
 	ExpressoParser<S> getParser(S stream, int advance, int[] excludedTypes) throws IOException {
@@ -82,15 +91,15 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 		if (compare == 0) {
 			int i;
 			for (i = 0; i < excludedTypes1.length && i < excludedTypes2.length; i++) {
-				if (excludedTypes1[i] != excludedTypes2[i] || excludedTypes1[i] == -1)
+				if (excludedTypes1[i] != excludedTypes2[i] || excludedTypes1[i] == -1) {
+					compare = Integer.compare(excludedTypes1[i], excludedTypes2[i]);
 					break;
+				}
 			}
-			if (i < excludedTypes1.length && excludedTypes1[i] != -1)
+			if (i == excludedTypes1.length)
 				compare = 1;
-			else if (i < excludedTypes2.length && excludedTypes2[i] != -1)
+			else if (i == excludedTypes2.length)
 				compare = -1;
-			else
-				compare = excludedTypes1[i] - excludedTypes2[i];
 		}
 		return compare;
 	}

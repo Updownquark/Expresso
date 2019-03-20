@@ -9,7 +9,7 @@ import java.util.List;
 import org.expresso.parse.BranchableStream;
 import org.qommons.BiTuple;
 
-public abstract class AbstractSequencedExpressionType<S extends BranchableStream<?, ?>> extends ExpressionComponent<S> {
+public abstract class AbstractSequencedExpressionType<S extends BranchableStream<?, ?>> extends AbstractExpressionComponent<S> {
 	private final Iterable<? extends ExpressionComponent<? super S>> theSequence;
 
 	public AbstractSequencedExpressionType(int id, Iterable<? extends ExpressionComponent<? super S>> sequence) {
@@ -36,6 +36,8 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		for (int i = 0; i < tries && sequenceIter.hasNext(); i++) {
 			ExpressionComponent<? super S> component = sequenceIter.next();
 			ExpressionPossibility<S2> repetition = branched.parseWith(component);
+			if (repetition == null)
+				return null;
 			repetitions.add(repetition);
 			if (!repetition.isComplete() || repetition.getErrorCount() > 0)
 				break;
@@ -56,7 +58,9 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		private final boolean allowRightFork;
 		private final boolean allowFewerReps;
 		private final boolean allowMoreReps;
+		private final int theLength;
 		private final int theErrorCount;
+		private final int theErrorPos;
 
 		SequencePossibility(AbstractSequencedExpressionType<? super S> type, ExpressoParser<S> parser,
 			List<ExpressionPossibility<S>> repetitions) {
@@ -73,10 +77,21 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 			this.allowRightFork = allowRightFork;
 			this.allowFewerReps = allowFewerReps;
 			this.allowMoreReps = allowMoreReps;
+			int length = 0;
 			int errorCount = 0;
-			for (ExpressionPossibility<S> rep : repetitions)
+			int errorPos = -1;
+			for (ExpressionPossibility<S> rep : repetitions) {
+				if (errorPos == -1) {
+					errorPos = rep.getFirstErrorPosition();
+					if (errorPos >= 0)
+						errorPos += length;
+				}
+				length += rep.length();
 				errorCount += rep.getErrorCount();
+			}
+			theLength = length;
 			theErrorCount = errorCount;
+			theErrorPos = errorPos;
 		}
 
 		@Override
@@ -86,10 +101,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 
 		@Override
 		public int length() {
-			if (theRepetitions.isEmpty())
-				return 0;
-			ExpressionPossibility<S> last = theRepetitions.get(theRepetitions.size() - 1);
-			return last.getStream().getPosition() + last.length() - theParser.getStream().getPosition();
+			return theLength;
 		}
 
 		@Override
@@ -167,6 +179,11 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		}
 
 		@Override
+		public int getFirstErrorPosition() {
+			return theErrorPos;
+		}
+
+		@Override
 		public boolean isComplete() {
 			if (!theRepetitions.isEmpty()) {
 				ExpressionPossibility<S> last = theRepetitions.get(theRepetitions.size() - 1);
@@ -204,6 +221,11 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 					selfError = new BiTuple<>(length(), ccError);
 			}
 			return selfError;
+		}
+
+		@Override
+		public Expression<S> unwrap() {
+			return this;
 		}
 	}
 }

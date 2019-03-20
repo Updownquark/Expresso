@@ -5,7 +5,7 @@ import java.util.Arrays;
 
 import org.expresso.parse.BranchableStream;
 
-public class LeadUpExpressionComponent<S extends BranchableStream<?, ?>> extends ExpressionComponent<S> {
+public class LeadUpExpressionComponent<S extends BranchableStream<?, ?>> extends AbstractExpressionComponent<S> {
 	private final ExpressionComponent<S> theTerminal;
 
 	public LeadUpExpressionComponent(int id, ExpressionComponent<S> terminal) {
@@ -16,7 +16,7 @@ public class LeadUpExpressionComponent<S extends BranchableStream<?, ?>> extends
 	@Override
 	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException {
 		ExpressionPossibility<S2> terminal = parser.parseWith(theTerminal);
-		return new LeadUpPossibility<>(this, parser, theTerminal, terminal);
+		return terminal == null ? null : new LeadUpPossibility<>(this, parser, theTerminal, terminal);
 	}
 
 	private static class LeadUpPossibility<S extends BranchableStream<?, ?>> implements ExpressionPossibility<S> {
@@ -50,7 +50,7 @@ public class LeadUpExpressionComponent<S extends BranchableStream<?, ?>> extends
 			if (advanced == null)
 				return null;
 			ExpressionPossibility<S> terminal = advanced.parseWith(theTerminal);
-			return new LeadUpPossibility<>(theType, theParser, theTerminal, terminal);
+			return terminal == null ? null : new LeadUpPossibility<>(theType, theParser, theTerminal, terminal);
 		}
 
 		@Override
@@ -75,6 +75,14 @@ public class LeadUpExpressionComponent<S extends BranchableStream<?, ?>> extends
 		}
 
 		@Override
+		public int getFirstErrorPosition() {
+			int errPos = theTerminalPossibility.getFirstErrorPosition();
+			if (errPos >= 0)
+				errPos += theTerminalPossibility.getStream().getPosition() - theParser.getStream().getPosition();
+			return errPos;
+		}
+
+		@Override
 		public boolean isComplete() {
 			return theTerminalPossibility.isComplete();
 		}
@@ -88,6 +96,11 @@ public class LeadUpExpressionComponent<S extends BranchableStream<?, ?>> extends
 	private static class LeadUpExpression<S extends BranchableStream<?, ?>> extends ComposedExpression<S> {
 		public LeadUpExpression(LeadUpExpressionComponent<? super S> type, S stream, Expression<S> terminal) {
 			super(stream, type, Arrays.asList(terminal));
+		}
+
+		@Override
+		public Expression<S> unwrap() {
+			return this;
 		}
 	}
 }

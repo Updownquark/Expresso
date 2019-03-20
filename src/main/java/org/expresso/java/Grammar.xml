@@ -10,8 +10,8 @@
 			<one-of>
 				<literal field="value">&quot;</literal>
 				<pattern field="value">[\x20-~]</pattern>
-				<pattern field="value" tag="escaped">\\[&apos;&quot;tnrbf]</pattern>
-				<pattern field="value" tag="escaped,unicode">\\u[0-9a-fA-F]{4}</pattern>
+				<pattern field="value,escaped">\\[&apos;&quot;tnrbf]</pattern>
+				<pattern field="value,escaped,unicode">\\u[0-9a-fA-F]{4}</pattern>
 			</one-of>
 			<literal>&apos;</literal>
 		</without>
@@ -40,19 +40,19 @@
 		</option>
 		<without classes="ignorable">
 			<one-of>
-				<sequence tag="decimal">
+				<sequence field="decimal">
 					<pattern field="integer">[1-9][_0-9]*</pattern>
 					<literal>.</literal>
 					<option>
 						<pattern field="fraction">[0-9][_0-9]</pattern>
 					</option>
 				</sequence>
-				<sequence tag="decimal">
+				<sequence field="decimal">
 					<literal>.</literal>
 					<pattern field="fraction">[0-9][_0-9]*</pattern>
 				</sequence>
-				<pattern field="integer" tag="int">[1-9][_0-9]*</pattern>
-				<literal field="integer" tag="int">0</literal>
+				<pattern field="integer">[1-9][_0-9]*</pattern>
+				<literal field="integer">0</literal>
 			</one-of>
 			<option>
 				<pattern>[eE]</pattern>
@@ -207,13 +207,13 @@
 		<result-producer field="condition" />
 		<literal>)</literal>
 		<one-of>
-			<statement field="content" tag="post-condition" />
-			<block field="content" tag="post-condition" />
+			<statement field="content,post-condition" />
+			<block field="content,post-condition" />
 		</one-of>
 	</expression>
 	<expression name="do-while-loop">
 		<literal field="name">do</literal>
-		<block field="content" tag="pre-condition" />
+		<block field="content,pre-condition" />
 		<literal>while</literal>
 		<literal>(</literal>
 		<result-producer field="condition" />
@@ -245,8 +245,8 @@
 		<literal>)</literal>
 		<one-of>
 			<literal field="terminal">;</literal>
-			<statement field="content" tag="post-condition" />
-			<block field="content" tag="post-condition" />
+			<statement field="content,post-condition" />
+			<block field="content,post-condition" />
 		</one-of>
 	</expression>
 	<expression name="enhanced-for-loop">
@@ -258,8 +258,8 @@
 		<result-producer field="iterable" />
 		<literal>)</literal>
 		<one-of>
-			<statement field="content" tag="post-condition" />
-			<block field="content" tag="post-condition" />
+			<statement field="content,post-condition" />
+			<block field="content,post-condition" />
 		</one-of>
 	</expression>
 	<expression name="if">
@@ -322,7 +322,7 @@
 		<pattern field="name">[_a-zA-Z][_a-zA-Z0-9]*</pattern>
 	</expression>
 	<expression name="primitive">
-		<one-of field="primitive" tag="type">
+		<one-of field="primitive,type">
 			<literal>void</literal>
 			<literal>boolean</literal>
 			<literal>true</literal>
@@ -340,7 +340,7 @@
 		<!-- Just documenting, this is in this order as opposed to having the repeat first because of var-args.  With the repeat first,
 			var arg parameters were parsed with the repeat successful (identifier, then '.'), but the next identifier wasn't there, so the
 			parsing failed.  This ordering fixes this problem. -->
-		<identifier field="name" tag="final-name" />
+		<identifier field="name,final-name" />
 		<repeat>
 			<literal>.</literal>
 			<identifier field="name" />

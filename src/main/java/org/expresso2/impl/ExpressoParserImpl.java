@@ -53,10 +53,10 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 
 	@Override
 	public ExpressionPossibility<S> parseWith(ExpressionComponent<? super S> component) throws IOException {
-		if (theExcludedTypes != null && Arrays.binarySearch(theExcludedTypes, component.id) >= 0)
+		if (theExcludedTypes != null && Arrays.binarySearch(theExcludedTypes, component.getId()) >= 0)
 			return null;
 		boolean[] newCache = new boolean[1];
-		CachedExpressionPossibility<S> cached = theCache.computeIfAbsent(component.id, k -> {
+		CachedExpressionPossibility<S> cached = theCache.computeIfAbsent(component.getId(), k -> {
 			newCache[0] = true;
 			return new CachedExpressionPossibility<>();
 		});

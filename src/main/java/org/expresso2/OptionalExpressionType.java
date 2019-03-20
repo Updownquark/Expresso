@@ -71,6 +71,11 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 		}
 
 		@Override
+		public int getFirstErrorPosition() {
+			return theOption.getFirstErrorPosition();
+		}
+
+		@Override
 		public boolean isComplete() {
 			return theOption.isComplete();
 		}
@@ -84,6 +89,16 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 	private static class OptionalExpression<S extends BranchableStream<?, ?>> extends ComposedExpression<S> {
 		OptionalExpression(S stream, OptionalExpressionType<? super S> type, Expression<S> optional) {
 			super(stream, type, optional == null ? Collections.emptyList() : Arrays.asList(optional));
+		}
+
+		@Override
+		public Expression<S> unwrap() {
+			if (getChildren().isEmpty())
+				return null;
+			else if (getChildren().size() == 1)
+				return getChildren().get(0).unwrap();
+			else
+				return this;
 		}
 	}
 }

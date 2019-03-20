@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
 
 import org.expresso.parse.impl.CharSequenceStream;
 
-public class TextPatternExpressionType<S extends CharSequenceStream> extends ExpressionComponent<S> {
+public class TextPatternExpressionType<S extends CharSequenceStream> extends AbstractExpressionComponent<S> {
 	private final Pattern thePattern;
 	private final int theMaxLength;
 
@@ -81,6 +81,11 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Exp
 		}
 
 		@Override
+		public int getFirstErrorPosition() {
+			return theMatcher.lookingAt() ? -1 : 0;
+		}
+
+		@Override
 		public boolean isComplete() {
 			return true;
 		}
@@ -91,7 +96,7 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Exp
 		}
 	}
 
-	private static class TextPatternExpression<S extends CharSequenceStream> extends Expression<S> {
+	private static class TextPatternExpression<S extends CharSequenceStream> extends AbstractExpression<S> {
 		private final Matcher theMatcher;
 
 		public TextPatternExpression(S stream, TextPatternExpressionType<? super S> type, Matcher matcher) {
@@ -132,6 +137,11 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Exp
 		@Override
 		public int length() {
 			return theMatcher.lookingAt() ? theMatcher.end() : 0;
+		}
+
+		@Override
+		public Expression<S> unwrap() {
+			return this;
 		}
 	}
 }

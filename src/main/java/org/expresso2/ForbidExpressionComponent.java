@@ -5,7 +5,7 @@ import java.util.Arrays;
 
 import org.expresso.parse.BranchableStream;
 
-public class ForbidExpressionComponent<S extends BranchableStream<?, ?>> extends ExpressionComponent<S> {
+public class ForbidExpressionComponent<S extends BranchableStream<?, ?>> extends AbstractExpressionComponent<S> {
 	private final ExpressionComponent<S> theForbidden;
 
 	public ForbidExpressionComponent(int id, ExpressionComponent<S> forbidden) {
@@ -16,7 +16,7 @@ public class ForbidExpressionComponent<S extends BranchableStream<?, ?>> extends
 	@Override
 	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException {
 		ExpressionPossibility<S2> forbidden = parser.parseWith(theForbidden);
-		return new ForbiddenPossibility<>(this, parser, forbidden);
+		return forbidden == null ? null : new ForbiddenPossibility<>(this, parser, forbidden);
 	}
 
 	private static class ForbiddenPossibility<S extends BranchableStream<?, ?>> implements ExpressionPossibility<S> {
@@ -70,6 +70,14 @@ public class ForbidExpressionComponent<S extends BranchableStream<?, ?>> extends
 		}
 
 		@Override
+		public int getFirstErrorPosition() {
+			int errPos = theForbidden.getFirstErrorPosition();
+			if (errPos < 0 && theForbidden.length() > 0)
+				errPos = 0;
+			return errPos;
+		}
+
+		@Override
 		public boolean isComplete() {
 			return theForbidden.isComplete();
 		}
@@ -116,6 +124,11 @@ public class ForbidExpressionComponent<S extends BranchableStream<?, ?>> extends
 				return null;
 			else
 				return "Forbidden content present";
+		}
+
+		@Override
+		public Expression<S> unwrap() {
+			return this;
 		}
 	}
 }

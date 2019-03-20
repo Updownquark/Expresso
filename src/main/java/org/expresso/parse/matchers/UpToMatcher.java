@@ -54,7 +54,7 @@ public class UpToMatcher<S extends BranchableStream<?, ?>> extends BaseMatcher<S
 
 			@Override
 			public boolean hasNext() throws IOException {
-				return !found && !(copy.isDiscovered() && copy.getDiscoveredLength() == 0);
+				return !found && !(copy.isFullyDiscovered() && copy.getDiscoveredLength() == 0);
 			}
 
 			@Override

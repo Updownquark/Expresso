@@ -61,6 +61,11 @@ class CachedExpressionPossibility<S extends BranchableStream<?, ?>> implements E
 	}
 
 	@Override
+	public int getFirstErrorPosition() {
+		return thePossibility.getFirstErrorPosition();
+	}
+
+	@Override
 	public boolean isComplete() {
 		return thePossibility.isComplete();
 	}

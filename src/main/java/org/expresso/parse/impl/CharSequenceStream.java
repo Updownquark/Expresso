@@ -19,7 +19,7 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 
 	@Override
 	public int length() {
-		return isDiscovered() ? getDiscoveredLength() : getDiscoveredLength() + 1;
+		return isFullyDiscovered() ? getDiscoveredLength() : getDiscoveredLength() + 1;
 	}
 
 	@Override
@@ -45,7 +45,7 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 			} // Check the end index
 		}
 		if(start == 0) {
-			if(isDiscovered() && end == length())
+			if(isFullyDiscovered() && end == length())
 				return this;
 			return new CharSequence() {
 				@Override
@@ -119,10 +119,15 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 	}
 
 	@Override
+	protected StringBuilder printChunk(char[] chunk, int start, int end, StringBuilder printTo) {
+		return printTo.append(chunk, start, end - start);
+	}
+
+	@Override
 	public String printPosition() {
 		StringBuilder ret = new StringBuilder();
 		ret.append("Line ").append(theLineNumber).append(", Column ").append(theColumnNumber).append('\n').append(theCurrentLine);
-		for (int i = 0; i < getDiscoveredLength() || !isDiscovered(); i++) {
+		for (int i = 0; i < getDiscoveredLength() || !isFullyDiscovered(); i++) {
 			char c = charAt(i);
 			if (c == '\n')
 				break;
@@ -158,7 +163,10 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 	 * @return The stream backed by the character array
 	 */
 	public static CharSequenceStream from(char [] array) {
+		// TODO this will throw an exception for an zero-length array
 		return new CharSequenceStream(array.length) {
+			private boolean isFinished;
+
 			@Override
 			protected char [] createChunk(int length) {
 				return array;
@@ -166,6 +174,9 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 
 			@Override
 			protected int getNextData(char [] chunk, int start) {
+				if (isFinished)
+					return -1;
+				isFinished = true;
 				return chunk.length;
 			}
 		};

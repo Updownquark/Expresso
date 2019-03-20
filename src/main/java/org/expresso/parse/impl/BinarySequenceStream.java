@@ -48,7 +48,7 @@ public abstract class BinarySequenceStream extends BranchableStream<Byte, byte [
 	public static BinarySequenceStream from(byte [] array) {
 		return new BinarySequenceStream(array.length) {
 			@Override
-			public boolean isDiscovered() {
+			public boolean isFullyDiscovered() {
 				return true;
 			}
 

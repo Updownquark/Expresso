@@ -6,7 +6,7 @@ import java.util.List;
 import org.expresso.parse.BranchableStream;
 import org.qommons.BiTuple;
 
-public class ComposedExpression<S extends BranchableStream<?, ?>> extends Expression<S> {
+public abstract class ComposedExpression<S extends BranchableStream<?, ?>> extends AbstractExpression<S> {
 	private final List<? extends Expression<S>> theChildren;
 	private final int theLength;
 	private final Expression<S> theFirstError;
