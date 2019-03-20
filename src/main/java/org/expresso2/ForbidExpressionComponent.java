@@ -101,6 +101,11 @@ public class ForbidExpressionComponent<S extends BranchableStream<?, ?>> extends
 		public Expression<S> getExpression() {
 			return new ForbiddenExpression<>(theParser.getStream(), theType, theForbidden.getExpression());
 		}
+
+		@Override
+		public String toString() {
+			return "Forbidden: " + theForbidden;
+		}
 	}
 
 	private static class ForbiddenExpression<S extends BranchableStream<?, ?>> extends ComposedExpression<S> {

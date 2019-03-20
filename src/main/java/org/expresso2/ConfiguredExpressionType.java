@@ -86,5 +86,10 @@ public interface ConfiguredExpressionType<S extends BranchableStream<?, ?>> exte
 		public ConfiguredExpression<S> getExpression() {
 			return new ConfiguredExpression.SimpleConfiguredExpression<>(theType, theWrapped.getExpression());
 		}
+
+		@Override
+		public String toString() {
+			return theWrapped.toString();
+		}
 	}
 }

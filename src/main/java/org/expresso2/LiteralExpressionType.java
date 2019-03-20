@@ -56,7 +56,7 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 		}
 
 		@Override
-		public ExpressionComponent<? super S> getType() {
+		public LiteralExpressionType<C, ? super S> getType() {
 			return theType;
 		}
 
@@ -116,6 +116,14 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 		@Override
 		public Expression<S> getExpression() {
 			return new LiteralExpression<>(theType, theParser.getStream(), theLength, matchedUntil);
+		}
+
+		@Override
+		public String toString() {
+			if (matchedUntil == getType().getLength())
+				return getType().toString();
+			else
+				return getType().toString() + "[" + matchedUntil + "]";
 		}
 	}
 

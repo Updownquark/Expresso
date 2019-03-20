@@ -19,8 +19,8 @@ public class OneOfExpression<S extends BranchableStream<?, ?>> extends AbstractE
 	}
 
 	@Override
-	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> session, boolean useCache) throws IOException {
-		return findNextPossibility(theComponents, session);
+	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser, boolean useCache) throws IOException {
+		return findNextPossibility(theComponents, parser);
 	}
 
 	@Override
@@ -30,34 +30,41 @@ public class OneOfExpression<S extends BranchableStream<?, ?>> extends AbstractE
 
 	<S2 extends S> ExpressionPossibility<S2> findNextPossibility(List<? extends ExpressionComponent<? super S>> components,
 		ExpressoParser<S2> parser) throws IOException {
-		// Repeat until you get the best (unchanging) result
-		int i;
-		ExpressionPossibility<S2> firstPossibility = null;
-		for (i = 0; i < components.size(); i++) {
-			ExpressionComponent<? super S> first = components.get(i);
-			firstPossibility = parser.parseWith(first, true);
+		for (int i = 0; i < theComponents.size(); i++) {
+			ExpressionComponent<? super S> first = theComponents.get(i);
+			ExpressionPossibility<S2> firstPossibility = parser.parseWith(first, true);
 			if (firstPossibility != null)
-				break;
+				return new OneOfPossibility<>(this, parser, firstPossibility, theComponents.subList(i + 1, theComponents.size()));
 		}
-		if (components.size() > 1 && firstPossibility != null) {
-			int j = i;
-			ExpressionPossibility<S2> firstPossibility2 = firstPossibility;
-			do {
-				i = j;
-				firstPossibility = firstPossibility2;
-				firstPossibility2 = null;
-				for (j = 0; j < i; j++) {
-					ExpressionComponent<? super S> first = components.get(j);
-					firstPossibility2 = parser.parseWith(first, false);
-					if (firstPossibility2 != null)
-						break;
-				}
-			} while (firstPossibility2 != null && !firstPossibility.isEquivalent(firstPossibility2));
-		}
-		if (firstPossibility != null)
-			return new OneOfPossibility<>(this, parser, firstPossibility, components.subList(i + 1, components.size()));
-		else
-			return null;
+		return null;
+		// // Repeat until you get the best (unchanging) result
+		// int i;
+		// ExpressionPossibility<S2> firstPossibility = null;
+		// for (i = 0; i < components.size(); i++) {
+		// ExpressionComponent<? super S> first = components.get(i);
+		// firstPossibility = parser.parseWith(first, true);
+		// if (firstPossibility != null)
+		// break;
+		// }
+		// if (components.size() > 1 && firstPossibility != null) {
+		// int j = i;
+		// ExpressionPossibility<S2> firstPossibility2 = firstPossibility;
+		// do {
+		// i = j;
+		// firstPossibility = firstPossibility2;
+		// firstPossibility2 = null;
+		// for (j = 0; j < i; j++) {
+		// ExpressionComponent<? super S> first = components.get(j);
+		// firstPossibility2 = parser.parseWith(first, false);
+		// if (firstPossibility2 != null)
+		// break;
+		// }
+		// } while (firstPossibility2 != null && !firstPossibility.isEquivalent(firstPossibility2));
+		// }
+		// if (firstPossibility != null)
+		// return new OneOfPossibility<>(this, parser, firstPossibility, components.subList(i + 1, components.size()));
+		// else
+		// return null;
 	}
 
 	private static class OneOfPossibility<S extends BranchableStream<?, ?>> implements ExpressionPossibility<S> {
@@ -75,7 +82,7 @@ public class OneOfExpression<S extends BranchableStream<?, ?>> extends AbstractE
 		}
 
 		@Override
-		public ExpressionComponent<? super S> getType() {
+		public OneOfExpression<? super S> getType() {
 			return theType;
 		}
 
@@ -134,6 +141,11 @@ public class OneOfExpression<S extends BranchableStream<?, ?>> extends AbstractE
 		@Override
 		public Expression<S> getExpression() {
 			return new OneOfExpr<>(theType, theComponent.getExpression());
+		}
+
+		@Override
+		public String toString() {
+			return "*(" + theComponent + ")";
 		}
 	}
 

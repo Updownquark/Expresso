@@ -83,6 +83,11 @@ public interface ExpressionPossibility<S extends BranchableStream<?, ?>> {
 			public Expression<S> getExpression() {
 				return Expression.empty(stream, type);
 			}
+
+			@Override
+			public String toString() {
+				return "(empty)";
+			}
 		};
 	}
 }

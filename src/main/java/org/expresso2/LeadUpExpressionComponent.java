@@ -111,6 +111,12 @@ public class LeadUpExpressionComponent<S extends BranchableStream<?, ?>> extends
 		public Expression<S> getExpression() {
 			return new LeadUpExpression<>(theType, theParser.getStream(), theTerminalPossibility.getExpression());
 		}
+
+		@Override
+		public String toString() {
+			return getStream().printContent(0, theTerminalPossibility.getStream().getPosition(), null).append(theTerminalPossibility)
+				.toString();
+		}
 	}
 
 	private static class LeadUpExpression<S extends BranchableStream<?, ?>> extends ComposedExpression<S> {

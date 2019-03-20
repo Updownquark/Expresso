@@ -63,8 +63,15 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 			newCache[0] = true;
 			return new CachedExpressionPossibility<>(component);
 		});
-		if (newCache[0] || !useCache)
-			cached.setPossibility(component.parse(this, true));
+		if (newCache[0]) {
+			// This loop deals with self-references, allowing successively deeper and better results
+			int refCount;
+			ExpressionPossibility<S> parsed;
+			do {
+				refCount = cached.getReferenceCount();
+				parsed = component.parse(this, true);
+			} while (cached.setPossibilityIfDifferent(parsed) && cached.getReferenceCount() != refCount);
+		}
 		return cached.asPossibility();
 	}
 

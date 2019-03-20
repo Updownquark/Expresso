@@ -68,8 +68,7 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 			if (optionFork != null)
 				return new OptionalPossibility<>(theType, theParser, optionFork, false);
 			else
-				return new OptionalPossibility<>(theType, theParser,
-					ExpressionPossibility.empty(theParser.getStream(), theType), true);
+				return new OptionalPossibility<>(theType, theParser, ExpressionPossibility.empty(theParser.getStream(), theType), true);
 		}
 
 		@Override
@@ -106,6 +105,11 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 		@Override
 		public Expression<S> getExpression() {
 			return new OptionalExpression<>(getStream(), theType, theOption.getExpression());
+		}
+
+		@Override
+		public String toString() {
+			return "?(" + theOption + ")";
 		}
 	}
 

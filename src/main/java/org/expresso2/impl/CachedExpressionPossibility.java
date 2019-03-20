@@ -14,6 +14,8 @@ class CachedExpressionPossibility<S extends BranchableStream<?, ?>> implements E
 	private CachedExpressionPossibility<S> theRightFork;
 	private CachedExpressionPossibility<S> theAdvanced;
 
+	private int theReferenceCount;
+
 	CachedExpressionPossibility(ExpressionComponent<? super S> type) {
 		theType = type;
 	}
@@ -23,8 +25,22 @@ class CachedExpressionPossibility<S extends BranchableStream<?, ?>> implements E
 		return this;
 	}
 
-	public ExpressionPossibility<S> asPossibility() {
-		return thePossibility == null ? null : this;
+	boolean setPossibilityIfDifferent(ExpressionPossibility<S> possibility) {
+		if (possibility == null)
+			return false;
+		else if (thePossibility != null && thePossibility.isEquivalent(possibility))
+			return false;
+		thePossibility = possibility;
+		return true;
+	}
+
+	int getReferenceCount() {
+		return theReferenceCount;
+	}
+
+	ExpressionPossibility<S> asPossibility() {
+		theReferenceCount++;
+		return thePossibility;
 	}
 
 	@Override
@@ -95,5 +111,10 @@ class CachedExpressionPossibility<S extends BranchableStream<?, ?>> implements E
 	@Override
 	public Expression<S> getExpression() {
 		return thePossibility.getExpression();
+	}
+
+	@Override
+	public String toString() {
+		return thePossibility == null ? "N/A" : thePossibility.toString();
 	}
 }

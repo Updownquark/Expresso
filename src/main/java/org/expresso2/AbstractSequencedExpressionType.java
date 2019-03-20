@@ -226,6 +226,11 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 				repetitions.add(rep.getExpression());
 			return new SequenceExpression<>(getStream(), theType, Collections.unmodifiableList(repetitions));
 		}
+
+		@Override
+		public String toString() {
+			return theRepetitions.toString();
+		}
 	}
 
 	public static final class SequenceExpression<S extends BranchableStream<?, ?>> extends ComposedExpression<S> {

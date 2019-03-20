@@ -108,6 +108,14 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 		public Expression<S> getExpression() {
 			return new TextPatternExpression<>(getStream(), theType, theMatcher);
 		}
+
+		@Override
+		public String toString() {
+			String str = getType().toString();
+			if (theMatcher.lookingAt())
+				str = str + "[" + getStream().printContent(0, length(), null) + "]";
+			return str;
+		}
 	}
 
 	private static class TextPatternExpression<S extends CharSequenceStream> extends AbstractExpression<S> {
