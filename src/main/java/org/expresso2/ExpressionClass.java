@@ -9,7 +9,7 @@ public class ExpressionClass<S extends BranchableStream<?, ?>> extends OneOfExpr
 	private final String theName;
 
 	public ExpressionClass(int id, String name, List<? extends ExpressionType<S>> members) {
-		super(id, members);
+		super(id, members, true);
 		theName = name;
 	}
 

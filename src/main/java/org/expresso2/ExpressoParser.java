@@ -11,5 +11,9 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> {
 
 	ExpressoParser<S> exclude(int... expressionIds);
 
+	default ExpressionPossibility<S> parseWith(ExpressionComponent<? super S> component) throws IOException {
+		return parseWith(component, true);
+	}
+
 	ExpressionPossibility<S> parseWith(ExpressionComponent<? super S> component, boolean useCache) throws IOException;
 }

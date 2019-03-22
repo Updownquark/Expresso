@@ -1,7 +1,11 @@
 package org.expresso2;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.expresso.parse.BranchableStream;
 
@@ -14,8 +18,8 @@ public class ForbidExpressionComponent<S extends BranchableStream<?, ?>> extends
 	}
 
 	@Override
-	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser, boolean useCache) throws IOException {
-		ExpressionPossibility<S2> forbidden = parser.parseWith(theForbidden, true);
+	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException {
+		ExpressionPossibility<S2> forbidden = parser.parseWith(theForbidden);
 		return forbidden == null ? null : new ForbiddenPossibility<>(this, parser, forbidden);
 	}
 
@@ -46,21 +50,13 @@ public class ForbidExpressionComponent<S extends BranchableStream<?, ?>> extends
 		}
 
 		@Override
-		public ExpressionPossibility<S> advance() throws IOException {
-			ExpressionPossibility<S> forbidden = theForbidden.advance();
-			return forbidden == null ? null : new ForbiddenPossibility<>(theType, theParser, forbidden);
-		}
-
-		@Override
-		public ExpressionPossibility<S> leftFork() throws IOException {
-			ExpressionPossibility<S> forbidden = theForbidden.leftFork();
-			return forbidden == null ? null : new ForbiddenPossibility<>(theType, theParser, forbidden);
-		}
-
-		@Override
-		public ExpressionPossibility<S> rightFork() throws IOException {
-			ExpressionPossibility<S> forbidden = theForbidden.rightFork();
-			return forbidden == null ? null : new ForbiddenPossibility<>(theType, theParser, forbidden);
+		public Collection<? extends ExpressionPossibility<S>> fork() throws IOException {
+			Collection<? extends ExpressionPossibility<S>> forbiddenForks = theForbidden.fork();
+			if (forbiddenForks.isEmpty())
+				return forbiddenForks;
+			else
+				return forbiddenForks.stream().map(fork -> new ForbiddenPossibility<>(theType, theParser, fork))
+					.collect(Collectors.toCollection(() -> new ArrayList<>(forbiddenForks.size())));
 		}
 
 		@Override
@@ -88,13 +84,18 @@ public class ForbidExpressionComponent<S extends BranchableStream<?, ?>> extends
 		}
 
 		@Override
-		public boolean isEquivalent(ExpressionPossibility<S> o) {
+		public boolean equals(Object o) {
 			if (this == o)
 				return true;
 			else if (!(o instanceof ForbiddenPossibility))
 				return false;
 			ForbiddenPossibility<S> other = (ForbiddenPossibility<S>) o;
-			return getType().equals(other.getType()) && theForbidden.isEquivalent(other.theForbidden);
+			return getType().equals(other.getType()) && theForbidden.equals(other.theForbidden);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(theType, theForbidden);
 		}
 
 		@Override

@@ -1,7 +1,11 @@
 package org.expresso2;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.NavigableSet;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.expresso.parse.BranchableStream;
 
@@ -11,7 +15,16 @@ public interface ConfiguredExpressionType<S extends BranchableStream<?, ?>> exte
 	NavigableSet<String> getFields();
 
 	@Override
-	<S2 extends S> ConfiguredExpressionPossibility<S2> parse(ExpressoParser<S2> parser, boolean useCache) throws IOException;
+	default int getCacheId() {
+		return -1;
+	}
+
+	@Override
+	default <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException {
+		throw new IllegalStateException("The one-argument parse method of an uncachable component should not be called");
+	}
+
+	<S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser, boolean useCache) throws IOException;
 
 	static <S extends BranchableStream<?, ?>> ConfiguredExpressionPossibility<S> wrap(ConfiguredExpressionType<? super S> type,
 		ExpressionPossibility<S> possibility) {
@@ -43,18 +56,13 @@ public interface ConfiguredExpressionType<S extends BranchableStream<?, ?>> exte
 		}
 
 		@Override
-		public ExpressionPossibility<S> advance() throws IOException {
-			return wrap(theType, theWrapped.advance());
-		}
-
-		@Override
-		public ExpressionPossibility<S> leftFork() throws IOException {
-			return wrap(theType, theWrapped.leftFork());
-		}
-
-		@Override
-		public ExpressionPossibility<S> rightFork() throws IOException {
-			return wrap(theType, theWrapped.rightFork());
+		public Collection<? extends ExpressionPossibility<S>> fork() throws IOException {
+			Collection<? extends ExpressionPossibility<S>> wrappedForks = theWrapped.fork();
+			if (wrappedForks.isEmpty())
+				return wrappedForks;
+			else
+				return wrappedForks.stream().map(fork -> wrap(theType, fork))
+					.collect(Collectors.toCollection(() -> new ArrayList<>(wrappedForks.size())));
 		}
 
 		@Override
@@ -73,13 +81,18 @@ public interface ConfiguredExpressionType<S extends BranchableStream<?, ?>> exte
 		}
 
 		@Override
-		public boolean isEquivalent(ExpressionPossibility<S> o) {
+		public boolean equals(Object o) {
 			if (o == this)
 				return true;
 			else if (!(o instanceof ConfiguredExpressionPossibility))
 				return false;
 			ConfiguredExpressionPossibility<S> other = (ConfiguredExpressionPossibility<S>) o;
-			return theType.equals(other.getType()) && theWrapped.isEquivalent(other.theWrapped);
+			return theType.equals(other.getType()) && theWrapped.equals(other.theWrapped);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(theType, theWrapped);
 		}
 
 		@Override

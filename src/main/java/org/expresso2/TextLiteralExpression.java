@@ -28,6 +28,6 @@ public class TextLiteralExpression<S extends CharSequenceStream> extends Literal
 
 	@Override
 	public String toString() {
-		return theText;
+		return "Literal(" + theText + ")";
 	}
 }

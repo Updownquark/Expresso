@@ -1,9 +1,13 @@
 package org.expresso2;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.expresso.parse.BranchableStream;
 
@@ -13,8 +17,8 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 	}
 
 	@Override
-	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> session, boolean useCache) throws IOException {
-		ExpressionPossibility<S2> superPossibility = super.parse(session, true);
+	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> session) throws IOException {
+		ExpressionPossibility<S2> superPossibility = super.parse(session);
 		if (superPossibility == null)
 			superPossibility = ExpressionPossibility.empty(session.getStream(), this);
 		return new OptionalPossibility<>(this, session, superPossibility, true);
@@ -55,26 +59,22 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 		}
 
 		@Override
-		public ExpressionPossibility<S> advance() throws IOException {
-			ExpressionPossibility<S> optAdvanced = theOption.advance();
-			return optAdvanced == null ? null : new OptionalPossibility<>(theType, theParser, optAdvanced, false);
-		}
-
-		@Override
-		public ExpressionPossibility<S> leftFork() throws IOException {
-			if (isEmpty)
-				return null;
-			ExpressionPossibility<S> optionFork = theOption.leftFork();
-			if (optionFork != null)
-				return new OptionalPossibility<>(theType, theParser, optionFork, false);
+		public Collection<? extends ExpressionPossibility<S>> fork() throws IOException {
+			Collection<? extends ExpressionPossibility<S>> optionForks = theOption.fork();
+			Collection<? extends ExpressionPossibility<S>> mappedOptionForks;
+			if (optionForks.isEmpty())
+				mappedOptionForks = optionForks;
 			else
-				return new OptionalPossibility<>(theType, theParser, ExpressionPossibility.empty(theParser.getStream(), theType), true);
-		}
-
-		@Override
-		public ExpressionPossibility<S> rightFork() throws IOException {
-			ExpressionPossibility<S> optionFork = theOption.rightFork();
-			return optionFork == null ? null : new OptionalPossibility<>(theType, theParser, optionFork, false);
+				mappedOptionForks = optionForks.stream().map(fork -> new OptionalPossibility<>(theType, theParser, fork, false))
+					.collect(Collectors.toCollection(() -> new ArrayList<>(optionForks.size())));
+			List<ExpressionPossibility<S>> empty = isEmpty ? null : Arrays.asList(new OptionalPossibility<>(theType, theParser,
+				ExpressionPossibility.empty(theParser.getStream(), theOption.getType()), true));
+			if (isEmpty)
+				return mappedOptionForks;
+			else if (mappedOptionForks.isEmpty())
+				return empty;
+			else
+				return new CompositeCollection<ExpressionPossibility<S>>().addComponent(mappedOptionForks).addComponent(empty);
 		}
 
 		@Override
@@ -93,13 +93,18 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 		}
 
 		@Override
-		public boolean isEquivalent(ExpressionPossibility<S> o) {
+		public boolean equals(Object o) {
 			if (this == o)
 				return true;
 			else if (!(o instanceof OptionalPossibility))
 				return false;
 			OptionalPossibility<S> other = (OptionalPossibility<S>) o;
-			return getType().equals(other.getType()) && theOption.isEquivalent(other.theOption);
+			return getType().equals(other.getType()) && theOption.equals(other.theOption);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(theType, theOption);
 		}
 
 		@Override

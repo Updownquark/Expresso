@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.expresso.parse.BranchableStream;
+import org.expresso2.ConfiguredExpressionType;
 import org.expresso2.ExpressionComponent;
 import org.expresso2.ExpressionPossibility;
 import org.expresso2.ExpressoParser;
@@ -45,6 +46,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		if (union == theExcludedTypes)
 			return this;
 		try {
+			theSession.debug(() -> "Excluding " + Arrays.toString(expressionIds));
 			return theSession.getParser(theStream, 0, union);
 		} catch (IOException e) {
 			throw new IllegalStateException("Should not happen--not advancing stream", e);
@@ -55,23 +57,26 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	public ExpressionPossibility<S> parseWith(ExpressionComponent<? super S> component, boolean useCache) throws IOException {
 		int cacheId = component.getCacheId();
 		if (cacheId < 0)
-			return component.parse(this, useCache);
-		if (theExcludedTypes != null && Arrays.binarySearch(theExcludedTypes, cacheId) >= 0)
+			return ((ConfiguredExpressionType<? super S>) component).parse(this, useCache);
+		if (theExcludedTypes != null && Arrays.binarySearch(theExcludedTypes, cacheId) >= 0) {
+			theSession.debug(() -> "Excluded by type");
 			return null;
+		}
 		boolean[] newCache = new boolean[1];
-		CachedExpressionPossibility<S> cached = theCache.computeIfAbsent(cacheId, k -> {
+		CachedExpressionPossibility<S> cached = theCache.compute(cacheId, (k, oldCache) -> {
+			if (oldCache != null && useCache)
+				return oldCache;
 			newCache[0] = true;
 			return new CachedExpressionPossibility<>(component);
 		});
 		if (newCache[0]) {
-			// This loop deals with self-references, allowing successively deeper and better results
-			int refCount;
-			ExpressionPossibility<S> parsed;
-			do {
-				refCount = cached.getReferenceCount();
-				parsed = component.parse(this, true);
-			} while (cached.setPossibilityIfDifferent(parsed) && cached.getReferenceCount() != refCount);
-		}
+			theSession.debug(() -> component.toString() + ": cache " + System.identityHashCode(cached));
+			theSession.adjustDepth(1);
+			cached.setPossibility(component.parse(this));
+			theSession.adjustDepth(-1);
+		} else
+			theSession.debug(() -> component + ": Used cache " + System.identityHashCode(cached)//
+				+ (cached.asPossibility() == null ? " (empty)" : ""));
 		return cached.asPossibility();
 	}
 

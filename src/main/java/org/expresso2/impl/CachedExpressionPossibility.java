@@ -1,6 +1,11 @@
 package org.expresso2.impl;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import org.expresso.parse.BranchableStream;
 import org.expresso2.Expression;
@@ -10,11 +15,7 @@ import org.expresso2.ExpressionPossibility;
 class CachedExpressionPossibility<S extends BranchableStream<?, ?>> implements ExpressionPossibility<S> {
 	private final ExpressionComponent<? super S> theType;
 	private ExpressionPossibility<S> thePossibility;
-	private CachedExpressionPossibility<S> theLeftFork;
-	private CachedExpressionPossibility<S> theRightFork;
-	private CachedExpressionPossibility<S> theAdvanced;
-
-	private int theReferenceCount;
+	private List<CachedExpressionPossibility<S>> theForks;
 
 	CachedExpressionPossibility(ExpressionComponent<? super S> type) {
 		theType = type;
@@ -25,22 +26,8 @@ class CachedExpressionPossibility<S extends BranchableStream<?, ?>> implements E
 		return this;
 	}
 
-	boolean setPossibilityIfDifferent(ExpressionPossibility<S> possibility) {
-		if (possibility == null)
-			return false;
-		else if (thePossibility != null && thePossibility.isEquivalent(possibility))
-			return false;
-		thePossibility = possibility;
-		return true;
-	}
-
-	int getReferenceCount() {
-		return theReferenceCount;
-	}
-
 	ExpressionPossibility<S> asPossibility() {
-		theReferenceCount++;
-		return thePossibility;
+		return thePossibility == null ? null : this;
 	}
 
 	@Override
@@ -59,24 +46,16 @@ class CachedExpressionPossibility<S extends BranchableStream<?, ?>> implements E
 	}
 
 	@Override
-	public ExpressionPossibility<S> advance() throws IOException {
-		if (theAdvanced == null)
-			theAdvanced = new CachedExpressionPossibility<S>(theType).setPossibility(thePossibility.advance());
-		return theAdvanced.asPossibility();
-	}
-
-	@Override
-	public ExpressionPossibility<S> leftFork() throws IOException {
-		if (theLeftFork == null)
-			theLeftFork = new CachedExpressionPossibility<S>(theType).setPossibility(thePossibility.leftFork());
-		return theLeftFork.asPossibility();
-	}
-
-	@Override
-	public ExpressionPossibility<S> rightFork() throws IOException {
-		if (theRightFork == null)
-			theRightFork = new CachedExpressionPossibility<S>(theType).setPossibility(thePossibility.rightFork());
-		return theRightFork.asPossibility();
+	public Collection<? extends ExpressionPossibility<S>> fork() throws IOException {
+		if (theForks == null) {
+			Collection<? extends ExpressionPossibility<S>> forks = thePossibility.fork();
+			if (forks.isEmpty())
+				theForks = Collections.emptyList();
+			else
+				theForks = forks.stream().map(fork -> new CachedExpressionPossibility<S>(theType).setPossibility(fork))
+					.collect(Collectors.toCollection(() -> new ArrayList<>(forks.size())));
+		}
+		return theForks;
 	}
 
 	@Override
@@ -95,7 +74,7 @@ class CachedExpressionPossibility<S extends BranchableStream<?, ?>> implements E
 	}
 
 	@Override
-	public boolean isEquivalent(ExpressionPossibility<S> o) {
+	public boolean equals(Object o) {
 		if (this == o)
 			return true;
 		else if (thePossibility == null)
@@ -105,7 +84,12 @@ class CachedExpressionPossibility<S extends BranchableStream<?, ?>> implements E
 		CachedExpressionPossibility<S> other = (CachedExpressionPossibility<S>) o;
 		if (other.thePossibility == null)
 			return false;
-		return thePossibility.isEquivalent(other.thePossibility);
+		return thePossibility.equals(other.thePossibility);
+	}
+
+	@Override
+	public int hashCode() {
+		return thePossibility == null ? 0 : thePossibility.hashCode();
 	}
 
 	@Override

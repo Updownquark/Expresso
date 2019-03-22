@@ -1,8 +1,10 @@
 package org.expresso2;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -29,13 +31,13 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 	}
 
 	@Override
-	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> session, boolean useCache) throws IOException {
+	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> session) throws IOException {
 		return new TextPatternPossibility<>(this, session);
 	}
 
 	@Override
 	public String toString() {
-		return thePattern.toString();
+		return "Pattern(" + thePattern + ")";
 	}
 
 	private static class TextPatternPossibility<S extends CharSequenceStream> implements ExpressionPossibility<S> {
@@ -66,18 +68,8 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 		}
 
 		@Override
-		public ExpressionPossibility<S> advance() throws IOException {
-			return null;
-		}
-
-		@Override
-		public ExpressionPossibility<S> leftFork() throws IOException {
-			return null;
-		}
-
-		@Override
-		public ExpressionPossibility<S> rightFork() throws IOException {
-			return null;
+		public Collection<? extends ExpressionPossibility<S>> fork() throws IOException {
+			return Collections.emptyList();
 		}
 
 		@Override
@@ -96,12 +88,18 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 		}
 
 		@Override
-		public boolean isEquivalent(ExpressionPossibility<S> o) {
+		public boolean equals(Object o) {
 			if (this == o)
 				return true;
 			else if (!(o instanceof TextPatternPossibility))
 				return false;
-			return getType().equals(o.getType()) && getStream().getPosition() == o.getStream().getPosition();
+			TextPatternPossibility<S> other = (TextPatternPossibility<S>) o;
+			return getType().equals(other.getType()) && getStream().getPosition() == other.getStream().getPosition();
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(theType, getStream().getPosition());
 		}
 
 		@Override

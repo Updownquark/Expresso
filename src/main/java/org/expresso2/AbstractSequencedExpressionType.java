@@ -2,9 +2,13 @@ package org.expresso2;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.expresso.parse.BranchableStream;
 import org.qommons.BiTuple;
@@ -28,14 +32,14 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 	protected abstract String getErrorForComponentCount(int componentCount);
 
 	@Override
-	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser, boolean useCache) throws IOException {
+	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException {
 		int tries = getInitComponentCount();
 		List<ExpressionPossibility<S2>> repetitions = new ArrayList<>(tries);
 		ExpressoParser<S2> branched = parser;
 		Iterator<? extends ExpressionComponent<? super S>> sequenceIter = theSequence.iterator();
-		for (int i = 0; i < tries && sequenceIter.hasNext(); i++) {
+		for (int i = 0; i < tries && branched != null && sequenceIter.hasNext(); i++) {
 			ExpressionComponent<? super S> component = sequenceIter.next();
-			ExpressionPossibility<S2> repetition = branched.parseWith(component, true);
+			ExpressionPossibility<S2> repetition = branched.parseWith(component);
 			if (repetition == null)
 				return null;
 			repetitions.add(repetition);
@@ -46,16 +50,10 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		return new SequencePossibility<>(this, parser, Collections.unmodifiableList(repetitions));
 	}
 
-	private enum DegreeOfFreedom {
-		Repetition, TerminalFork
-	}
-
 	private static class SequencePossibility<S extends BranchableStream<?, ?>> implements ExpressionPossibility<S> {
 		private final AbstractSequencedExpressionType<? super S> theType;
 		private final ExpressoParser<S> theParser;
 		private final List<ExpressionPossibility<S>> theRepetitions;
-		private final boolean allowLeftFork;
-		private final boolean allowRightFork;
 		private final boolean allowFewerReps;
 		private final boolean allowMoreReps;
 		private final int theLength;
@@ -64,17 +62,14 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 
 		SequencePossibility(AbstractSequencedExpressionType<? super S> type, ExpressoParser<S> parser,
 			List<ExpressionPossibility<S>> repetitions) {
-			this(type, parser, repetitions, true, true, true, true);
+			this(type, parser, repetitions, true, true);
 		}
 
 		private SequencePossibility(AbstractSequencedExpressionType<? super S> type, ExpressoParser<S> parser,
-			List<ExpressionPossibility<S>> repetitions, boolean allowLeftFork, boolean allowRightFork, boolean allowMoreReps,
-			boolean allowFewerReps) {
+			List<ExpressionPossibility<S>> repetitions, boolean allowMoreReps, boolean allowFewerReps) {
 			theType = type;
 			theParser = parser;
 			theRepetitions = repetitions;
-			this.allowLeftFork = allowLeftFork;
-			this.allowRightFork = allowRightFork;
 			this.allowFewerReps = allowFewerReps;
 			this.allowMoreReps = allowMoreReps;
 			int length = 0;
@@ -110,53 +105,23 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		}
 
 		@Override
-		public ExpressionPossibility<S> advance() throws IOException {
-			if (theRepetitions.isEmpty())
-				return null;
-			ExpressionPossibility<S> last = theRepetitions.get(theRepetitions.size() - 1);
-			ExpressionPossibility<S> lastAdvanced = last.advance();
-			if (lastAdvanced == null)
-				return null;
-			List<ExpressionPossibility<S>> repetitions = new ArrayList<>(theRepetitions.size());
-			for (int i = 0; i < theRepetitions.size() - 1; i++)
-				repetitions.add(theRepetitions.get(i));
-			repetitions.add(lastAdvanced);
-			return new SequencePossibility<>(theType, theParser, Collections.unmodifiableList(repetitions));
-		}
-
-		@Override
-		public ExpressionPossibility<S> leftFork() throws IOException {
-			if (allowLeftFork && !theRepetitions.isEmpty()) {
+		public Collection<? extends ExpressionPossibility<S>> fork() throws IOException {
+			CompositeCollection<ExpressionPossibility<S>> forks = new CompositeCollection<>();
+			if (!theRepetitions.isEmpty()) {
 				ExpressionPossibility<S> last = theRepetitions.get(theRepetitions.size() - 1);
-				ExpressionPossibility<S> lastForked = last.leftFork();
-				if (lastForked != null) {
-					List<ExpressionPossibility<S>> repetitions = new ArrayList<>(theRepetitions.size());
-					for (int i = 0; i < theRepetitions.size() - 1; i++)
-						repetitions.add(theRepetitions.get(i));
-					repetitions.add(lastForked);
-					return new SequencePossibility<>(theType, theParser, Collections.unmodifiableList(repetitions), true, false, true,
-						true);
+				Collection<? extends ExpressionPossibility<S>> lastForks = last.fork();
+				if (!lastForks.isEmpty()) {
+					forks.addComponent(lastForks.stream().map(lastFork -> {
+						List<ExpressionPossibility<S>> repetitions = new ArrayList<>(theRepetitions.size());
+						for (int i = 0; i < theRepetitions.size() - 1; i++)
+							repetitions.add(theRepetitions.get(i));
+						repetitions.add(lastFork);
+						return new SequencePossibility<>(theType, theParser, Collections.unmodifiableList(repetitions));
+					}).collect(Collectors.toCollection(() -> new ArrayList<>(lastForks.size()))));
 				}
-			}
-			if (allowFewerReps && !theRepetitions.isEmpty()) {
-				return new SequencePossibility<>(theType, theParser, theRepetitions.subList(0, theRepetitions.size() - 1), true, true, true,
-					false);
-			}
-			return null;
-		}
-
-		@Override
-		public ExpressionPossibility<S> rightFork() throws IOException {
-			if (allowRightFork && !theRepetitions.isEmpty()) {
-				ExpressionPossibility<S> last = theRepetitions.get(theRepetitions.size() - 1);
-				ExpressionPossibility<S> lastForked = last.rightFork();
-				if (lastForked != null) {
-					List<ExpressionPossibility<S>> repetitions = new ArrayList<>(theRepetitions.size());
-					for (int i = 0; i < theRepetitions.size() - 1; i++)
-						repetitions.add(theRepetitions.get(i));
-					repetitions.add(lastForked);
-					return new SequencePossibility<>(theType, theParser, Collections.unmodifiableList(repetitions), true, true, false,
-						true);
+				if (allowFewerReps) {
+					forks.addComponent(Arrays.asList(
+						new SequencePossibility<>(theType, theParser, theRepetitions.subList(0, theRepetitions.size() - 1), true, false)));
 				}
 			}
 			if (allowMoreReps) {
@@ -169,13 +134,13 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 					if (!sequenceIter.hasNext()) {
 						List<ExpressionPossibility<S>> repetitions = new ArrayList<>(theRepetitions.size() + 1);
 						ExpressionComponent<? super S> nextComponent = sequenceIter.next();
-						repetitions.add(theParser.advance(length()).parseWith(nextComponent, true));
-						return new SequencePossibility<>(theType, theParser, Collections.unmodifiableList(repetitions), true, true, false,
-							true);
+						repetitions.add(theParser.advance(length()).parseWith(nextComponent));
+						forks.addComponent(Arrays
+							.asList(new SequencePossibility<>(theType, theParser, Collections.unmodifiableList(repetitions), false, true)));
 					}
 				}
 			}
-			return null;
+			return forks;
 		}
 
 		@Override
@@ -199,7 +164,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		}
 
 		@Override
-		public boolean isEquivalent(ExpressionPossibility<S> o) {
+		public boolean equals(Object o) {
 			if (o == this)
 				return true;
 			else if (o == null || o.getClass() != getClass())
@@ -214,9 +179,14 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 			if (theRepetitions.size() != other.theRepetitions.size())
 				return false;
 			for (int i = 0; i < theRepetitions.size(); i++)
-				if (!theRepetitions.get(i).isEquivalent(other.theRepetitions.get(i)))
+				if (!theRepetitions.get(i).equals(other.theRepetitions.get(i)))
 					return false;
 			return true;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(getClass(), theType, getStream().getPosition(), length(), theRepetitions);
 		}
 
 		@Override

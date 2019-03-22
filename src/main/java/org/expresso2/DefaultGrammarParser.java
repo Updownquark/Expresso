@@ -106,8 +106,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements G
 			} else
 				classes = Collections.emptyNavigableSet();
 			int priority = type.getInt("priority", 0);
-			if (declaredTypes.put(typeName,
-				new ParsedExpressionType<>(id[0]++, priority, typeName, classes)) != null)
+			if (declaredTypes.put(typeName, new ParsedExpressionType<>(id[0]++, priority, typeName, classes)) != null)
 				throw new IllegalArgumentException("Duplicate expressions named " + typeName);
 		}
 		Map<String, ExpressionClass<S>> classes = new LinkedHashMap<>(declaredClasses.size() * 4 / 3);
@@ -372,14 +371,15 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements G
 		return components;
 	}
 
-	private static class ParsedExpressionType<S extends BranchableStream<?, ?>> extends AbstractExpressionComponent<S> {
+	private static class ParsedExpressionType<S extends BranchableStream<?, ?>> implements ExpressionComponent<S> {
+		private final int id;
 		private final int priority;
 		private final String name;
 		final NavigableSet<ExpressionClass<S>> classes;
 		ExpressionType<S> type;
 
 		ParsedExpressionType(int id, int priority, String name, NavigableSet<ExpressionClass<S>> classes) {
-			super(-1);
+			this.id = id;
 			this.priority = priority;
 			this.name = name;
 			this.classes = classes;
@@ -390,8 +390,13 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements G
 		}
 
 		@Override
-		public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> session, boolean useCache) throws IOException {
-			return type.parse(session, useCache);
+		public int getCacheId() {
+			return type.getCacheId();
+		}
+
+		@Override
+		public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException {
+			return type.parse(parser);
 		}
 
 		@Override
@@ -426,7 +431,6 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements G
 
 		@Override
 		public <S2 extends S> ConfiguredExpressionPossibility<S2> parse(ExpressoParser<S2> parser, boolean useCache) throws IOException {
-			// TODO The non-cachiness should probably be passed in here
 			return ConfiguredExpressionType.wrap(this, parser.parseWith(theWrapped, useCache));
 		}
 

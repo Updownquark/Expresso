@@ -1,6 +1,7 @@
 package org.expresso2.impl;
 
 import java.io.IOException;
+import java.util.function.Supplier;
 
 import org.expresso.parse.BranchableStream;
 import org.expresso2.Expression;
@@ -14,41 +15,32 @@ import org.qommons.tree.BetterTreeSet;
 public class ParseSession<S extends BranchableStream<?, ?>> {
 	private final ExpressoGrammar<? super S> theGrammar;
 	private final BetterTreeSet<ExpressoParserImpl<S>> theParsers;
+	private boolean isDebugging;
+	private int theDebugIndent;
 
 	public ParseSession(ExpressoGrammar<? super S> grammar) {
 		theGrammar = grammar;
 		theParsers = new BetterTreeSet<>(false, ParseSession::compareParseStates);
+		isDebugging = true;
 	}
 
 	public Expression<S> parse(S stream, ExpressionComponent<? super S> component, boolean bestError)
 		throws IOException {
 		BetterSortedSet<ExpressionPossibility<S>> possibilities = new BetterTreeSet<>(false, ParseSession::comparePossibilities);
-		ExpressionPossibility<S> nextBest = getParser(stream, 0, new int[0]).parseWith(component, true);
+		ExpressionPossibility<S> nextBest = getParser(stream, 0, new int[0]).parseWith(component);
 		ExpressionPossibility<S> bestComplete = null;
 		ExpressionPossibility<S> best = null;
 		while (nextBest != null) {
-			ExpressionPossibility<S> branch;
 			if (best == null || comparePossibilities(nextBest, best) < 0)
 				best = nextBest;
 			if (nextBest.isComplete() && nextBest.getErrorCount() == 0
 				&& (bestComplete == null || comparePossibilities(nextBest, bestComplete) < 0))
 				bestComplete = nextBest;
-			if (!bestError) {
-				int errorPos = nextBest.getFirstErrorPosition();
-				if (errorPos < 0 || errorPos == nextBest.length())
-					branch = nextBest.advance();
-				else
-					branch = null;
-			} else
-				branch = nextBest.advance();
-			if (branch != null)
-				possibilities.add(branch);
-			branch = nextBest.rightFork();
-			if (branch != null)
-				possibilities.add(branch);
-			branch = nextBest.leftFork();
-			if (branch != null)
-				possibilities.add(branch);
+			ExpressionPossibility<S> fNextBest = nextBest;
+			debug(() -> "Forking " + fNextBest.getType() + ": " + fNextBest + " @" + fNextBest.getStream().getPosition());
+			adjustDepth(1);
+			possibilities.addAll(nextBest.fork());
+			adjustDepth(-1);
 
 			nextBest = possibilities.pollFirst();
 		}
@@ -62,7 +54,24 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 			return null;
 	}
 
+	public void adjustDepth(int adjust) {
+		if (isDebugging)
+			theDebugIndent += adjust;
+	}
+
+	public void debug(Supplier<String> debug) {
+		if (!isDebugging)
+			return;
+		StringBuilder str = new StringBuilder();
+		for (int i = 0; i < theDebugIndent; i++)
+			str.append('\t');
+		str.append(debug.get());
+		System.out.println(str.toString());
+	}
+
 	ExpressoParser<S> getParser(S stream, int advance, int[] excludedTypes) throws IOException {
+		if (!stream.hasMoreData(advance))
+			return null;
 		int streamPosition = stream.getPosition() + advance;
 		ExpressoParserImpl<S> parser = theParsers.searchValue(
 			p -> compareParseStates(p.getStream().getPosition(), p.getExcludedTypes(), streamPosition, excludedTypes),
