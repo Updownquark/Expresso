@@ -4,13 +4,16 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.expresso.parse.BranchableStream;
+import org.qommons.tree.SortedTreeList;
 
 public class OneOfExpression<S extends BranchableStream<?, ?>> extends AbstractExpressionComponent<S> {
 	private final List<? extends ExpressionComponent<? super S>> theComponents;
@@ -32,13 +35,12 @@ public class OneOfExpression<S extends BranchableStream<?, ?>> extends AbstractE
 
 	@Override
 	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException {
-		for (int i = 0; i < theComponents.size(); i++) {
-			ExpressionComponent<? super S> first = theComponents.get(i);
-			ExpressionPossibility<S2> firstPossibility = parser.parseWith(first);
-			if (firstPossibility != null)
-				return new OneOfPossibility<>(this, parser, firstPossibility, theComponents, i, new HashSet<>());
-		}
-		return null;
+		Queue<ExpressionPossibility<S2>> possibilities = possibilities(parser.useCache(this, null), new HashSet<>());
+		if (possibilities.isEmpty())
+			return null;
+		Set<ExpressionPossibility<S2>> allVisited = new HashSet<>(possibilities);
+		ExpressionPossibility<S2> first = possibilities.poll();
+		return new OneOfPossibility<>(this, parser, first, possibilities, allVisited);
 	}
 
 	@Override
@@ -46,22 +48,31 @@ public class OneOfExpression<S extends BranchableStream<?, ?>> extends AbstractE
 		return "OneOf" + theComponents;
 	}
 
+	<S2 extends S> Queue<ExpressionPossibility<S2>> possibilities(ExpressoParser<S2> parser, Set<ExpressionPossibility<S2>> allVisited)
+		throws IOException {
+		SortedTreeList<ExpressionPossibility<S2>> possibilities = new SortedTreeList<>(false, ExpressionPossibility::compareTo);
+		for (ExpressionComponent<? super S> component : theComponents) {
+			ExpressionPossibility<S2> possibility = parser.parseWith(component);
+			if (possibility != null && allVisited.add(possibility))
+				possibilities.add(possibility);
+		}
+		return possibilities;
+	}
+
 	private static class OneOfPossibility<S extends BranchableStream<?, ?>> implements ExpressionPossibility<S> {
 		private final OneOfExpression<? super S> theType;
 		private final ExpressoParser<S> theParser;
 		private final ExpressionPossibility<S> theComponent;
-		private final List<? extends ExpressionComponent<? super S>> allowedComponents;
-		private final int theIndex;
-		private final Set<ExpressionPossibility<S>> allFoundPossibilities;
+		private final Collection<ExpressionPossibility<S>> otherPossibilities;
+		private final Set<ExpressionPossibility<S>> allVisited;
 
 		OneOfPossibility(OneOfExpression<? super S> type, ExpressoParser<S> parser, ExpressionPossibility<S> component,
-			List<? extends ExpressionComponent<? super S>> components, int index, Set<ExpressionPossibility<S>> allFound) {
+			Collection<ExpressionPossibility<S>> otherPossibilities, Set<ExpressionPossibility<S>> allVisited) {
 			theType = type;
 			theParser = parser;
 			theComponent = component;
-			allowedComponents = components;
-			theIndex = index;
-			allFoundPossibilities = allFound;
+			this.otherPossibilities = otherPossibilities;
+			this.allVisited = allVisited;
 		}
 
 		@Override
@@ -81,50 +92,24 @@ public class OneOfExpression<S extends BranchableStream<?, ?>> extends AbstractE
 
 		@Override
 		public Collection<? extends ExpressionPossibility<S>> fork() throws IOException {
+			CompositeCollection<ExpressionPossibility<S>> forked = new CompositeCollection<>();
+			if (!otherPossibilities.isEmpty()) {
+				forked.addComponent(otherPossibilities.stream().map(this::singletonPossibility)
+					.collect(Collectors.toCollection(() -> new ArrayList<>(otherPossibilities.size()))));
+			}
 			Collection<? extends ExpressionPossibility<S>> componentForks = theComponent.fork();
-			Collection<? extends ExpressionPossibility<S>> mappedComponentForks;
-			if (componentForks.isEmpty())
-				mappedComponentForks = componentForks;
-			else
-				mappedComponentForks = componentForks.stream()
-					.map(fork -> new OneOfPossibility<>(theType, theParser, fork, allowedComponents, theIndex, allFoundPossibilities))
-					.collect(Collectors.toCollection(() -> new ArrayList<>(componentForks.size())));
-
-			ExpressionPossibility<S> nextPossibility = null;
-			for (int index = theIndex + 1; nextPossibility == null && index < allowedComponents.size(); index++) {
-				ExpressionPossibility<S> nextComponent = theParser.parseWith(allowedComponents.get(index));
-				if (nextComponent != null)
-					nextPossibility = new OneOfPossibility<>(theType, theParser, nextComponent, allowedComponents, index,
-						allFoundPossibilities);
+			if (!componentForks.isEmpty()) {
+				forked.addComponent(componentForks.stream().filter(allVisited::add).map(this::singletonPossibility)
+					.collect(Collectors.toCollection(() -> new ArrayList<>(componentForks.size()))));
 			}
+			Queue<ExpressionPossibility<S>> dive = theType.possibilities(theParser.useCache(theType, this), allVisited);
+			if (!dive.isEmpty())
+				forked.addComponent(Arrays.asList(new OneOfPossibility<>(theType, theParser, dive.poll(), dive, allVisited)));
+			return forked;
+		}
 
-			ExpressionPossibility<S> recursed = null;
-			int limit = theType.isPrioritized ? theIndex - 1 : allowedComponents.size();
-			for (int i = 0; i < limit && recursed == null; i++) {
-				ExpressionComponent<? super S> first = allowedComponents.get(i);
-				ExpressionPossibility<S> firstPossibility = theParser.parseWith(first, false);
-				if (firstPossibility != null && allFoundPossibilities.add(firstPossibility))
-					recursed = new OneOfPossibility<>(theType, theParser, firstPossibility, allowedComponents.subList(0, limit), i,
-						allFoundPossibilities);
-			}
-
-			List<ExpressionPossibility<S>> localPossibilities;
-			if (nextPossibility != null && recursed == null)
-				localPossibilities = Arrays.asList(nextPossibility, recursed);
-			else if (nextPossibility != null)
-				localPossibilities = Arrays.asList(nextPossibility);
-			else if (recursed != null)
-				localPossibilities = Arrays.asList(recursed);
-			else
-				localPossibilities = null;
-
-			if (localPossibilities == null)
-				return mappedComponentForks;
-			else if (mappedComponentForks.isEmpty())
-				return localPossibilities;
-			else
-				return new CompositeCollection<ExpressionPossibility<S>>().addComponent(mappedComponentForks)
-					.addComponent(localPossibilities);
+		OneOfPossibility<S> singletonPossibility(ExpressionPossibility<S> possibility) {
+			return new OneOfPossibility<>(theType, theParser, possibility, Collections.emptyList(), allVisited);
 		}
 
 		@Override

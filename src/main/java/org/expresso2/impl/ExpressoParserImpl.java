@@ -10,17 +10,21 @@ import org.expresso2.ConfiguredExpressionType;
 import org.expresso2.ExpressionComponent;
 import org.expresso2.ExpressionPossibility;
 import org.expresso2.ExpressoParser;
+import org.qommons.BiTuple;
 
 public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements ExpressoParser<S> {
 	private final ParseSession<S> theSession;
 	private final S theStream;
 	private final int[] theExcludedTypes;
+	private final PersistentStack<BiTuple<ExpressionComponent<? super S>, ExpressionPossibility<S>>> theCacheOverride;
 	private final Map<Integer, CachedExpressionPossibility<S>> theCache;
 
-	public ExpressoParserImpl(ParseSession<S> session, S stream, int[] excludedTypes) {
+	public ExpressoParserImpl(ParseSession<S> session, S stream, int[] excludedTypes,
+		PersistentStack<BiTuple<ExpressionComponent<? super S>, ExpressionPossibility<S>>> cacheOverride) {
 		theSession = session;
 		theStream = stream;
 		theExcludedTypes = excludedTypes;
+		theCacheOverride = cacheOverride;
 		theCache = new HashMap<>();
 	}
 
@@ -54,6 +58,12 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	}
 
 	@Override
+	public ExpressoParser<S> useCache(ExpressionComponent<? super S> component, ExpressionPossibility<S> possibility) {
+		return new ExpressoParserImpl<>(theSession, theStream, theExcludedTypes,
+			new PersistentStack<>(theCacheOverride, new BiTuple<>(component, possibility)));
+	}
+
+	@Override
 	public ExpressionPossibility<S> parseWith(ExpressionComponent<? super S> component, boolean useCache) throws IOException {
 		int cacheId = component.getCacheId();
 		if (cacheId < 0)
@@ -62,6 +72,10 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 			theSession.debug(() -> "Excluded by type");
 			return null;
 		}
+		BiTuple<ExpressionComponent<? super S>, ExpressionPossibility<S>> override = theCacheOverride == null ? null
+			: theCacheOverride.search(tuple -> tuple.getValue1() == component);
+		if (override != null)
+			return override.getValue2();
 		boolean[] newCache = new boolean[1];
 		CachedExpressionPossibility<S> cached = theCache.compute(cacheId, (k, oldCache) -> {
 			if (oldCache != null && useCache)

@@ -131,7 +131,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 					// Advance past pre-computed repetitions
 					for (int i = 0; i < theRepetitions.size() && sequenceIter.hasNext(); i++)
 						sequenceIter.next();
-					if (!sequenceIter.hasNext()) {
+					if (sequenceIter.hasNext()) {
 						List<ExpressionPossibility<S>> repetitions = new ArrayList<>(theRepetitions.size() + 1);
 						ExpressionComponent<? super S> nextComponent = sequenceIter.next();
 						repetitions.add(theParser.advance(length()).parseWith(nextComponent));

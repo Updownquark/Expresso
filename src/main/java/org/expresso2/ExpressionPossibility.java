@@ -7,7 +7,7 @@ import java.util.Objects;
 
 import org.expresso.parse.BranchableStream;
 
-public interface ExpressionPossibility<S extends BranchableStream<?, ?>> {
+public interface ExpressionPossibility<S extends BranchableStream<?, ?>> extends Comparable<ExpressionPossibility<S>> {
 	ExpressionComponent<? super S> getType();
 
 	S getStream();
@@ -23,6 +23,13 @@ public interface ExpressionPossibility<S extends BranchableStream<?, ?>> {
 	boolean isComplete();
 
 	Expression<S> getExpression();
+
+	@Override
+	default int compareTo(ExpressionPossibility<S> p2) {
+		if (getErrorCount() != p2.getErrorCount())
+			return getErrorCount() - p2.getErrorCount();
+		return p2.length() - length();
+	}
 
 	static <S extends BranchableStream<?, ?>> ExpressionPossibility<S> empty(S stream, ExpressionComponent<? super S> type) {
 		return new ExpressionPossibility<S>() {

@@ -19,8 +19,8 @@ public class TextLiteralExpression<S extends CharSequenceStream> extends Literal
 
 	@Override
 	protected int getMatchUntil(S stream) throws IOException {
-		for (int i = 0; i < theText.length() && stream.hasMoreData(i + 1); i++) {
-			if (theText.charAt(i) != stream.charAt(i))
+		for (int i = 0; i < theText.length(); i++) {
+			if (!stream.hasMoreData(i + 1) || theText.charAt(i) != stream.charAt(i))
 				return i;
 		}
 		return theText.length();
