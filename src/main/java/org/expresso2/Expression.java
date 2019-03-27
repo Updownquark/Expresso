@@ -26,7 +26,7 @@ public interface Expression<S extends BranchableStream<?, ?>> {
 
 	Expression<S> unwrap();
 
-	default Deque<Expression<S>> getField(String... fields) {
+	default Deque<ConfiguredExpression<S>> getField(String... fields) {
 		if (fields.length == 0)
 			throw new IllegalArgumentException("Fields expected");
 		Deque<Expression<S>> result = new LinkedList<>();
@@ -42,7 +42,7 @@ public interface Expression<S extends BranchableStream<?, ?>> {
 				FieldSearcher.findFields(lfr, field, result);
 			}
 		}
-		return result;
+		return (Deque<ConfiguredExpression<S>>) (Deque<?>) result;
 	}
 
 	public static <S extends BranchableStream<?, ?>> Expression<S> empty(S stream, ExpressionComponent<? super S> type) {
@@ -92,9 +92,9 @@ public interface Expression<S extends BranchableStream<?, ?>> {
 
 	public static class FieldSearcher {
 		static <S extends BranchableStream<?, ?>> void findFields(Expression<S> expr, String field, Deque<Expression<S>> results) {
-			if (expr.getType() instanceof ConfiguredExpressionType
-				&& ((ConfiguredExpressionType<? super S>) expr.getType()).getFields().contains(field)) {
-				results.add(expr);
+			if (expr instanceof ConfiguredExpression) {
+				if (((ConfiguredExpression<S>) expr).getType().getFields().contains(field))
+					results.add(expr);
 				return;
 			}
 			for (Expression<S> child : expr.getChildren())

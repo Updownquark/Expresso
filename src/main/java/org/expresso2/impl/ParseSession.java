@@ -12,6 +12,7 @@ import org.expresso2.ExpressoGrammar;
 import org.expresso2.ExpressoParser;
 import org.qommons.collect.BetterSortedSet;
 import org.qommons.tree.BetterTreeSet;
+import org.qommons.tree.SortedTreeList;
 
 public class ParseSession<S extends BranchableStream<?, ?>> {
 	private final ExpressoGrammar<? super S> theGrammar;
@@ -22,49 +23,64 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 	public ParseSession(ExpressoGrammar<? super S> grammar) {
 		theGrammar = grammar;
 		theParsers = new BetterTreeSet<>(false, ParseSession::compareParseStates);
-		isDebugging = true;
+		isDebugging = false;
 	}
 
 	public Expression<S> parse(S stream, ExpressionComponent<? super S> component, boolean bestError)
 		throws IOException {
-		BetterSortedSet<ExpressionPossibility<S>> possibilities = new BetterTreeSet<>(false, ExpressionPossibility::compareTo);
-		ExpressionPossibility<S> nextBest = getParser(stream, 0, new int[0]).parseWith(component);
+		SortedTreeList<ExpressionPossibility<S>> toEvaluate = new SortedTreeList<>(false, ExpressionPossibility::compareTo);
+		// SortedTreeList<ExpressionPossibility<S>> forks = new SortedTreeList<>(false, ExpressionPossibility::compareTo);
+		toEvaluate.add(getParser(stream, 0, new int[0]).parseWith(component));
 		ExpressionPossibility<S> bestComplete = null;
 		ExpressionPossibility<S> best = null;
-		int round = 1;
-		int roundCount = 1;
-		int nextRoundCount = 0;
-		while (nextBest != null) {
-			ExpressionPossibility<S> fNextBest = nextBest;
+		while (!toEvaluate.isEmpty()) {
+			ExpressionPossibility<S> nextBest = toEvaluate.poll();
+			debug(() -> "Checking " + nextBest.getType() + ": " + nextBest);
 			if (best == null || nextBest.compareTo(best) < 0) {
-				debug(() -> "Replaced best with " + fNextBest);
+				debug(() -> "Replaced best");
 				best = nextBest;
 			}
-			if (nextBest.isComplete() && nextBest.getErrorCount() == 0 && (bestComplete == null || nextBest.compareTo(bestComplete) < 0)) {
-				debug(() -> "Replaced best complete with " + fNextBest);
+			if (nextBest.getErrorCount() == 0 && (bestComplete == null || nextBest.compareTo(bestComplete) < 0)) {
+				debug(() -> "Replaced best complete");
 				bestComplete = nextBest;
-			}
-
-			roundCount--;
-			if (roundCount == 0) {
-				if (stream.isFullyDiscovered() && best.length() == stream.getDiscoveredLength())
+				if (isSatisfied(bestComplete, stream))
 					break;
-				round++;
-				int fRound = round;
-				debug(() -> "\nRound " + fRound);
-				roundCount = nextRoundCount;
-				nextRoundCount = 0;
 			}
-
-			debug(() -> "Forking " + fNextBest.getType() + ": " + fNextBest + " @" + fNextBest.getStream().getPosition());
+			debug(() -> "Forking " + nextBest.getType() + ": " + nextBest);
 			adjustDepth(1);
-			Collection<? extends ExpressionPossibility<S>> forks = nextBest.fork();
-			nextRoundCount += forks.size();
-			possibilities.addAll(forks);
+			Collection<? extends ExpressionPossibility<S>> pForks = nextBest.fork();
 			adjustDepth(-1);
-
-			nextBest = possibilities.pollFirst();
+			toEvaluate.addAll(pForks);
 		}
+		/*for (int round = 1; !toEvaluate.isEmpty(); round++) {
+			int fRound = round;
+			debug(() -> "Round " + fRound);
+			for (ExpressionPossibility<S> nextBest : toEvaluate) {
+				debug(() -> "Checking " + nextBest.getType() + ": " + nextBest);
+				if (best == null || nextBest.compareTo(best) < 0) {
+					debug(() -> "Replaced best");
+					best = nextBest;
+				}
+				if (nextBest.getErrorCount() == 0 && (bestComplete == null || nextBest.compareTo(bestComplete) < 0)) {
+					debug(() -> "Replaced best complete");
+					bestComplete = nextBest;
+				}
+			}
+			if (isSatisfied(best, stream))
+				break;
+			for (ExpressionPossibility<S> p : toEvaluate) {
+				debug(() -> "Forking " + p.getType() + ": " + p);
+				adjustDepth(1);
+				Collection<? extends ExpressionPossibility<S>> pForks = p.fork();
+				adjustDepth(-1);
+				forks.addAll(pForks);
+			}
+			SortedTreeList<ExpressionPossibility<S>> temp = toEvaluate;
+			toEvaluate = forks;
+			forks = temp;
+			forks.clear();
+		}*/
+
 		if (bestComplete != null)
 			return bestComplete.getExpression();
 		else if (best == null)
@@ -73,6 +89,10 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 			return best.getExpression();
 		else
 			return null; // Perhaps throw an exception using the best to give specific information about what might be wrong in the stream
+	}
+
+	private static boolean isSatisfied(ExpressionPossibility<?> best, BranchableStream<?, ?> stream) {
+		return best.getErrorCount() == 0 && stream.isFullyDiscovered() && best.length() == stream.getDiscoveredLength();
 	}
 
 	public void adjustDepth(int adjust) {

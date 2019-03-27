@@ -76,11 +76,6 @@ public interface ConfiguredExpressionType<S extends BranchableStream<?, ?>> exte
 		}
 
 		@Override
-		public boolean isComplete() {
-			return theWrapped.isComplete();
-		}
-
-		@Override
 		public boolean equals(Object o) {
 			if (o == this)
 				return true;

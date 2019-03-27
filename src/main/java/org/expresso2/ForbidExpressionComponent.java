@@ -79,11 +79,6 @@ public class ForbidExpressionComponent<S extends BranchableStream<?, ?>> extends
 		}
 
 		@Override
-		public boolean isComplete() {
-			return theForbidden.isComplete();
-		}
-
-		@Override
 		public boolean equals(Object o) {
 			if (this == o)
 				return true;

@@ -123,11 +123,6 @@ public class OneOfExpression<S extends BranchableStream<?, ?>> extends AbstractE
 		}
 
 		@Override
-		public boolean isComplete() {
-			return theComponent.isComplete();
-		}
-
-		@Override
 		public boolean equals(Object o) {
 			if (this == o)
 				return true;

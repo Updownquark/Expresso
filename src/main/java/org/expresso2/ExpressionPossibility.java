@@ -20,15 +20,40 @@ public interface ExpressionPossibility<S extends BranchableStream<?, ?>> extends
 
 	int getFirstErrorPosition();
 
-	boolean isComplete();
-
 	Expression<S> getExpression();
 
 	@Override
 	default int compareTo(ExpressionPossibility<S> p2) {
-		if (getErrorCount() != p2.getErrorCount())
-			return getErrorCount() - p2.getErrorCount();
-		return p2.length() - length();
+		int fep1 = getFirstErrorPosition();
+		int fep2 = p2.getFirstErrorPosition();
+		int len1 = length();
+		int len2 = p2.length();
+
+		// The possibility that understands the most content without error is the best
+		int understood1 = fep1 >= 0 ? fep1 : len1;
+		int understood2 = fep2 >= 0 ? fep2 : len2;
+		if (understood1 != understood2)
+			return understood2 - understood1;
+
+		// If both understand the same but one is complete, it is the best
+		if ((fep1 < 0) != (fep2 < 0)) {
+			if (fep1 < 0)
+				return -1;
+			else if (fep2 < 0)
+				return 1;
+		}
+
+		// If both are incomplete but one thinks it might understand more, give it a chance
+		if (len1 != len2)
+			return len2 - len1;
+
+		// Otherwise just differentiate on the number of errors
+		int ec1 = getErrorCount();
+		int ec2 = p2.getErrorCount();
+		if (ec1 != ec2)
+			return ec1 - ec2;
+
+		return 0;
 	}
 
 	static <S extends BranchableStream<?, ?>> ExpressionPossibility<S> empty(S stream, ExpressionComponent<? super S> type) {
@@ -61,11 +86,6 @@ public interface ExpressionPossibility<S extends BranchableStream<?, ?>> extends
 			@Override
 			public int getFirstErrorPosition() {
 				return -1;
-			}
-
-			@Override
-			public boolean isComplete() {
-				return true;
 			}
 
 			@Override

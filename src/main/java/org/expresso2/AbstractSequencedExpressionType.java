@@ -42,9 +42,12 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 			ExpressionPossibility<S2> repetition = branched.parseWith(component);
 			if (repetition == null)
 				return null;
-			repetitions.add(repetition);
-			if (!repetition.isComplete() || repetition.getErrorCount() > 0)
+			if (repetition.getErrorCount() > 0) {
+				if (!isComplete(repetitions.size()))
+					repetitions.add(repetition);
 				break;
+			}
+			repetitions.add(repetition);
 			branched = branched.advance(repetition.length());
 		}
 		return new SequencePossibility<>(this, parser, Collections.unmodifiableList(repetitions));
@@ -84,6 +87,11 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 				length += rep.length();
 				errorCount += rep.getErrorCount();
 			}
+			if (theType.getErrorForComponentCount(repetitions.size()) != null) {
+				errorCount++;
+				if (errorPos < 0)
+					errorPos = length;
+			}
 			theLength = length;
 			theErrorCount = errorCount;
 			theErrorPos = errorPos;
@@ -119,7 +127,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 						return new SequencePossibility<>(theType, theParser, Collections.unmodifiableList(repetitions));
 					}).collect(Collectors.toCollection(() -> new ArrayList<>(lastForks.size()))));
 				}
-				if (allowFewerReps) {
+				if (allowFewerReps && theRepetitions.size() > 1) {
 					forks.addComponent(Arrays.asList(
 						new SequencePossibility<>(theType, theParser, theRepetitions.subList(0, theRepetitions.size() - 1), true, false)));
 				}
@@ -132,11 +140,15 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 					for (int i = 0; i < theRepetitions.size() && sequenceIter.hasNext(); i++)
 						sequenceIter.next();
 					if (sequenceIter.hasNext()) {
-						List<ExpressionPossibility<S>> repetitions = new ArrayList<>(theRepetitions.size() + 1);
 						ExpressionComponent<? super S> nextComponent = sequenceIter.next();
-						repetitions.add(theParser.advance(length()).parseWith(nextComponent));
-						forks.addComponent(Arrays
-							.asList(new SequencePossibility<>(theType, theParser, Collections.unmodifiableList(repetitions), false, true)));
+						ExpressionPossibility<S> nextPossibility = theParser.advance(length()).parseWith(nextComponent);
+						if (nextPossibility != null) {
+							List<ExpressionPossibility<S>> repetitions = new ArrayList<>(theRepetitions.size() + 1);
+							repetitions.addAll(theRepetitions);
+							repetitions.add(nextPossibility);
+							forks.addComponent(Arrays.asList(
+								new SequencePossibility<>(theType, theParser, Collections.unmodifiableList(repetitions), false, true)));
+						}
 					}
 				}
 			}
@@ -151,16 +163,6 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		@Override
 		public int getFirstErrorPosition() {
 			return theErrorPos;
-		}
-
-		@Override
-		public boolean isComplete() {
-			if (!theRepetitions.isEmpty()) {
-				ExpressionPossibility<S> last = theRepetitions.get(theRepetitions.size() - 1);
-				if (!last.isComplete())
-					return false;
-			}
-			return theType.isComplete(theRepetitions.size());
 		}
 
 		@Override
@@ -218,7 +220,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 			BiTuple<Integer, String> selfError = super.getSelfError();
 			if (selfError == null) {
 				String ccError = getType().getErrorForComponentCount(getChildren().size());
-				if (ccError == null)
+				if (ccError != null)
 					selfError = new BiTuple<>(length(), ccError);
 			}
 			return selfError;

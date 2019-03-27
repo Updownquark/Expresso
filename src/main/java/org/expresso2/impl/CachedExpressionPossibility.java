@@ -16,6 +16,7 @@ class CachedExpressionPossibility<S extends BranchableStream<?, ?>> implements E
 	private final ExpressionComponent<? super S> theType;
 	private ExpressionPossibility<S> thePossibility;
 	private List<CachedExpressionPossibility<S>> theForks;
+	private int cachedHash = -1;
 
 	CachedExpressionPossibility(ExpressionComponent<? super S> type) {
 		theType = type;
@@ -69,11 +70,6 @@ class CachedExpressionPossibility<S extends BranchableStream<?, ?>> implements E
 	}
 
 	@Override
-	public boolean isComplete() {
-		return thePossibility.isComplete();
-	}
-
-	@Override
 	public boolean equals(Object o) {
 		if (this == o)
 			return true;
@@ -89,7 +85,14 @@ class CachedExpressionPossibility<S extends BranchableStream<?, ?>> implements E
 
 	@Override
 	public int hashCode() {
-		return thePossibility == null ? 0 : thePossibility.hashCode();
+		if (thePossibility == null)
+			return 0;
+		else if (cachedHash != -1)
+			return cachedHash;
+		else {
+			cachedHash = thePossibility.hashCode();
+			return cachedHash;
+		}
 	}
 
 	@Override

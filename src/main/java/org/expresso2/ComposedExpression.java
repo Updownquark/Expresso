@@ -20,6 +20,8 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> exten
 		Expression<S> firstError = null;
 		int errorCount = 0;
 		theSelfError = getSelfError();
+		if (theSelfError != null)
+			errorCount++;
 		for (Expression<S> child : children) {
 			errorCount += child.getErrorCount();
 			if (errorCount > 0 && firstError == null)

@@ -19,9 +19,10 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 	@Override
 	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> session) throws IOException {
 		ExpressionPossibility<S2> superPossibility = super.parse(session);
-		if (superPossibility == null)
+		boolean empty = superPossibility == null;
+		if (empty)
 			superPossibility = ExpressionPossibility.empty(session.getStream(), this);
-		return new OptionalPossibility<>(this, session, superPossibility, true);
+		return new OptionalPossibility<>(this, session, superPossibility, empty);
 	}
 
 	@Override
@@ -67,8 +68,8 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 			else
 				mappedOptionForks = optionForks.stream().map(fork -> new OptionalPossibility<>(theType, theParser, fork, false))
 					.collect(Collectors.toCollection(() -> new ArrayList<>(optionForks.size())));
-			List<ExpressionPossibility<S>> empty = isEmpty ? null : Arrays.asList(new OptionalPossibility<>(theType, theParser,
-				ExpressionPossibility.empty(theParser.getStream(), theOption.getType()), true));
+			List<ExpressionPossibility<S>> empty = isEmpty ? Collections.emptyList() : Arrays.asList(new OptionalPossibility<>(theType,
+				theParser, ExpressionPossibility.empty(theParser.getStream(), theOption.getType()), true));
 			if (isEmpty)
 				return mappedOptionForks;
 			else if (mappedOptionForks.isEmpty())
@@ -85,11 +86,6 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 		@Override
 		public int getFirstErrorPosition() {
 			return theOption.getFirstErrorPosition();
-		}
-
-		@Override
-		public boolean isComplete() {
-			return theOption.isComplete();
 		}
 
 		@Override

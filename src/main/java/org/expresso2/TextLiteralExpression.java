@@ -27,6 +27,20 @@ public class TextLiteralExpression<S extends CharSequenceStream> extends Literal
 	}
 
 	@Override
+	public int hashCode() {
+		return theText.hashCode();
+	}
+
+	@Override
+	public boolean equals(Object o) {
+		if (this == o)
+			return true;
+		else if (!(o instanceof TextLiteralExpression))
+			return false;
+		return theText.equals(((TextLiteralExpression<?>) o).theText);
+	}
+
+	@Override
 	public String toString() {
 		return "Literal(" + theText + ")";
 	}

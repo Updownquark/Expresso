@@ -1,8 +1,10 @@
 package org.expresso2.java;
 
 import java.io.IOException;
+import java.util.Deque;
 
 import org.expresso.parse.impl.CharSequenceStream;
+import org.expresso2.ConfiguredExpression;
 import org.expresso2.DefaultGrammarParser;
 import org.expresso2.Expression;
 import org.expresso2.ExpressionComponent;
@@ -54,5 +56,39 @@ public class JavaTest {
 		Assert.assertEquals("vbl", result.getField("target").getFirst().toString());
 		Assert.assertEquals("field", result.getField("name").getFirst().toString());
 		Assert.assertEquals(0, result.getField("method").size());
+	}
+
+	@Test
+	public void testDoubleField() {
+		Expression<CharSequenceStream> result = parse("vbl.field1.field2", "result-producer", true).unwrap();
+		Assert.assertEquals("member", ((ExpressionType<?>) result.getType()).getName());
+		Expression<CharSequenceStream> inner = result.getField("target").getFirst().getWrapped().unwrap();
+		Assert.assertEquals("member", ((ExpressionType<?>) inner.getType()).getName());
+		Assert.assertEquals("vbl", inner.getField("target").getFirst().toString());
+		Assert.assertEquals("field1", inner.getField("name").getFirst().toString());
+		Assert.assertEquals("field2", result.getField("name").getFirst().toString());
+		Assert.assertEquals(0, result.getField("method").size());
+	}
+
+	@Test
+	public void testConstructor() {
+		Expression<CharSequenceStream> result = parse("new Integer(5, b)", "result-producer", true).unwrap();
+		Assert.assertEquals("constructor", ((ExpressionType<?>) result.getType()).getName());
+		Expression<CharSequenceStream> type = result.getField("type").getFirst().getWrapped().unwrap();
+		Assert.assertEquals("Integer", type.toString());
+		Deque<ConfiguredExpression<CharSequenceStream>> args = result.getField("parameter");
+		Assert.assertEquals(2, args.size());
+		Assert.assertEquals("number", ((ExpressionType<?>) args.getFirst().getType()).getName());
+		Assert.assertEquals("identifier", ((ExpressionType<?>) args.getLast().getType()).getName());
+	}
+
+	@Test
+	public void testPerformance() {
+		@SuppressWarnings("unused")
+		int j = 0; // This variable is just here to make a line for breakpoints during profiling
+		for (int i = 0; i < 1000; i++) {
+			parse("vbl.field", "result-producer", true);
+		}
+		j = 0;
 	}
 }

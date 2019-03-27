@@ -36,6 +36,20 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 	}
 
 	@Override
+	public int hashCode() {
+		return thePattern.hashCode();
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		else if (!(obj instanceof TextPatternExpressionType))
+			return false;
+		return thePattern.equals(((TextPatternExpressionType<?>) obj).thePattern);
+	}
+
+	@Override
 	public String toString() {
 		return "Pattern(" + thePattern + ")";
 	}
@@ -80,11 +94,6 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 		@Override
 		public int getFirstErrorPosition() {
 			return theMatcher.lookingAt() ? -1 : 0;
-		}
-
-		@Override
-		public boolean isComplete() {
-			return true;
 		}
 
 		@Override

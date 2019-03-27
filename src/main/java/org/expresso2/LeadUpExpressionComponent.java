@@ -94,11 +94,6 @@ public class LeadUpExpressionComponent<S extends BranchableStream<?, ?>> extends
 		}
 
 		@Override
-		public boolean isComplete() {
-			return theTerminalPossibility.isComplete();
-		}
-
-		@Override
 		public boolean equals(Object o) {
 			if (this == o)
 				return true;

@@ -136,4 +136,9 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		else
 			return i1; // Arrays were the same
 	}
+
+	@Override
+	public String toString() {
+		return theStream.toString();
+	}
 }
