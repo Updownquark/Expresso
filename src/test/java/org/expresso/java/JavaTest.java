@@ -1,105 +1,95 @@
 package org.expresso.java;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.util.List;
+import java.util.Deque;
 
-import javax.swing.UIDefaults;
-import javax.swing.UIManager;
-import javax.swing.UnsupportedLookAndFeelException;
-
-import org.expresso.parse.ParseMatch;
-import org.expresso.parse.impl.CharSequenceStream;
-import org.expresso.parse.impl.DefaultExpressoParser2;
-import org.expresso.parse.matchers.DefaultGrammarParser;
-import org.expresso.parse.matchers.DefaultGrammarParser.PrioritizedMatcher;
-import org.expresso.parse.matchers.WhitespaceMatcher;
-import org.jdom2.JDOMException;
+import org.expresso.ConfiguredExpressionType;
+import org.expresso.DefaultGrammarParser;
+import org.expresso.Expression;
+import org.expresso.ExpressionField;
+import org.expresso.ExpressionType;
+import org.expresso.ExpressoGrammar;
+import org.expresso.ExpressoGrammarParser;
+import org.expresso.stream.CharSequenceStream;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-/** Tests the capabilities of the java parsing */
+/** Tests the Expresso parser using the embedded Java grammar */
 public class JavaTest {
-	private DefaultExpressoParser2<CharSequenceStream> theParser;
+	private ExpressoGrammar<CharSequenceStream> theParser;
 
-	/** Sets up the java parser */
+	/**
+	 * Builds the parser from the embedded Java grammar
+	 * 
+	 * @throws IOException If the grammar file cannot be read
+	 */
 	@Before
-	public void setupParser() {
-		try {
-			UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-		} catch(ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {
-			System.err.println("Unable to set system L&F");
-			e.printStackTrace();
-		}
-		UIDefaults uiDefs = UIManager.getDefaults();
-		uiDefs.put("Tree.leftChildIndent", 1);
-
-		List<PrioritizedMatcher> matchers;
-		try {
-			matchers = DefaultGrammarParser.getMatchers(
-					new InputStreamReader(DefaultGrammarParser.class.getResourceAsStream("/org/expresso/java/Grammar.xml"), "UTF-8"));
-		} catch(IOException | JDOMException e) {
-			throw new IllegalStateException("Could not setup default java parsing", e);
-		}
-
-		DefaultExpressoParser2.Builder<CharSequenceStream> builder = DefaultExpressoParser2.build("Java");
-		builder.addMatcher(new WhitespaceMatcher<>(), false);
-		for(PrioritizedMatcher matcher : matchers)
-			builder.addMatcher(matcher.matcher, matcher.isDefault);
-		theParser = builder.build();
-		org.expresso.parse.debug.ExpressoParserDebugGUI<CharSequenceStream> debugger;
-		debugger = new org.expresso.parse.debug.ExpressoParserDebugGUI<>();
-		theParser.setDebugger(debugger);
-		org.expresso.parse.debug.ExpressoParserDebugGUI.getDebuggerFrame(debugger);
+	public void setupParser() throws IOException {
+		ExpressoGrammarParser<CharSequenceStream> grammarParser = ExpressoGrammarParser.defaultText();
+		theParser = grammarParser.parseGrammar(DefaultGrammarParser.class.getResource("/org/expresso/grammars/Java8.xml"));
 	}
 
-	/** Parses all the .java files in this project */
+	private Expression<CharSequenceStream> parse(String expression, String type, boolean checkForErrors) {
+		ExpressionType<CharSequenceStream> component = theParser.getExpressionsByName().get(type);
+		if (component == null)
+			component = theParser.getExpressionClasses().get(type);
+		if (component == null)
+			throw new IllegalArgumentException("No such type or class: " + type);
+		Expression<CharSequenceStream> result;
+		try {
+			result = theParser.parse(CharSequenceStream.from(expression), component, !checkForErrors);
+		} catch (IOException e) {
+			throw new IllegalStateException(e);
+		}
+		if (result.getErrorCount() > 0)
+			Assert.assertEquals(result.getFirstError().getLocalErrorMessage(), 0, result.getErrorCount());
+		Assert.assertEquals(expression.length(), result.length());
+		return result;
+	}
+
+	/** Tests parsing a simple variable name (vbl) */
 	@Test
-	public void parseExpressoClasses() {
-		File current = new File(System.getProperty("user.dir"));
-		if(!current.getName().equals("Expresso"))
-			throw new IllegalStateException("Expected working directory to be the root of the Expresso project");
-		boolean success = true;
-		success &= parseClasses(new File(current, "src/main/java"));
-		success &= parseClasses(new File(current, "src/test/java"));
-		if (!success)
-			throw new IllegalStateException("Could not parse some files.  See error messages in console.");
+	public void testVariable() {
+		Expression<CharSequenceStream> result = parse("vbl", "result-producer", true);
+		result = result.unwrap();
+		Assert.assertEquals("identifier", ((ConfiguredExpressionType<?>) result.getType()).getName());
+		Assert.assertEquals("vbl", result.getField("name").getFirst().toString());
 	}
 
-	private boolean parseClasses(File dir) {
-		boolean success = true;
-		for(File file : dir.listFiles()) {
-			if (file.isDirectory() || !file.getName().toLowerCase().endsWith(".java"))
-				continue;
-			System.out.println("Parsing " + file);
-			ParseMatch<CharSequenceStream> match;
-			try {
-				match = theParser.parseBestByType(CharSequenceStream.from(file, 4096), null, "java-file");
-			} catch(IOException e) {
-				throw new IllegalStateException("Could not read " + file, e);
-			}
-			if (match == null) {
-				System.err.println("Could not parse " + file);
-				success = false;
-			}
-			else if (match.getError() != null) {
-				StringBuilder error = new StringBuilder();
-				error.append("Error parsing ").append(file).append(": ").append(match.getError());
-				CharSequenceStream stream = (CharSequenceStream) match.getStream().clone();
-				try {
-					stream=(CharSequenceStream) stream.advance(match.getLength());
-					error.append(' ').append(stream.printPosition());
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-				System.err.println(error);
-				success = false;
-			}
-		}
-		for(File file : dir.listFiles())
-			if(file.isDirectory())
-				success &= parseClasses(file);
-		return success;
+	/** Test parsing a field invocation (vbl.field) */
+	@Test
+	public void testField() {
+		Expression<CharSequenceStream> result = parse("vbl.field", "result-producer", true).unwrap();
+		Assert.assertEquals("member", ((ConfiguredExpressionType<?>) result.getType()).getName());
+		Assert.assertEquals("vbl", result.getField("target").getFirst().toString());
+		Assert.assertEquals("field", result.getField("name").getFirst().toString());
+		Assert.assertEquals(0, result.getField("method").size());
+	}
+
+	/** Tests parsing a nested field invocation (vbl.field1.field2) */
+	@Test
+	public void testDoubleField() {
+		Expression<CharSequenceStream> result = parse("vbl.field1.field2", "result-producer", true).unwrap();
+		Assert.assertEquals("member", ((ConfiguredExpressionType<?>) result.getType()).getName());
+		Expression<CharSequenceStream> inner = result.getField("target").getFirst().getWrapped().unwrap();
+		Assert.assertEquals("member", ((ConfiguredExpressionType<?>) inner.getType()).getName());
+		Assert.assertEquals("vbl", inner.getField("target").getFirst().toString());
+		Assert.assertEquals("field1", inner.getField("name").getFirst().toString());
+		Assert.assertEquals("field2", result.getField("name").getFirst().toString());
+		Assert.assertEquals(0, result.getField("method").size());
+	}
+
+	/** Tests parsing a constructor invocation (new Integer(5, b)). I may change the type later, it doesn't matter here. */
+	@Test
+	public void testConstructor() {
+		Expression<CharSequenceStream> result = parse("new Integer(5,b)", "result-producer", true).unwrap();
+		Assert.assertEquals("constructor", ((ConfiguredExpressionType<?>) result.getType()).getName());
+		Expression<CharSequenceStream> type = result.getField("type").getFirst().getWrapped().unwrap();
+		Assert.assertEquals("Integer", type.toString());
+		Deque<ExpressionField<CharSequenceStream>> args = result.getField("arguments", "argument");
+		Assert.assertEquals(2, args.size());
+		Assert.assertEquals("number", ((ConfiguredExpressionType<?>) args.getFirst().getWrapped().unwrap().getType()).getName());
+		Assert.assertEquals("identifier", ((ConfiguredExpressionType<?>) args.getLast().getWrapped().unwrap().getType()).getName());
 	}
 }
