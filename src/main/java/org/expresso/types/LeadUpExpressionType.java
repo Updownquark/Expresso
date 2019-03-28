@@ -7,13 +7,15 @@ import java.util.Collection;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import org.expresso.BareContentExpressionType;
 import org.expresso.Expression;
 import org.expresso.ExpressionPossibility;
 import org.expresso.ExpressionType;
 import org.expresso.ExpressoParser;
 import org.expresso.stream.BranchableStream;
 
-public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends AbstractExpressionType<S> {
+public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends AbstractExpressionType<S>
+	implements BareContentExpressionType<S> {
 	private final ExpressionType<S> theTerminal;
 
 	public LeadUpExpressionType(int id, ExpressionType<S> terminal) {

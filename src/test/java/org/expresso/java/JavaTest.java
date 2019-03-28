@@ -80,10 +80,17 @@ public class JavaTest {
 		Assert.assertEquals(0, result.getField("method").size());
 	}
 
-	/** Tests parsing a constructor invocation (new Integer(5, b)). I may change the type later, it doesn't matter here. */
+	/**
+	 * <p>
+	 * Tests parsing a constructor invocation (new Integer(5, b)).
+	 * </p>
+	 * <p>
+	 * I may change the type later to make more sense, but, it doesn't matter here.
+	 * </p>
+	 */
 	@Test
 	public void testConstructor() {
-		Expression<CharSequenceStream> result = parse("new Integer(5,b)", "result-producer", true).unwrap();
+		Expression<CharSequenceStream> result = parse("new Integer(5, b)", "result-producer", true).unwrap();
 		Assert.assertEquals("constructor", ((ConfiguredExpressionType<?>) result.getType()).getName());
 		Expression<CharSequenceStream> type = result.getField("type").getFirst().getWrapped().unwrap();
 		Assert.assertEquals("Integer", type.toString());

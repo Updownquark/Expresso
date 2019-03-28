@@ -48,6 +48,9 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 	public static final Set<String> RESERVED_EXPRESSION_NAMES = Collections.unmodifiableSet(new LinkedHashSet<>(//
 		Arrays.asList("expresso", "expression", "class", "field", "name")));
 
+	/** The */
+	public static final String IGNORABLE = "ignorable";
+
 	/** A grammar precursor, used by some grammar components to generate {@link ExpressionType}s */
 	public interface PreGrammar {
 		/**
@@ -76,8 +79,8 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		 * @return The built and configured {@link ExpressionType}
 		 * @throws IllegalArgumentException If the configuration for the expression has an error
 		 */
-		ExpressionType<S> build(int id, Map<String, String> config, String value, String untrimmedValue, List<ExpressionType<S>> children,
-			PreGrammar grammar) throws IllegalArgumentException;
+		ExpressionType<S> build(int id, Map<String, String> config, String value, String untrimmedValue,
+			List<ExpressionType<S>> children, PreGrammar grammar) throws IllegalArgumentException;
 	}
 
 	private final Map<String, GrammarComponent<S>> theComponents;
@@ -127,7 +130,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 			String typeName = type.get("name");
 			if (typeName == null)
 				throw new IllegalArgumentException("expression has no name: " + type);
-			else if (RESERVED_EXPRESSION_NAMES.contains(typeName))
+			else if (RESERVED_EXPRESSION_NAMES.contains(typeName) || IGNORABLE.equals(typeName))
 				throw new IllegalArgumentException(typeName + " cannot be used as an expression name in expresso");
 			else if (theComponents.containsKey(typeName))
 				throw new IllegalArgumentException(typeName + " is a reserved component type name: " + type);
@@ -159,6 +162,12 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		BetterSortedMap<String, ExpressionClass<S>> classes = new BetterTreeMap<>(false, QommonsUtils.DISTINCT_NUMBER_TOLERANT);
 		for (PreParsedClass clazz : declaredClasses.values())
 			classes.put(clazz.clazz.getName(), clazz.clazz);
+		ExpressionType<S> ignorable;
+		ExpressionClass<S> ignorableClass = classes.get(IGNORABLE);
+		if (ignorableClass != null)
+			ignorable = new RepeatExpressionType<>(id[0]++, 0, Integer.MAX_VALUE, Arrays.asList(ignorableClass));
+		else
+			ignorable = null;
 		PreGrammar preGrammar = new PreGrammar() {
 			@Override
 			public int getTypeId(String typeName) {
@@ -185,7 +194,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 					throw new IllegalArgumentException("field attribute is not allowed on an expression");
 				ExpressionType<S> component;
 				try {
-					component = parseComponent(componentConfig, classes, declaredTypes, id, preGrammar, true);
+					component = parseComponent(componentConfig, classes, declaredTypes, id, preGrammar, true, ignorable);
 				} catch (RuntimeException e) {
 					throw new IllegalStateException(e.getMessage() + ":\n" + type, e);
 				}
@@ -207,7 +216,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 	}
 
 	private ExpressionType<S> parseComponent(QommonsConfig config, Map<String, ExpressionClass<S>> allClasses,
-		Map<String, ParsedExpressionType<S>> allTypes, int[] id, PreGrammar grammar, boolean throwIfNotFound) {
+		Map<String, ParsedExpressionType<S>> allTypes, int[] id, PreGrammar grammar, boolean throwIfNotFound, ExpressionType<S> ignorable) {
 		String componentType = config.getName();
 		String value = config.getValue();
 		if ("".equals(value))
@@ -236,13 +245,13 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		if ((rc = theComponents.get(componentType)) != null) {
 			Map<String, String> params = new LinkedHashMap<>();
 			String untrimmedValue = config.getValueUntrimmed();
-			int componentId = id[0]++;
 			List<ExpressionType<S>> subComponents = new ArrayList<>(subComponentConfigs.length);
+			int componentId = id[0]++;
 			for (QommonsConfig subComponentConfig : subComponentConfigs) {
 				String scName = subComponentConfig.getName();
 				if (scName.equals("field"))
 					continue;
-				ExpressionType<S> subComponent = parseComponent(subComponentConfig, allClasses, allTypes, id, grammar, false);
+				ExpressionType<S> subComponent = parseComponent(subComponentConfig, allClasses, allTypes, id, grammar, false, ignorable);
 				if (subComponent != null)
 					subComponents.add(subComponent);
 				else if (subComponentConfig.subConfigs().length > 0 || subComponentConfig.getValue() == null)
@@ -286,7 +295,11 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 			throw new IllegalArgumentException("Unrecognized component type: " + componentType + " in " + config);
 		else
 			return null;
-		return fields == null ? found : new ExpressionTypeReference<>(found, Collections.unmodifiableNavigableSet(fields));
+		ExpressionType<S> exType = fields == null ? found
+			: new ExpressionTypeReference<>(found, Collections.unmodifiableNavigableSet(fields));
+		if (ignorable != null && found instanceof BareContentExpressionType)
+			exType = new SequenceExpressionType<>(id[0]++, Arrays.asList(ignorable, exType));
+		return exType;
 	}
 
 	/** @return The standard text GrammarParser */
@@ -297,7 +310,8 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 				throw new IllegalArgumentException("Literal cannot have children");
 			else if (untrimmedValue == null)
 				throw new IllegalArgumentException("Literal declared with no content");
-			else if (value != null)
+
+			if (value != null)
 				return new TextLiteralExpressionType<>(id, value);
 			else
 				return new TextLiteralExpressionType<>(id, untrimmedValue);
@@ -317,7 +331,8 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 			else if (value == null)
 				throw new IllegalArgumentException("Pattern declared with no content");
 			Pattern pattern = Pattern.compile(value, ci ? Pattern.CASE_INSENSITIVE : 0);
-			return new TextPatternExpressionType<>(id, maxLen == null ? Integer.MAX_VALUE : Integer.parseInt(maxLen), pattern);
+			return new TextPatternExpressionType<>(id,
+				maxLen == null ? Integer.MAX_VALUE : Integer.parseInt(maxLen), pattern);
 		});
 		return new DefaultGrammarParser<>(components);
 	}

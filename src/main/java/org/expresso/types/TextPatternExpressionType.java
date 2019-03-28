@@ -9,13 +9,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.expresso.AbstractExpression;
+import org.expresso.BareContentExpressionType;
 import org.expresso.Expression;
 import org.expresso.ExpressionPossibility;
 import org.expresso.ExpressionType;
 import org.expresso.ExpressoParser;
 import org.expresso.stream.CharSequenceStream;
 
-public class TextPatternExpressionType<S extends CharSequenceStream> extends AbstractExpressionType<S> {
+public class TextPatternExpressionType<S extends CharSequenceStream> extends AbstractExpressionType<S>
+	implements BareContentExpressionType<S> {
 	private final Pattern thePattern;
 	private final int theMaxLength;
 

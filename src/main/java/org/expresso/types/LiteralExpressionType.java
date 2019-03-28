@@ -8,12 +8,14 @@ import java.util.List;
 import java.util.Objects;
 
 import org.expresso.AbstractExpression;
+import org.expresso.BareContentExpressionType;
 import org.expresso.Expression;
 import org.expresso.ExpressionPossibility;
 import org.expresso.ExpressoParser;
 import org.expresso.stream.BranchableStream;
 
-public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? super C>> extends AbstractExpressionType<S> {
+public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? super C>> extends AbstractExpressionType<S>
+	implements BareContentExpressionType<S> {
 	private final C theValue;
 
 	public LiteralExpressionType(int id, C value) {
