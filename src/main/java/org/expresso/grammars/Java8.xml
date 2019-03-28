@@ -1,7 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <expresso>
-	<expression name="char" class="result-producer">
+	<classes>
+		<class name="result-producer" />
+		<class name="literal-value" extends="result-producer" />
+		<class name="literal-number" extends="literal-value" />
+		<class name="comment" extends="ignorable" />
+		<class name="body-content" />
+		<class name="control-statement" extends="body-content" />
+		<class name="linear-control-statement" extends="control-statement" />
+		<class name="loop" extends="control-statement" />
+		<class name="terminal-statement" extends="body-content" />
+		<class name="assignable" />
+		<class name="assignment" />
+		<class name="type" />
+		<class name="class-content" />
+		<class name="declaration" extends="class-content" />
+		<class name="file-content" />
+		<class name="import" extends="file-content" />
+		<class name="unary" />
+		<class name="binary" />
+		<class name="ternary" />
+		<class name="logical" />
+	</classes>
+	<expression name="char" class="literal-value">
 		<literal>&apos;</literal>
 		<without types="ignorable">
 			<one-of>
@@ -13,7 +35,7 @@
 			<literal>&apos;</literal>
 		</without>
 	</expression>
-	<expression name="string" class="result-producer">
+	<expression name="string" class="literal-value">
 		<literal>&quot;</literal>
 		<without types="ignorable">
 			<up-to field="value">
@@ -25,7 +47,7 @@
 			<literal>&quot;</literal>
 		</without>
 	</expression>
-	<expression name="number" class="result-producer">
+	<expression name="number" class="literal-number">
 		<option>
 			<ignorable field="pre-ignore" />
 		</option>
@@ -75,7 +97,7 @@
 			</option>
 		</without>
 	</expression>
-	<expression name="hex-int" class="result-producer">
+	<expression name="hex-int" class="literal-number">
 		<literal field="hex">0x</literal>
 		<without types="ignorable">
 			<pattern field="value">[_0-9a-fA-F]+</pattern>
@@ -87,7 +109,7 @@
 			</forbid>
 		</without>
 	</expression>
-	<expression name="octal-int" class="result-producer">
+	<expression name="octal-int" class="literal-number">
 		<literal field="oct">0</literal>
 		<without types="ignorable">
 			<pattern field="value">[_0-9]+</pattern>
@@ -99,7 +121,7 @@
 			</option>
 		</without>
 	</expression>
-	<expression name="binary-int" class="result-producer">
+	<expression name="binary-int" class="literal-number">
 		<literal field="binary">0b</literal>
 		<without types="ignorable">
 			<pattern field="value">[_0-9]*</pattern>
@@ -111,7 +133,7 @@
 			</option>
 		</without>
 	</expression>
-	<expression name="boolean" class="result-producer">
+	<expression name="boolean" class="literal-value">
 		<one-of>
 			<literal>true</literal>
 			<literal>false</literal>
@@ -125,7 +147,7 @@
 	<expression name="whitespace" class="ignorable">
 		<pattern>\s+</pattern>
 	</expression>
-	<expression name="line-comment" class="ignorable">
+	<expression name="line-comment" class="comment">
 		<without types="ignorable">
 			<literal>//</literal>
 			<up-to field="content">
@@ -134,7 +156,7 @@
 			<literal>&#10;</literal>
 		</without>
 	</expression>
-	<expression name="block-comment" class="ignorable">
+	<expression name="block-comment" class="comment">
 		<literal>/*</literal>
 		<without types="ignorable">
 			<up-to field="content">
@@ -145,21 +167,21 @@
 	</expression>
 	
 	<!-- Blocks and block structures -->
-	<expression name="block">
+	<expression name="block" class="body-content">
 		<literal>{</literal>
 		<repeat>
 			<statement field="content" />
 		</repeat>
 		<literal>}</literal>
 	</expression>
-	<expression name="synchronized-block">
+	<expression name="synchronized-block" class="body-content">
 		<literal>synchronized</literal>
 		<literal>(</literal>
 		<result-producer field="sync-item" />
 		<literal>)</literal>
 		<block field="content" />
 	</expression>
-	<expression name="try-catch-finally">
+	<expression name="try-catch-finally" class="body-content">
 		<literal>try</literal>
 		<option>
 			<literal>(</literal>
@@ -186,7 +208,7 @@
 			<block field="finally" />
 		</option>
 	</expression>
-	<expression name="while-loop">
+	<expression name="while-loop" class="loop">
 		<literal field="name">while</literal>
 		<literal>(</literal>
 		<result-producer field="condition" />
@@ -196,7 +218,7 @@
 			<block field="content,post-condition" />
 		</one-of>
 	</expression>
-	<expression name="do-while-loop">
+	<expression name="do-while-loop" class="loop">
 		<literal field="name">do</literal>
 		<block field="content,pre-condition" />
 		<literal>while</literal>
@@ -205,14 +227,14 @@
 		<literal>)</literal>
 		<literal>;</literal>
 	</expression>
-	<expression name="for-loop">
+	<expression name="for-loop" class="loop">
 		<literal field="name">for</literal>
 		<literal>(</literal>
 		<option>
-			<statement-content field="init" />
+			<body-content field="init" />
 			<repeat>
 				<literal>,</literal>
-				<statement-content field="init" />
+				<body-content field="init" />
 			</repeat>
 		</option>
 		<literal>;</literal>
@@ -224,7 +246,7 @@
 			<assignable field="increment" />
 			<repeat>
 				<literal>,</literal>
-				<statement-content field="increment" />
+				<body-content field="increment" />
 			</repeat>
 		</option>
 		<literal>)</literal>
@@ -234,7 +256,7 @@
 			<block field="content,post-condition" />
 		</one-of>
 	</expression>
-	<expression name="enhanced-for-loop">
+	<expression name="enhanced-for-loop" class="loop">
 		<literal>for</literal>
 		<literal>(</literal>
 		<type field="type" />
@@ -247,7 +269,7 @@
 			<block field="content,post-condition" />
 		</one-of>
 	</expression>
-	<expression name="if">
+	<expression name="if" class="linear-control-statement">
 		<literal>if</literal>
 		<literal>(</literal>
 		<result-producer field="condition" />
@@ -275,7 +297,7 @@
 			</one-of>
 		</option>
 	</expression>
-	<expression name="switch">
+	<expression name="switch" class="linear-control-statement">
 		<literal>switch</literal>
 		<literal>(</literal>
 		<result-producer field="variable" />
@@ -306,8 +328,8 @@
 	<expression name="identifier" class="assignable,result-producer">
 		<pattern field="name">[_a-zA-Z][_a-zA-Z0-9]*</pattern>
 	</expression>
-	<expression name="primitive">
-		<one-of field="primitive,type">
+	<expression name="primitive" class="type">
+		<one-of>
 			<literal>void</literal>
 			<literal>boolean</literal>
 			<literal>true</literal>
@@ -372,19 +394,20 @@
 	</expression>
 
 	<!-- Control statements -->
-	<expression name="statement">
+	<expression name="statement" class="body-content">
 		<option>
-			<statement-content field="content" />
+			<body-content field="content" />
 		</option>
 		<literal>;</literal>
 	</expression>
-	<expression name="return">
+	<expression name="return" class="terminal-statement">
 		<literal>return</literal>
 		<option>
 			<result-producer field="value" />
 		</option>
+		<literal>;</literal>
 	</expression>
-	<expression name="throw">
+	<expression name="throw" class="terminal-statement">
 		<literal>throw</literal>
 		<result-producer field="value" />
 	</expression>
@@ -443,7 +466,7 @@
 			<literal>synchronized</literal>
 		</one-of>
 	</expression>
-	<expression name="variable-declaration" class="declaration,assignable,statement-content">
+	<expression name="variable-declaration" class="declaration,assignable,body-content">
 		<option>
 			<annotations field="annotations" />
 		</option>
@@ -457,7 +480,7 @@
 		<whitespace />
 		<identifier field="name" />
 	</expression>
-	<expression name="method-declaration" class="declaration,statement-content">
+	<expression name="method-declaration" class="declaration">
 		<option>
 			<annotations field="annotations" />
 		</option>
@@ -493,7 +516,7 @@
 			<block field="body" />
 		</option>
 	</expression>
-	<expression name="class-declaration" class="declaration,statement-content">
+	<expression name="class-declaration" class="declaration,body-content,file-content">
 		<option>
 			<annotations field="annotations" />
 		</option>
@@ -531,7 +554,7 @@
 			</repeat>
 		<literal>}</literal>
 	</expression>
-	<expression name="enum-declaration" class="declaration,statement-content">
+	<expression name="enum-declaration" class="declaration,body-content,file-content">
 		<option>
 			<annotations field="annotations" />
 		</option>
@@ -605,10 +628,7 @@
 			<literal>;</literal>
 		</option>
 		<repeat>
-			<import field="import" />
-		</repeat>
-		<repeat min="1">
-			<class-declaration field="class" />
+			<file-content field="content" />
 		</repeat>
 	</expression>
 	
@@ -622,7 +642,7 @@
 			</repeat>
 		</option>
 	</expression>
-	<expression name="constructor" class="statement-content,result-producer"> <!-- Invocation, not declaration -->
+	<expression name="constructor" class="body-content,result-producer"> <!-- Invocation, not declaration -->
 		<literal>new</literal>
 		<repeat min="1">
 			<ignorable />
@@ -635,7 +655,7 @@
 			<block field="anonymous-body" />
 		</option>
 	</expression>
-	<expression name="lambda" class="statement-content,result-producer">
+	<expression name="lambda" class="result-producer">
 		<one-of>
 			<identifier field="parameter-name" />
 			<sequence>
@@ -643,20 +663,20 @@
 				<option>
 					<one-of>
 						<sequence>
-							<repeat>
-								<type field="parameter-type" />
-								<identifier field="parameter-name" />
-								<literal>,</literal>
-							</repeat>
 							<type field="parameter-type" />
 							<identifier field="parameter-name" />
+							<repeat>
+								<literal>,</literal>
+								<type field="parameter-type" />
+								<identifier field="parameter-name" />
+							</repeat>
 						</sequence>
 						<sequence>
-							<repeat>
-								<identifier field="parameter-name" />
-								<literal>,</literal>
-							</repeat>
 							<identifier field="parameter-name" />
+							<repeat>
+								<literal>,</literal>
+								<identifier field="parameter-name" />
+							</repeat>
 						</sequence>
 					</one-of>
 				</option>
@@ -669,7 +689,7 @@
 			<result-producer field="value" />
 		</one-of>
 	</expression>
-	<expression name="array-initializer" class="statement-content,result-producer">
+	<expression name="array-initializer" class="result-producer">
 		<literal>new</literal>
 		<repeat min="1">
 			<ignorable />
@@ -686,67 +706,67 @@
 			<literal>}</literal>
 		</option>
 	</expression>
-	<expression name="assign" priority="100" class="assignment,binary,statement-content,result-producer">
+	<expression name="assign" priority="100" class="assignment,binary,body-content,result-producer">
 		<assignable field="variable" />
 		<literal field="name">=</literal>
 		<result-producer field="operand" />
 	</expression>
-	<expression name="add-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+	<expression name="add-assign" priority="100" class="assignment,binary,body-content,result-producer">
 		<assignable field="variable" />
 		<literal field="name">+=</literal>
 		<result-producer field="operand" />
 	</expression>
-	<expression name="subtract-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+	<expression name="subtract-assign" priority="100" class="assignment,binary,body-content,result-producer">
 		<assignable field="variable" />
 		<literal field="name">-=</literal>
 		<result-producer field="operand" />
 	</expression>
-	<expression name="multiply-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+	<expression name="multiply-assign" priority="100" class="assignment,binary,body-content,result-producer">
 		<assignable field="variable" />
 		<literal field="name">*=</literal>
 		<result-producer field="operand" />
 	</expression>
-	<expression name="divide-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+	<expression name="divide-assign" priority="100" class="assignment,binary,body-content,result-producer">
 		<assignable field="variable" />
 		<literal field="name">/=</literal>
 		<result-producer field="operand" />
 	</expression>
-	<expression name="modulo-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+	<expression name="modulo-assign" priority="100" class="assignment,binary,body-content,result-producer">
 		<assignable field="variable" />
 		<literal field="name">%=</literal>
 		<result-producer field="operand" />
 	</expression>
-	<expression name="or-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+	<expression name="or-assign" priority="100" class="assignment,binary,body-content,result-producer">
 		<assignable field="variable" />
 		<literal field="name">|=</literal>
 		<result-producer field="operand" />
 	</expression>
-	<expression name="and-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+	<expression name="and-assign" priority="100" class="assignment,binary,body-content,result-producer">
 		<assignable field="variable" />
 		<literal field="name">&amp;=</literal>
 		<result-producer field="operand" />
 	</expression>
-	<expression name="xor-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+	<expression name="xor-assign" priority="100" class="assignment,binary,body-content,result-producer">
 		<assignable field="variable" />
 		<literal field="name">^=</literal>
 		<result-producer field="operand" />
 	</expression>
-	<expression name="left-shift-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+	<expression name="left-shift-assign" priority="100" class="assignment,binary,body-content,result-producer">
 		<assignable field="variable" />
 		<literal field="name">&lt;&lt;=</literal>
 		<result-producer field="operand" />
 	</expression>
-	<expression name="right-shift-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+	<expression name="right-shift-assign" priority="100" class="assignment,binary,body-content,result-producer">
 		<assignable field="variable" />
 		<literal field="name">&gt;&gt;=</literal>
 		<result-producer field="operand" />
 	</expression>
-	<expression name="unsigned-right-shift-assign" priority="100" class="assignment,binary,statement-content,result-producer">
+	<expression name="unsigned-right-shift-assign" priority="100" class="assignment,binary,body-content,result-producer">
 		<assignable field="variable" />
 		<literal field="name">&gt;&gt;&gt;=</literal>
 		<result-producer field="operand" />
 	</expression>
-	<expression name="conditional" priority="110" class="ternary,statement-content,result-producer">
+	<expression name="conditional" priority="110" class="ternary,body-content,result-producer">
 		<result-producer field="condition" />
 		<literal>?</literal>
 		<result-producer field="affirmative" />
@@ -869,29 +889,29 @@
 		<literal field="name">~</literal>
 		<result-producer field="operand" />
 	</expression>
-	<expression name="pre-increment" priority="220" class="unary,statement-content,result-producer">
+	<expression name="pre-increment" priority="220" class="unary,body-content,result-producer">
 		<literal field="name">++</literal>
 		<result-producer field="operand" />
 	</expression>
-	<expression name="pre-decrement" priority="220" class="unary,statement-content,result-producer">
+	<expression name="pre-decrement" priority="220" class="unary,body-content,result-producer">
 		<literal field="name">--</literal>
 		<result-producer field="operand" />
 	</expression>
-	<expression name="post-increment" priority="230" class="unary,statement-content,result-producer">
+	<expression name="post-increment" priority="230" class="unary,body-content,result-producer">
 		<result-producer field="operand" />
 		<literal field="name">++</literal>
 	</expression>
-	<expression name="post-decrement" priority="230" class="unary,statement-content,result-producer">
+	<expression name="post-decrement" priority="230" class="unary,body-content,result-producer">
 		<result-producer field="operand" />
 		<literal field="name">--</literal>
 	</expression>
-	<expression name="cast" priority="220" class="binary,statement-content,result-producer">
+	<expression name="cast" priority="220" class="binary,body-content,result-producer">
 		<literal>(</literal>
 		<type field="type" />
 		<literal>)</literal>
-		<expression-value field="value" />
+		<result-producer field="value" />
 	</expression>
-	<expression name="parenthetic" priority="250" class="expression-value,result-producer">
+	<expression name="parenthetic" priority="250" class="result-producer">
 		<literal>(</literal>
 		<result-producer field="content" />
 		<literal>)</literal>
@@ -902,7 +922,7 @@
 		<result-producer field="index" />
 		<literal>]</literal>
 	</expression>
-	<expression name="member" priority="250" class="assignable,statement-content,result-producer">
+	<expression name="member" priority="250" class="assignable,body-content,result-producer">
 		<result-producer field="target" />
 		<literal field="dot">.</literal>
 		<identifier field="name" />
@@ -912,7 +932,7 @@
 			<literal>)</literal>
 		</option>
 	</expression>
-	<expression name="function-invocation" priority="250" class="statement-content,result-producer">
+	<expression name="function-invocation" priority="250" class="body-content,result-producer">
 		<identifier field="name" />
 		<literal field="method">(</literal>
 		<argument-list field="arguments" />

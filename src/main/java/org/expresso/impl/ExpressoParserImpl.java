@@ -11,6 +11,11 @@ import org.expresso.ExpressoParser;
 import org.expresso.stream.BranchableStream;
 import org.qommons.BiTuple;
 
+/**
+ * Default implementation of {@link ExpressoParser}
+ *
+ * @param <S> The type of the stream to parse
+ */
 public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements ExpressoParser<S> {
 	private final ParseSession<S> theSession;
 	private final S theStream;
@@ -19,6 +24,13 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	private final PersistentStack<BiTuple<ExpressionType<? super S>, ExpressionPossibility<S>>> theCacheOverride;
 	private final Map<Integer, CachedExpressionPossibility<S>> theCache;
 
+	/**
+	 * @param session The parsing session
+	 * @param stream The stream (with position)
+	 * @param tolerateError Whether to look for potential errors in expressions
+	 * @param excludedTypes IDs of types that this parser will not return expressions for
+	 * @param cacheOverride Cache overrides for this parser
+	 */
 	public ExpressoParserImpl(ParseSession<S> session, S stream, boolean tolerateError, int[] excludedTypes,
 		PersistentStack<BiTuple<ExpressionType<? super S>, ExpressionPossibility<S>>> cacheOverride) {
 		theSession = session;
@@ -39,6 +51,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		return isErrorTolerated;
 	}
 
+	/** @return The IDs of the types that this parser will not return expressions for */
 	public int[] getExcludedTypes() {
 		return theExcludedTypes;
 	}

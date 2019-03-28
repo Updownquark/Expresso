@@ -15,6 +15,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.expresso.stream.BinarySequenceStream;
 import org.expresso.stream.BranchableStream;
@@ -79,8 +80,8 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		 * @return The built and configured {@link ExpressionType}
 		 * @throws IllegalArgumentException If the configuration for the expression has an error
 		 */
-		ExpressionType<S> build(int id, Map<String, String> config, String value, String untrimmedValue,
-			List<ExpressionType<S>> children, PreGrammar grammar) throws IllegalArgumentException;
+		ExpressionType<S> build(int id, Map<String, String> config, String value, String untrimmedValue, List<ExpressionType<S>> children,
+			PreGrammar grammar) throws IllegalArgumentException;
 	}
 
 	private final Map<String, GrammarComponent<S>> theComponents;
@@ -94,37 +95,88 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		theComponents = recognizedComponents;
 	}
 
+	class PreParsedClass {
+		final ExpressionClass<S> clazz;
+		final PreParsedClass[] parents;
+		final List<String> memberNames;
+		private final List<ConfiguredExpressionType<S>> types;
+		private final SortedTreeList<ExpressionClass<S>> childClasses;
+
+		PreParsedClass(int id, String className, PreParsedClass[] parents) {
+			types = new SortedTreeList<>(false, (t1, t2) -> -Integer.compare(t1.getPriority(), t2.getPriority()));
+			memberNames = new LinkedList<>();
+			childClasses = new SortedTreeList<>(false, ExpressionClass::compareTo);
+			clazz = new ExpressionClass<>(id, className, //
+				Collections.unmodifiableList(Arrays.asList(parents).stream().map(ppc -> ppc.clazz)
+					.collect(Collectors.toCollection(() -> new ArrayList<>(parents.length)))), //
+				BetterCollections.unmodifiableList(childClasses), Collections.unmodifiableList(types));
+			this.parents = parents;
+			for (PreParsedClass parent : parents)
+				parent.childClasses.add(clazz);
+		}
+
+		ExpressionClass<S> addTypeName(String typeName) {
+			memberNames.add(typeName);
+			return clazz;
+		}
+
+		ExpressionClass<S> addType(ConfiguredExpressionType<S> type) {
+			if (!types.contains(type))
+				types.add(type);
+			for (PreParsedClass parent : parents)
+				parent.addType(type);
+			return clazz;
+		}
+	}
 	@Override
 	public ExpressoGrammar<S> parseGrammar(String name, InputStream stream) throws IOException {
 		QommonsConfig config = QommonsConfig.fromXml(QommonsConfig.getRootElement(stream));
 		if (!config.getName().equals("expresso"))
 			throw new IllegalArgumentException("expresso expected as root, not " + config.getName());
 		int[] id = new int[1];
-		class PreParsedClass {
-			final ExpressionClass<S> clazz;
-			final List<String> memberNames;
-			private final List<ConfiguredExpressionType<S>> types;
+		Map<String, PreParsedClass> declaredClasses = new LinkedHashMap<>();
+		declaredClasses.put(IGNORABLE, new PreParsedClass(id[0]++, IGNORABLE, new DefaultGrammarParser.PreParsedClass[0]));
+		QommonsConfig[] classesConfig = config.subConfigs("classes");
+		if (classesConfig.length > 1)
+			throw new IllegalArgumentException("Only a single classes element is allowed");
+		if (classesConfig.length == 1) {
+			for (QommonsConfig classConfig : classesConfig[0].subConfigs()) {
+				if (!"class".equals(classConfig.getName()))
+					throw new IllegalArgumentException("Only class elements (and no attributes) may exist under the classes element");
+				String className = classConfig.get("name");
+				if (className == null)
+					throw new IllegalArgumentException("class element has no name: " + classConfig);
+				if (RESERVED_EXPRESSION_NAMES.contains(className))
+					throw new IllegalArgumentException(className + " cannot be used as a class name in expresso: " + classConfig);
+				else if (theComponents.containsKey(className))
+					throw new IllegalArgumentException(className + " is a reserved component type name: " + classConfig);
+				else if (declaredClasses.containsKey(className))
+					throw new IllegalArgumentException("Class " + className + " is already declared: " + classConfig);
 
-			PreParsedClass(String className) {
-				types = new SortedTreeList<>(false, (t1, t2) -> -Integer.compare(t1.getPriority(), t2.getPriority()));
-				memberNames = new LinkedList<>();
-				clazz = new ExpressionClass<>(id[0]++, className, Collections.unmodifiableList(types));
-			}
-
-			ExpressionClass<S> addTypeName(String typeName) {
-				memberNames.add(typeName);
-				return clazz;
-			}
-
-			ExpressionClass<S> addType(ConfiguredExpressionType<S> type) {
-				types.add(type);
-				return clazz;
+				String extendsStr = classConfig.get("extends");
+				PreParsedClass[] parents;
+				if (extendsStr == null)
+					parents = new DefaultGrammarParser.PreParsedClass[0];
+				else {
+					String[] extendsSplit = extendsStr.split(",");
+					parents = new DefaultGrammarParser.PreParsedClass[extendsSplit.length];
+					for (int i = 0; i < extendsSplit.length; i++) {
+						extendsSplit[i] = extendsSplit[i].trim();
+						parents[i] = declaredClasses.get(extendsSplit[i]);
+						if (parents[i] == null)
+							throw new IllegalArgumentException(
+								"Parent class " + extendsSplit[i] + " of class " + className + " has not been declared");
+					}
+				}
+				declaredClasses.put(className, new PreParsedClass(id[0]++, className, parents));
 			}
 		}
-		Map<String, PreParsedClass> declaredClasses = new LinkedHashMap<>();
+
 		Map<String, ParsedExpressionType<S>> declaredTypes = new LinkedHashMap<>();
 		// One run-though to populate the type references
 		for (QommonsConfig type : config.subConfigs()) {
+			if (type.getName().equals("classes"))
+				continue;
 			if (!type.getName().equals("expression"))
 				throw new IllegalArgumentException("expression elements expected, not " + type.getName());
 			String typeName = type.get("name");
@@ -143,16 +195,12 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 			if (classesStr != null) {
 				String[] classesSplit = classesStr.split(",");
 				classes = new BetterTreeSet<>(false, ExpressionClass::compareTo);
-				for (String clazz : classesSplit) {
-					classes.add(declaredClasses.computeIfAbsent(clazz.trim(), c -> {
-						if (RESERVED_EXPRESSION_NAMES.contains(c))
-							throw new IllegalArgumentException(typeName + " cannot be used as a class name in expresso");
-						else if (theComponents.containsKey(c))
-							throw new IllegalArgumentException(c + " is a reserved component type name: " + type);
-						else if (declaredTypes.containsKey(c))
-							throw new IllegalArgumentException(c + " has already been declared as an expression: " + type);
-						return new PreParsedClass(c);
-					}).addTypeName(typeName));
+				for (int i = 0; i < classesSplit.length; i++) {
+					classesSplit[i] = classesSplit[i].trim();
+					PreParsedClass clazz = declaredClasses.get(classesSplit[i]);
+					if (clazz == null)
+						throw new IllegalArgumentException("Class " + classesSplit[i] + " does not exist: " + type);
+					classes.add(clazz.addTypeName(typeName));
 				}
 				classes = BetterCollections.unmodifiableSortedSet(classes);
 			} else
@@ -184,6 +232,8 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		};
 		// Second run-through to initialize all the types
 		for (QommonsConfig type : config.subConfigs()) {
+			if (type.getName().equals("classes"))
+				continue;
 			ParsedExpressionType<S> typeRef = declaredTypes.get(type.get("name"));
 			QommonsConfig[] componentConfigs = type.subConfigs();
 			List<ExpressionType<S>> components = new ArrayList<>(componentConfigs.length//
@@ -333,8 +383,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 			else if (value == null)
 				throw new IllegalArgumentException("Pattern declared with no content");
 			Pattern pattern = Pattern.compile(value, ci ? Pattern.CASE_INSENSITIVE : 0);
-			return new TextPatternExpressionType<>(id,
-				maxLen == null ? Integer.MAX_VALUE : Integer.parseInt(maxLen), pattern);
+			return new TextPatternExpressionType<>(id, maxLen == null ? Integer.MAX_VALUE : Integer.parseInt(maxLen), pattern);
 		});
 		return new DefaultGrammarParser<>(components);
 	}
