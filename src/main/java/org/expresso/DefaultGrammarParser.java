@@ -145,7 +145,9 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 				classes = new BetterTreeSet<>(false, ExpressionClass::compareTo);
 				for (String clazz : classesSplit) {
 					classes.add(declaredClasses.computeIfAbsent(clazz.trim(), c -> {
-						if (theComponents.containsKey(c))
+						if (RESERVED_EXPRESSION_NAMES.contains(c))
+							throw new IllegalArgumentException(typeName + " cannot be used as a class name in expresso");
+						else if (theComponents.containsKey(c))
 							throw new IllegalArgumentException(c + " is a reserved component type name: " + type);
 						else if (declaredTypes.containsKey(c))
 							throw new IllegalArgumentException(c + " has already been declared as an expression: " + type);
