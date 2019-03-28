@@ -99,4 +99,46 @@ public class JavaTest {
 		Assert.assertEquals("number", ((ConfiguredExpressionType<?>) args.getFirst().getWrapped().unwrap().getType()).getName());
 		Assert.assertEquals("identifier", ((ConfiguredExpressionType<?>) args.getLast().getWrapped().unwrap().getType()).getName());
 	}
+
+	/** Test parsing a constructor with generic type arguments (new java.util.ArrayList&lt;Integer>(5)) */
+	@Test
+	public void testGenericConstructor() {
+		Expression<CharSequenceStream> result = parse("new java.util.ArrayList<java.lang.Integer>(5)", "result-producer", true).unwrap();
+		Assert.assertEquals("constructor", ((ConfiguredExpressionType<?>) result.getType()).getName());
+		Expression<CharSequenceStream> type = result.getField("type").getFirst().getWrapped().unwrap();
+		Assert.assertEquals("java.util.ArrayList", type.getField("base").getFirst().toString());
+		Assert.assertEquals("java.lang.Integer", type.getField("parameters", "parameter").getFirst().toString());
+		Deque<ExpressionField<CharSequenceStream>> args = result.getField("arguments", "argument");
+		Assert.assertEquals(1, args.size());
+		Assert.assertEquals("number", ((ConfiguredExpressionType<?>) args.getFirst().getWrapped().unwrap().getType()).getName());
+	}
+
+	/** Tests a nested method invocation (list.addAll(java.util.Arrays.asList(1, 2, 3, 4, 5))) */
+	@Test
+	public void testMethod() {
+		Expression<CharSequenceStream> result = parse("list.addAll(java.util.Arrays.asList(1, 2, 3, 4, 5))", "result-producer", true)
+			.unwrap();
+	}
+
+	/**
+	 * Tests a more complex block of statements:
+	 * 
+	 * <pre>
+	 * {
+	 * 	java.util.ArrayList<Integer> list;
+	 * 	list = new ArrayList<>(5);
+	 * 	list.addAll(java.util.Arrays.asList(1, 2, 3, 4, 5));
+	 * }
+	 * </pre>
+	 */
+	@Test
+	public void testBlock() {
+		String expression = "{\n";
+		expression += "java.util.ArrayList<Integer> list;\n";
+		expression += "list = new ArrayList<>(5);\n";
+		expression += "list.addAll(java.util.Arrays.asList(1, 2, 3, 4, 5));\n";
+		expression += "}";
+		Expression<CharSequenceStream> result = parse(expression, "body-content", true).unwrap();
+
+	}
 }
