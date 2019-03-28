@@ -13,24 +13,31 @@ import org.qommons.collect.BetterSortedSet;
  */
 public class ConfiguredExpressionType<S extends BranchableStream<?, ?>> extends SequenceExpressionType<S>
 	implements GrammarExpressionType<S> {
-	private final int thePriority;
-
+	private final ExpressoGrammar<S> theGrammar;
 	private final String theName;
+	private final int thePriority;
 	private final BetterSortedSet<ExpressionClass<S>> theClasses;
 
 	/**
+	 * @param grammar The grammar that this expression type belongs to
 	 * @param id The cache ID of this type
 	 * @param priority The priority of the type
 	 * @param name The name of the type
 	 * @param classes The classes the type belongs to
 	 * @param components The sequence of components composing this type
 	 */
-	public ConfiguredExpressionType(int id, int priority, String name, BetterSortedSet<ExpressionClass<S>> classes,
-		List<ExpressionType<S>> components) {
+	public ConfiguredExpressionType(ExpressoGrammar<S> grammar, int id, int priority, String name,
+		BetterSortedSet<ExpressionClass<S>> classes, List<ExpressionType<S>> components) {
 		super(id, components);
-		this.thePriority = priority;
+		theGrammar = grammar;
+		thePriority = priority;
 		theName = name;
 		theClasses = classes;
+	}
+
+	@Override
+	public ExpressoGrammar<S> getGrammar() {
+		return theGrammar;
 	}
 
 	@Override
@@ -46,6 +53,18 @@ public class ConfiguredExpressionType<S extends BranchableStream<?, ?>> extends 
 	/** @return All classes that this type belongs to */
 	public BetterSortedSet<ExpressionClass<S>> getClasses() {
 		return theClasses;
+	}
+
+	/**
+	 * @param clazz The class to test
+	 * @return The class that this expression type belongs to that extends the given class, or null if there is none
+	 */
+	public ExpressionClass<S> getExtension(ExpressionClass<S> clazz) {
+		for (ExpressionClass<S> c : theClasses) {
+			if (c.doesExtend(clazz))
+				return c;
+		}
+		return null;
 	}
 
 	@Override

@@ -102,11 +102,11 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		private final List<ConfiguredExpressionType<S>> types;
 		private final SortedTreeList<ExpressionClass<S>> childClasses;
 
-		PreParsedClass(int id, String className, PreParsedClass[] parents) {
+		PreParsedClass(ExpressoGrammar<S> grammar, int id, String className, PreParsedClass[] parents) {
 			types = new SortedTreeList<>(false, (t1, t2) -> -Integer.compare(t1.getPriority(), t2.getPriority()));
 			memberNames = new LinkedList<>();
 			childClasses = new SortedTreeList<>(false, ExpressionClass::compareTo);
-			clazz = new ExpressionClass<>(id, className, //
+			clazz = new ExpressionClass<>(grammar, id, className, //
 				Collections.unmodifiableList(Arrays.asList(parents).stream().map(ppc -> ppc.clazz)
 					.collect(Collectors.toCollection(() -> new ArrayList<>(parents.length)))), //
 				BetterCollections.unmodifiableList(childClasses), Collections.unmodifiableList(types));
@@ -128,14 +128,22 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 			return clazz;
 		}
 	}
+
 	@Override
 	public ExpressoGrammar<S> parseGrammar(String name, InputStream stream) throws IOException {
 		QommonsConfig config = QommonsConfig.fromXml(QommonsConfig.getRootElement(stream));
+		BetterSortedMap<String, ExpressionClass<S>> classes = new BetterTreeMap<>(false, QommonsUtils.DISTINCT_NUMBER_TOLERANT);
+		List<ConfiguredExpressionType<S>> types = new ArrayList<>(config.subConfigs().length);
+		BetterSortedMap<String, ConfiguredExpressionType<S>> typesByName = new BetterTreeMap<>(false,
+			QommonsUtils.DISTINCT_NUMBER_TOLERANT);
+		ExpressoGrammar<S> grammar = new ExpressoGrammar<>(name, Collections.unmodifiableList(types),
+			BetterCollections.unmodifiableSortedMap(typesByName), BetterCollections.unmodifiableSortedMap(classes));
+
 		if (!config.getName().equals("expresso"))
 			throw new IllegalArgumentException("expresso expected as root, not " + config.getName());
 		int[] id = new int[1];
 		Map<String, PreParsedClass> declaredClasses = new LinkedHashMap<>();
-		declaredClasses.put(IGNORABLE, new PreParsedClass(id[0]++, IGNORABLE, new DefaultGrammarParser.PreParsedClass[0]));
+		declaredClasses.put(IGNORABLE, new PreParsedClass(grammar, id[0]++, IGNORABLE, new DefaultGrammarParser.PreParsedClass[0]));
 		QommonsConfig[] classesConfig = config.subConfigs("classes");
 		if (classesConfig.length > 1)
 			throw new IllegalArgumentException("Only a single classes element is allowed");
@@ -168,7 +176,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 								"Parent class " + extendsSplit[i] + " of class " + className + " has not been declared");
 					}
 				}
-				declaredClasses.put(className, new PreParsedClass(id[0]++, className, parents));
+				declaredClasses.put(className, new PreParsedClass(grammar, id[0]++, className, parents));
 			}
 		}
 
@@ -191,25 +199,24 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 			else if (declaredClasses.containsKey(typeName))
 				throw new IllegalArgumentException(typeName + " has already been declared as a class: " + type);
 			String classesStr = type.get("class");
-			BetterSortedSet<ExpressionClass<S>> classes;
+			BetterSortedSet<ExpressionClass<S>> typeClasses;
 			if (classesStr != null) {
 				String[] classesSplit = classesStr.split(",");
-				classes = new BetterTreeSet<>(false, ExpressionClass::compareTo);
+				typeClasses = new BetterTreeSet<>(false, ExpressionClass::compareTo);
 				for (int i = 0; i < classesSplit.length; i++) {
 					classesSplit[i] = classesSplit[i].trim();
 					PreParsedClass clazz = declaredClasses.get(classesSplit[i]);
 					if (clazz == null)
 						throw new IllegalArgumentException("Class " + classesSplit[i] + " does not exist: " + type);
-					classes.add(clazz.addTypeName(typeName));
+					typeClasses.add(clazz.addTypeName(typeName));
 				}
-				classes = BetterCollections.unmodifiableSortedSet(classes);
+				typeClasses = BetterCollections.unmodifiableSortedSet(typeClasses);
 			} else
-				classes = BetterSortedSet.empty(ExpressionClass::compareTo);
+				typeClasses = BetterSortedSet.empty(ExpressionClass::compareTo);
 			int priority = type.getInt("priority", 0);
-			if (declaredTypes.put(typeName, new ParsedExpressionType<>(id[0]++, priority, typeName, classes)) != null)
+			if (declaredTypes.put(typeName, new ParsedExpressionType<>(id[0]++, priority, typeName, typeClasses)) != null)
 				throw new IllegalArgumentException("Duplicate expressions named " + typeName);
 		}
-		BetterSortedMap<String, ExpressionClass<S>> classes = new BetterTreeMap<>(false, QommonsUtils.DISTINCT_NUMBER_TOLERANT);
 		for (PreParsedClass clazz : declaredClasses.values())
 			classes.put(clazz.clazz.getName(), clazz.clazz);
 		ExpressionType<S> ignorable;
@@ -252,19 +259,15 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 				}
 				components.add(component);
 			}
-			typeRef.initialize(Collections.unmodifiableList(components));
+			typeRef.initialize(grammar, Collections.unmodifiableList(components));
 			for (ExpressionClass<S> clazz : typeRef.classes)
 				declaredClasses.get(clazz.getName()).addType(typeRef.type);
 		}
-		List<ConfiguredExpressionType<S>> types = new ArrayList<>(declaredTypes.size());
-		BetterSortedMap<String, ConfiguredExpressionType<S>> typesByName = new BetterTreeMap<>(false,
-			QommonsUtils.DISTINCT_NUMBER_TOLERANT);
 		for (ParsedExpressionType<S> typeRef : declaredTypes.values()) {
 			types.add(typeRef.type);
 			typesByName.put(typeRef.name, typeRef.type);
 		}
-		return new ExpressoGrammar<>(name, Collections.unmodifiableList(types), BetterCollections.unmodifiableSortedMap(typesByName),
-			BetterCollections.unmodifiableSortedMap(classes));
+		return grammar;
 	}
 
 	private ExpressionType<S> parseComponent(QommonsConfig config, Map<String, ExpressionClass<S>> allClasses,
@@ -488,8 +491,8 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 			this.classes = classes;
 		}
 
-		void initialize(List<ExpressionType<S>> components) {
-			type = new ConfiguredExpressionType<>(id, priority, name, classes, components);
+		void initialize(ExpressoGrammar<S> grammar, List<ExpressionType<S>> components) {
+			type = new ConfiguredExpressionType<>(grammar, id, priority, name, classes, components);
 		}
 
 		@Override

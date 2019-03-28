@@ -10,6 +10,9 @@ import org.qommons.QommonsUtils;
  * @param <S> The stream super-type of the expression
  */
 public interface GrammarExpressionType<S extends BranchableStream<?, ?>> extends ExpressionType<S>, Comparable<GrammarExpressionType<?>> {
+	/** @return The grammar that this expression type belongs to */
+	ExpressoGrammar<S> getGrammar();
+
 	/** @return The expression type's configured name */
 	String getName();
 
