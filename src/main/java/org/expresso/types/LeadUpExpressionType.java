@@ -111,6 +111,11 @@ public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends Abst
 		}
 
 		@Override
+		public int getComplexity() {
+			return theTerminalPossibility.getComplexity() + 1;
+		}
+
+		@Override
 		public boolean equals(Object o) {
 			if (this == o)
 				return true;

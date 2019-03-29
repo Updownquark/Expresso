@@ -335,7 +335,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 				String scName = subComponentConfig.getName();
 				if (scName.equals("field"))
 					continue;
-				throw new IllegalArgumentException("Cannot parameterize type references: " + componentType);
+				throw new IllegalArgumentException("Cannot parameterize type references except with field: " + componentType);
 			}
 			found = type;
 		} else if ((clazz = allClasses.get(componentType)) != null) {
@@ -343,7 +343,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 				String scName = subComponentConfig.getName();
 				if (scName.equals("field"))
 					continue;
-				throw new IllegalArgumentException("Cannot parameterize class references: " + componentType);
+				throw new IllegalArgumentException("Cannot parameterize class references except with field: " + componentType);
 			}
 			found = clazz;
 		} else if (throwIfNotFound)

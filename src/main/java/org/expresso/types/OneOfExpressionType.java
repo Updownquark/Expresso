@@ -131,6 +131,11 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 		}
 
 		@Override
+		public int getComplexity() {
+			return theComponent.getComplexity() + 1;
+		}
+
+		@Override
 		public boolean equals(Object o) {
 			if (this == o)
 				return true;

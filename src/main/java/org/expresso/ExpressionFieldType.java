@@ -90,6 +90,11 @@ public interface ExpressionFieldType<S extends BranchableStream<?, ?>> extends E
 		}
 
 		@Override
+		public int getComplexity() {
+			return theWrapped.getComplexity();
+		}
+
+		@Override
 		public boolean equals(Object o) {
 			if (o == this)
 				return true;

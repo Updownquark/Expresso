@@ -34,6 +34,8 @@ public interface ExpressionPossibility<S extends BranchableStream<?, ?>> extends
 	/** @return The location of the first error in this possibility (or -1 if there is no error) */
 	int getFirstErrorPosition();
 
+	int getComplexity();
+
 	/**
 	 * Creates an {@link Expression} as a concrete representation of this possibility
 	 * 
@@ -51,8 +53,18 @@ public interface ExpressionPossibility<S extends BranchableStream<?, ?>> extends
 	 */
 	StringBuilder print(StringBuilder str, int indent, String metadata);
 
+	default String printContent() {
+		return getStream().printContent(0, length(), null).toString();
+	}
+
 	@Override
 	default int compareTo(ExpressionPossibility<S> p2) {
+		// If one is more consistent (has fewer errors than the other), then obviously it is better
+		int ec1 = getErrorCount();
+		int ec2 = p2.getErrorCount();
+		if (ec1 != ec2)
+			return ec1 - ec2;
+
 		int fep1 = getFirstErrorPosition();
 		int fep2 = p2.getFirstErrorPosition();
 		int len1 = length();
@@ -72,15 +84,15 @@ public interface ExpressionPossibility<S extends BranchableStream<?, ?>> extends
 				return 1;
 		}
 
+		// Use Occam's razor
+		int c1 = getComplexity();
+		int c2 = p2.getComplexity();
+		if (c1 != c2)
+			return c1 - c2;
+
 		// If both are incomplete but one thinks it might understand more, give it a chance
 		if (len1 != len2)
 			return len2 - len1;
-
-		// Otherwise just differentiate on the number of errors
-		int ec1 = getErrorCount();
-		int ec2 = p2.getErrorCount();
-		if (ec1 != ec2)
-			return ec1 - ec2;
 
 		return 0;
 	}
@@ -120,6 +132,11 @@ public interface ExpressionPossibility<S extends BranchableStream<?, ?>> extends
 			@Override
 			public int getFirstErrorPosition() {
 				return -1;
+			}
+
+			@Override
+			public int getComplexity() {
+				return 0;
 			}
 
 			@Override

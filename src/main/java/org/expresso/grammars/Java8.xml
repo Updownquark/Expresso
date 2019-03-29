@@ -15,6 +15,8 @@
 		<class name="assignable" />
 		<class name="assignment" extends="statement-content" />
 		<class name="type" />
+		<class name="declarable-type" extends="type" />
+		<class name="concrete-type" extends="declarable-type" />
 		<class name="class-content" />
 		<class name="declaration" extends="class-content" />
 		<class name="file-content" />
@@ -329,7 +331,7 @@
 	<expression name="identifier" class="assignable,result-producer">
 		<pattern field="name">[_a-zA-Z][_a-zA-Z0-9]*</pattern>
 	</expression>
-	<expression name="primitive" class="type">
+	<expression name="primitive" class="concrete-type">
 		<one-of>
 			<literal>void</literal>
 			<literal>boolean</literal>
@@ -344,7 +346,7 @@
 			<literal>double</literal>
 		</one-of>
 	</expression>
-	<expression name="basic-type" priority="998" class="type">
+	<expression name="basic-type" priority="998" class="concrete-type">
 		<!-- Just documenting, this is in this order as opposed to having the repeat first because of var-args.  With the repeat first,
 			var arg parameters were parsed with the repeat successful (identifier, then '.'), but the next identifier wasn't there, so the
 			parsing failed.  This ordering fixes this problem. -->
@@ -389,7 +391,7 @@
 		</option>
 		<literal>&gt;</literal>
 	</expression>
-	<expression name="generic-type" priority="998" class="type">
+	<expression name="generic-type" priority="998" class="declarable-type">
 		<basic-type field="base" />
 		<type-parameters field="parameters" />
 	</expression>
@@ -923,21 +925,27 @@
 		<result-producer field="index" />
 		<literal>]</literal>
 	</expression>
-	<expression name="member" priority="250" class="assignable,result-producer">
-		<result-producer field="target" />
-		<literal field="dot">.</literal>
-		<identifier field="name" />
-		<option>
-			<literal field="method">(</literal>
-			<argument-list field="arguments" />
-			<literal>)</literal>
-		</option>
-	</expression>
 	<expression name="function-invocation" priority="250" class="statement-content,result-producer">
 		<identifier field="name" />
 		<literal field="method">(</literal>
 		<argument-list field="arguments" />
 		<literal>)</literal>
+	</expression>
+	<expression name="field-ref" priority="250" class="assignable,result-producer">
+		<one-of field="target">
+			<result-producer field="value" />
+			<concrete-type field="type" />
+		</one-of>
+		<literal>.</literal>
+		<identifier field="name" />
+	</expression>
+	<expression name="method" priority="251" class="statement-content,result-producer">
+		<one-of field="target">
+			<result-producer field="value" />
+			<concrete-type field="type" />
+		</one-of>
+		<literal>.</literal>
+		<function-invocation field="method" />
 	</expression>
 	<expression name="resolution" priority="240" class="result-producer">
 		<result-producer field="target" />

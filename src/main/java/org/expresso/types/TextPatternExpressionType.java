@@ -107,6 +107,11 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 		}
 
 		@Override
+		public int getComplexity() {
+			return 1;
+		}
+
+		@Override
 		public boolean equals(Object o) {
 			if (this == o)
 				return true;

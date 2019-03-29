@@ -108,6 +108,11 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 		}
 
 		@Override
+		public int getComplexity() {
+			return 1;
+		}
+
+		@Override
 		public boolean equals(Object o) {
 			if (this == o)
 				return true;

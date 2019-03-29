@@ -61,8 +61,8 @@ public class JavaTest {
 	@Test
 	public void testField() {
 		Expression<CharSequenceStream> result = parse("vbl.field", "result-producer", true).unwrap();
-		Assert.assertEquals("member", ((ConfiguredExpressionType<?>) result.getType()).getName());
-		Assert.assertEquals("vbl", result.getField("target").getFirst().toString());
+		Assert.assertEquals("field-ref", ((ConfiguredExpressionType<?>) result.getType()).getName());
+		Assert.assertEquals("vbl", result.getField("target", "value").getFirst().toString());
 		Assert.assertEquals("field", result.getField("name").getFirst().toString());
 		Assert.assertEquals(0, result.getField("method").size());
 	}
@@ -71,10 +71,10 @@ public class JavaTest {
 	@Test
 	public void testDoubleField() {
 		Expression<CharSequenceStream> result = parse("vbl.field1.field2", "result-producer", true).unwrap();
-		Assert.assertEquals("member", ((ConfiguredExpressionType<?>) result.getType()).getName());
-		Expression<CharSequenceStream> inner = result.getField("target").getFirst().getWrapped().unwrap();
-		Assert.assertEquals("member", ((ConfiguredExpressionType<?>) inner.getType()).getName());
-		Assert.assertEquals("vbl", inner.getField("target").getFirst().toString());
+		Assert.assertEquals("field-ref", ((ConfiguredExpressionType<?>) result.getType()).getName());
+		Expression<CharSequenceStream> inner = result.getField("target", "value").getFirst().getWrapped().unwrap();
+		Assert.assertEquals("field-ref", ((ConfiguredExpressionType<?>) inner.getType()).getName());
+		Assert.assertEquals("vbl", inner.getField("target", "value").getFirst().toString());
 		Assert.assertEquals("field1", inner.getField("name").getFirst().toString());
 		Assert.assertEquals("field2", result.getField("name").getFirst().toString());
 		Assert.assertEquals(0, result.getField("method").size());
@@ -116,7 +116,13 @@ public class JavaTest {
 	/** Tests a nested method invocation (list.addAll(java.util.Arrays.asList(1, 2, 3, 4, 5))) */
 	@Test
 	public void testMethod() {
-		Expression<CharSequenceStream> result = parse("list.addAll(java.util.Arrays.asList(1, 2, 3, 4, 5))", "result-producer", true)
+		Expression<CharSequenceStream> result = parse("java.util.Arrays.asList(1, 2, 3, 4, 5)", "result-producer", true).unwrap();
+	}
+
+	/** Tests a nested method invocation (list.addAll(java.util.Arrays.asList(1, 2, 3, 4, 5))) */
+	@Test
+	public void testDoubleMethod() {
+		Expression<CharSequenceStream> result = parse("list.addAll(java.util.Arrays.asList(1, 2, 3, 4, 5))", "result-producer", false)
 			.unwrap();
 	}
 

@@ -101,6 +101,11 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 		}
 
 		@Override
+		public int getComplexity() {
+			return theOption.getComplexity() + 1;
+		}
+
+		@Override
 		public boolean equals(Object o) {
 			if (this == o)
 				return true;

@@ -70,6 +70,11 @@ class CachedExpressionPossibility<S extends BranchableStream<?, ?>> implements E
 	}
 
 	@Override
+	public int getComplexity() {
+		return thePossibility.getComplexity();
+	}
+
+	@Override
 	public boolean equals(Object o) {
 		if (this == o)
 			return true;

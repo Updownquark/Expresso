@@ -68,6 +68,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		private final int theLength;
 		private final int theErrorCount;
 		private final int theErrorPos;
+		private final int theComplexity;
 
 		SequencePossibility(AbstractSequencedExpressionType<? super S> type, ExpressoParser<S> parser,
 			List<ExpressionPossibility<S>> repetitions) {
@@ -84,6 +85,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 			int length = 0;
 			int errorCount = 0;
 			int errorPos = -1;
+			int complexity = 1;
 			for (ExpressionPossibility<S> rep : repetitions) {
 				if (errorPos == -1) {
 					errorPos = rep.getFirstErrorPosition();
@@ -92,6 +94,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 				}
 				length += rep.length();
 				errorCount += rep.getErrorCount();
+				complexity += rep.getComplexity();
 			}
 			if (theType.getErrorForComponentCount(repetitions.size()) != null) {
 				errorCount++;
@@ -101,6 +104,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 			theLength = length;
 			theErrorCount = errorCount;
 			theErrorPos = errorPos;
+			theComplexity = complexity;
 		}
 
 		@Override
@@ -120,8 +124,10 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 
 		@Override
 		public Collection<? extends ExpressionPossibility<S>> fork() throws IOException {
+			// 3 potential ways to fork a sequence...
 			CompositeCollection<ExpressionPossibility<S>> forks = new CompositeCollection<>();
 			if (!theRepetitions.isEmpty()) {
+				// 1. Fork the last element in the sequence
 				ExpressionPossibility<S> last = theRepetitions.get(theRepetitions.size() - 1);
 				Collection<? extends ExpressionPossibility<S>> lastForks = last.fork();
 				if (!lastForks.isEmpty()) {
@@ -134,6 +140,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 					}).collect(Collectors.toCollection(() -> new ArrayList<>(lastForks.size()))));
 				}
 				if (allowFewerReps && theRepetitions.size() > 1) {
+					// 2. Remove the last element in the sequence
 					forks.addComponent(Arrays.asList(
 						new SequencePossibility<>(theType, theParser, theRepetitions.subList(0, theRepetitions.size() - 1), true, false)));
 				}
@@ -146,6 +153,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 					for (int i = 0; i < theRepetitions.size() && sequenceIter.hasNext(); i++)
 						sequenceIter.next();
 					if (sequenceIter.hasNext()) {
+						// 3. Append more repetitions to the sequence
 						ExpressionType<? super S> nextComponent = sequenceIter.next();
 						ExpressionPossibility<S> nextPossibility = theParser.advance(length()).parseWith(nextComponent);
 						if (nextPossibility != null) {
@@ -169,6 +177,11 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		@Override
 		public int getFirstErrorPosition() {
 			return theErrorPos;
+		}
+
+		@Override
+		public int getComplexity() {
+			return theComplexity;
 		}
 
 		@Override
@@ -209,7 +222,9 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		public StringBuilder print(StringBuilder str, int indent, String metadata) {
 			for (int i = 0; i < indent; i++)
 				str.append('\t');
-			str.append(theType).append(metadata);
+			str.append(theType).append(metadata).append(" (").append(getErrorCount()).append(", ").append(getFirstErrorPosition())
+				.append(", ").append(getComplexity()).append("): ");
+			getStream().printContent(0, length(), str);
 			for (ExpressionPossibility<S> child : theRepetitions) {
 				str.append('\n');
 				child.print(str, indent + 1, "");

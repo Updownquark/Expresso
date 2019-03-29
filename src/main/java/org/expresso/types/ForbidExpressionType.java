@@ -25,9 +25,9 @@ public class ForbidExpressionType<S extends BranchableStream<?, ?>> extends Abst
 	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException {
 		ExpressionPossibility<S2> forbidden = parser.parseWith(theForbidden);
 		if (forbidden == null)
-			return null;
+			return ExpressionPossibility.empty(parser.getStream(), this);
 		else if (!parser.tolerateErrors() && forbidden.getErrorCount() > 0)
-			return null;
+			return ExpressionPossibility.empty(parser.getStream(), this);
 		else
 			return new ForbiddenPossibility<>(this, parser, forbidden);
 	}
@@ -90,6 +90,11 @@ public class ForbidExpressionType<S extends BranchableStream<?, ?>> extends Abst
 			if (errPos < 0 && theForbidden.length() > 0)
 				errPos = 0;
 			return errPos;
+		}
+
+		@Override
+		public int getComplexity() {
+			return theForbidden.getComplexity() + 1;
 		}
 
 		@Override
