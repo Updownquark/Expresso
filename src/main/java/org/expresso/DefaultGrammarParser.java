@@ -501,7 +501,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		}
 
 		@Override
-		public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException {
+		public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
 			return type.parse(parser);
 		}
 
@@ -536,7 +536,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		}
 
 		@Override
-		public <S2 extends S> ExpressionFieldType.FieldExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException {
+		public <S2 extends S> ExpressionField<S2> parse(ExpressoParser<S2> parser) throws IOException {
 			return ExpressionFieldType.wrap(this, parser.parseWith(theWrapped));
 		}
 

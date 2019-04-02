@@ -8,11 +8,9 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.expresso.Expression;
-import org.expresso.ExpressionPossibility;
 import org.expresso.ExpressionType;
 import org.expresso.ExpressoParser;
 import org.expresso.stream.BranchableStream;
@@ -37,13 +35,13 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 	protected abstract String getErrorForComponentCount(int componentCount);
 
 	@Override
-	public <S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException {
-		List<ExpressionPossibility<S2>> repetitions = new LinkedList<>();
+	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
+		List<Expression<S2>> repetitions = new LinkedList<>();
 		ExpressoParser<S2> branched = parser;
 		Iterator<? extends ExpressionType<? super S>> sequenceIter = theSequence.iterator();
 		while (branched != null && sequenceIter.hasNext()) {
 			ExpressionType<? super S> component = sequenceIter.next();
-			ExpressionPossibility<S2> repetition = branched.parseWith(component);
+			Expression<S2> repetition = branched.parseWith(component);
 			if (repetition == null)
 				break;
 			if (repetition.getErrorCount() > 0) {
@@ -59,188 +57,20 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		return new SequencePossibility<>(this, parser, Collections.unmodifiableList(repetitions));
 	}
 
-	private static class SequencePossibility<S extends BranchableStream<?, ?>> implements ExpressionPossibility<S> {
-		private final AbstractSequencedExpressionType<? super S> theType;
-		private final ExpressoParser<S> theParser;
-		private final List<ExpressionPossibility<S>> theRepetitions;
+	private static class SequencePossibility<S extends BranchableStream<?, ?>> extends ComposedExpression<S> {
 		private final boolean allowFewerReps;
 		private final boolean allowMoreReps;
-		private final int theLength;
-		private final int theErrorCount;
-		private final int theErrorPos;
-		private final int theComplexity;
 
 		SequencePossibility(AbstractSequencedExpressionType<? super S> type, ExpressoParser<S> parser,
-			List<ExpressionPossibility<S>> repetitions) {
+			List<Expression<S>> repetitions) {
 			this(type, parser, repetitions, true, true);
 		}
 
 		private SequencePossibility(AbstractSequencedExpressionType<? super S> type, ExpressoParser<S> parser,
-			List<ExpressionPossibility<S>> repetitions, boolean allowMoreReps, boolean allowFewerReps) {
-			theType = type;
-			theParser = parser;
-			theRepetitions = repetitions;
+			List<? extends Expression<S>> repetitions, boolean allowMoreReps, boolean allowFewerReps) {
+			super(type, parser, repetitions);
 			this.allowFewerReps = allowFewerReps;
 			this.allowMoreReps = allowMoreReps;
-			int length = 0;
-			int errorCount = 0;
-			int errorPos = -1;
-			int complexity = 1;
-			for (ExpressionPossibility<S> rep : repetitions) {
-				if (errorPos == -1) {
-					errorPos = rep.getFirstErrorPosition();
-					if (errorPos >= 0)
-						errorPos += length;
-				}
-				length += rep.length();
-				errorCount += rep.getErrorCount();
-				complexity += rep.getComplexity();
-			}
-			if (theType.getErrorForComponentCount(repetitions.size()) != null) {
-				errorCount++;
-				if (errorPos < 0)
-					errorPos = length;
-			}
-			theLength = length;
-			theErrorCount = errorCount;
-			theErrorPos = errorPos;
-			theComplexity = complexity;
-		}
-
-		@Override
-		public ExpressionType<? super S> getType() {
-			return theType;
-		}
-
-		@Override
-		public S getStream() {
-			return theParser.getStream();
-		}
-
-		@Override
-		public int length() {
-			return theLength;
-		}
-
-		@Override
-		public Collection<? extends ExpressionPossibility<S>> fork() throws IOException {
-			// 3 potential ways to fork a sequence...
-			CompositeCollection<ExpressionPossibility<S>> forks = new CompositeCollection<>();
-			if (!theRepetitions.isEmpty()) {
-				// 1. Fork the last element in the sequence
-				ExpressionPossibility<S> last = theRepetitions.get(theRepetitions.size() - 1);
-				Collection<? extends ExpressionPossibility<S>> lastForks = last.fork();
-				if (!lastForks.isEmpty()) {
-					forks.addComponent(lastForks.stream().map(lastFork -> {
-						List<ExpressionPossibility<S>> repetitions = new ArrayList<>(theRepetitions.size());
-						for (int i = 0; i < theRepetitions.size() - 1; i++)
-							repetitions.add(theRepetitions.get(i));
-						repetitions.add(lastFork);
-						return new SequencePossibility<>(theType, theParser, Collections.unmodifiableList(repetitions));
-					}).collect(Collectors.toCollection(() -> new ArrayList<>(lastForks.size()))));
-				}
-				if (allowFewerReps && theRepetitions.size() > 1) {
-					// 2. Remove the last element in the sequence
-					forks.addComponent(Arrays.asList(
-						new SequencePossibility<>(theType, theParser, theRepetitions.subList(0, theRepetitions.size() - 1), true, false)));
-				}
-			}
-			if (allowMoreReps) {
-				int len = length();
-				if (getStream().discoverTo(len + 1) > len) {
-					Iterator<? extends ExpressionType<? super S>> sequenceIter = theType.theSequence.iterator();
-					// Advance past pre-computed repetitions
-					for (int i = 0; i < theRepetitions.size() && sequenceIter.hasNext(); i++)
-						sequenceIter.next();
-					if (sequenceIter.hasNext()) {
-						// 3. Append more repetitions to the sequence
-						ExpressionType<? super S> nextComponent = sequenceIter.next();
-						ExpressionPossibility<S> nextPossibility = theParser.advance(length()).parseWith(nextComponent);
-						if (nextPossibility != null) {
-							List<ExpressionPossibility<S>> repetitions = new ArrayList<>(theRepetitions.size() + 1);
-							repetitions.addAll(theRepetitions);
-							repetitions.add(nextPossibility);
-							forks.addComponent(Arrays.asList(
-								new SequencePossibility<>(theType, theParser, Collections.unmodifiableList(repetitions), false, true)));
-						}
-					}
-				}
-			}
-			return forks;
-		}
-
-		@Override
-		public int getErrorCount() {
-			return theErrorCount;
-		}
-
-		@Override
-		public int getFirstErrorPosition() {
-			return theErrorPos;
-		}
-
-		@Override
-		public int getComplexity() {
-			return theComplexity;
-		}
-
-		@Override
-		public boolean equals(Object o) {
-			if (o == this)
-				return true;
-			else if (o == null || o.getClass() != getClass())
-				return false;
-			SequencePossibility<S> other = (SequencePossibility<S>) o;
-			if (!getType().equals(other.getType()))
-				return false;
-			if (getStream().getPosition() != other.getStream().getPosition())
-				return false;
-			if (length() != other.length())
-				return false;
-			if (theRepetitions.size() != other.theRepetitions.size())
-				return false;
-			for (int i = 0; i < theRepetitions.size(); i++)
-				if (!theRepetitions.get(i).equals(other.theRepetitions.get(i)))
-					return false;
-			return true;
-		}
-
-		@Override
-		public int hashCode() {
-			return Objects.hash(getClass(), theType, getStream().getPosition(), length(), theRepetitions);
-		}
-
-		@Override
-		public Expression<S> getExpression() {
-			List<Expression<S>> repetitions = new ArrayList<>(theRepetitions.size());
-			for (ExpressionPossibility<S> rep : theRepetitions)
-				repetitions.add(rep.getExpression());
-			return new SequenceExpression<>(getStream(), theType, Collections.unmodifiableList(repetitions));
-		}
-
-		@Override
-		public StringBuilder print(StringBuilder str, int indent, String metadata) {
-			for (int i = 0; i < indent; i++)
-				str.append('\t');
-			str.append(theType).append(metadata).append(" (").append(getErrorCount()).append(", ").append(getFirstErrorPosition())
-				.append(", ").append(getComplexity()).append("): ");
-			getStream().printContent(0, length(), str);
-			for (ExpressionPossibility<S> child : theRepetitions) {
-				str.append('\n');
-				child.print(str, indent + 1, "");
-			}
-			return str;
-		}
-
-		@Override
-		public String toString() {
-			return print(new StringBuilder(), 0, "").toString();
-		}
-	}
-
-	public static final class SequenceExpression<S extends BranchableStream<?, ?>> extends ComposedExpression<S> {
-		SequenceExpression(S stream, AbstractSequencedExpressionType<? super S> type, List<Expression<S>> repetitions) {
-			super(stream, type, repetitions);
 		}
 
 		@Override
@@ -249,19 +79,79 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		}
 
 		@Override
+		protected int getSelfComplexity() {
+			return 1;
+		}
+
+		@Override
 		protected BiTuple<Integer, String> getSelfError() {
-			BiTuple<Integer, String> selfError = super.getSelfError();
-			if (selfError == null) {
-				String ccError = getType().getErrorForComponentCount(getChildren().size());
-				if (ccError != null)
-					selfError = new BiTuple<>(length(), ccError);
+			String msg = getType().getErrorForComponentCount(getChildren().size());
+			if (msg != null)
+				return new BiTuple<>(length(), msg);
+			else
+				return null;
+		}
+
+		@Override
+		public Collection<? extends Expression<S>> fork() throws IOException {
+			// 3 potential ways to fork a sequence...
+			CompositeCollection<Expression<S>> forks = new CompositeCollection<>();
+			if (!getChildren().isEmpty()) {
+				// 1. Fork the last element in the sequence
+				Expression<S> last = getChildren().get(getChildren().size() - 1);
+				Collection<? extends Expression<S>> lastForks = last.fork();
+				if (!lastForks.isEmpty()) {
+					forks.addComponent(lastForks.stream().map(lastFork -> {
+						List<Expression<S>> repetitions = new ArrayList<>(getChildren().size());
+						for (int i = 0; i < getChildren().size() - 1; i++)
+							repetitions.add(getChildren().get(i));
+						repetitions.add(lastFork);
+						return new SequencePossibility<>(getType(), getParser(), Collections.unmodifiableList(repetitions));
+					}).collect(Collectors.toCollection(() -> new ArrayList<>(lastForks.size()))));
+				}
+				if (allowFewerReps && getChildren().size() > 1) {
+					// 2. Remove the last element in the sequence
+					forks.addComponent(Arrays.<SequencePossibility<S>> asList(new SequencePossibility<>(getType(), getParser(),
+						getChildren().subList(0, getChildren().size() - 1), true, false)));
+				}
 			}
-			return selfError;
+			if (allowMoreReps) {
+				int len = length();
+				if (getStream().discoverTo(len + 1) > len) {
+					Iterator<? extends ExpressionType<? super S>> sequenceIter = getType().theSequence.iterator();
+					// Advance past pre-computed repetitions
+					for (int i = 0; i < getChildren().size() && sequenceIter.hasNext(); i++)
+						sequenceIter.next();
+					if (sequenceIter.hasNext()) {
+						// 3. Append more repetitions to the sequence
+						ExpressionType<? super S> nextComponent = sequenceIter.next();
+						Expression<S> nextPossibility = getParser().advance(length()).parseWith(nextComponent);
+						if (nextPossibility != null) {
+							List<Expression<S>> repetitions = new ArrayList<>(getChildren().size() + 1);
+							repetitions.addAll(getChildren());
+							repetitions.add(nextPossibility);
+							forks.addComponent(Arrays.asList(
+								new SequencePossibility<>(getType(), getParser(), Collections.unmodifiableList(repetitions), false, true)));
+						}
+					}
+				}
+			}
+			return forks;
 		}
 
 		@Override
 		public Expression<S> unwrap() {
 			return this;
+		}
+
+		@Override
+		protected boolean shouldPrintErrorInfo() {
+			return true;
+		}
+
+		@Override
+		protected boolean shouldPrintContent() {
+			return true;
 		}
 	}
 }

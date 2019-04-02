@@ -35,12 +35,12 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> {
 	 * @return A parser for the same place in the stream that will always return the given possibility when parsing the given expression
 	 *         type
 	 */
-	ExpressoParser<S> useCache(ExpressionType<? super S> type, ExpressionPossibility<S> possibility);
+	ExpressoParser<S> useCache(ExpressionType<? super S> type, Expression<S> possibility);
 
 	/**
 	 * @param type The expression type to parse with
 	 * @return The most likely possibility for parsing the stream at this parser's position with the given expression type
 	 * @throws IOException If an error occurs reading the stream
 	 */
-	ExpressionPossibility<S> parseWith(ExpressionType<? super S> type) throws IOException;
+	Expression<S> parseWith(ExpressionType<? super S> type) throws IOException;
 }

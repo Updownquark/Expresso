@@ -5,7 +5,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.expresso.ExpressionPossibility;
+import org.expresso.Expression;
 import org.expresso.ExpressionType;
 import org.expresso.ExpressoParser;
 import org.expresso.stream.BranchableStream;
@@ -21,8 +21,8 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	private final S theStream;
 	private final boolean isErrorTolerated;
 	private final int[] theExcludedTypes;
-	private final PersistentStack<BiTuple<ExpressionType<? super S>, ExpressionPossibility<S>>> theCacheOverride;
-	private final Map<Integer, CachedExpressionPossibility<S>> theCache;
+	private final PersistentStack<BiTuple<ExpressionType<? super S>, Expression<S>>> theCacheOverride;
+	private final Map<Integer, CachedExpression<S>> theCache;
 
 	/**
 	 * @param session The parsing session
@@ -32,7 +32,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	 * @param cacheOverride Cache overrides for this parser
 	 */
 	public ExpressoParserImpl(ParseSession<S> session, S stream, boolean tolerateError, int[] excludedTypes,
-		PersistentStack<BiTuple<ExpressionType<? super S>, ExpressionPossibility<S>>> cacheOverride) {
+		PersistentStack<BiTuple<ExpressionType<? super S>, Expression<S>>> cacheOverride) {
 		theSession = session;
 		theStream = stream;
 		isErrorTolerated = tolerateError;
@@ -77,13 +77,13 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	}
 
 	@Override
-	public ExpressoParser<S> useCache(ExpressionType<? super S> component, ExpressionPossibility<S> possibility) {
+	public ExpressoParser<S> useCache(ExpressionType<? super S> component, Expression<S> possibility) {
 		return new ExpressoParserImpl<>(theSession, theStream, isErrorTolerated, theExcludedTypes,
 			new PersistentStack<>(theCacheOverride, new BiTuple<>(component, possibility)));
 	}
 
 	@Override
-	public ExpressionPossibility<S> parseWith(ExpressionType<? super S> component) throws IOException {
+	public Expression<S> parseWith(ExpressionType<? super S> component) throws IOException {
 		int cacheId = component.getCacheId();
 		if (cacheId < 0)
 			return component.parse(this);
@@ -91,14 +91,14 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 			theSession.debug(() -> "Excluded by type");
 			return null;
 		}
-		BiTuple<ExpressionType<? super S>, ExpressionPossibility<S>> override = theCacheOverride == null ? null
+		BiTuple<ExpressionType<? super S>, Expression<S>> override = theCacheOverride == null ? null
 			: theCacheOverride.search(tuple -> tuple.getValue1() == component);
 		if (override != null)
 			return override.getValue2();
 		boolean[] newCache = new boolean[1];
-		CachedExpressionPossibility<S> cached = theCache.computeIfAbsent(cacheId, k -> {
+		CachedExpression<S> cached = theCache.computeIfAbsent(cacheId, k -> {
 			newCache[0] = true;
-			return new CachedExpressionPossibility<>(component);
+			return new CachedExpression<>(component);
 		});
 		if (newCache[0]) {
 			theSession.debug(() -> component.toString() + ": cache " + System.identityHashCode(cached));

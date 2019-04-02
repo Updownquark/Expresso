@@ -1,7 +1,12 @@
 package org.expresso;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.expresso.stream.BranchableStream;
 
@@ -53,6 +58,26 @@ public interface ExpressionField<S extends BranchableStream<?, ?>> extends Expre
 	}
 
 	@Override
+	default Collection<? extends Expression<S>> fork() throws IOException {
+		Collection<? extends Expression<S>> wrapFork = getWrapped().fork();
+		if (wrapFork.isEmpty())
+			return wrapFork;
+		else
+			return wrapFork.stream().map(f -> new SimpleExpressionField<>(getType(), f))
+				.collect(Collectors.toCollection(() -> new ArrayList<>(wrapFork.size())));
+	}
+
+	@Override
+	default int getComplexity() {
+		return getWrapped().getComplexity();
+	}
+
+	@Override
+	default StringBuilder print(StringBuilder str, int indent, String metadata) {
+		return getWrapped().print(str, indent, metadata + getType().getFields());
+	}
+
+	@Override
 	default Expression<S> unwrap() {
 		Expression<S> wrappedUnwrapped = getWrapped().unwrap();
 		if (wrappedUnwrapped != null && wrappedUnwrapped != getWrapped())
@@ -86,6 +111,21 @@ public interface ExpressionField<S extends BranchableStream<?, ?>> extends Expre
 		@Override
 		public Expression<S> getWrapped() {
 			return theWrapped;
+		}
+
+		@Override
+		public boolean equals(Object o) {
+			if (o == this)
+				return true;
+			else if (!(o instanceof ExpressionField))
+				return false;
+			ExpressionField<S> other = (ExpressionField<S>) o;
+			return theType.equals(other.getType()) && theWrapped.equals(other.getWrapped());
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(theType, theWrapped);
 		}
 
 		@Override

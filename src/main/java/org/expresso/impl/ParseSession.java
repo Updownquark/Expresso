@@ -5,7 +5,6 @@ import java.util.Collection;
 import java.util.function.Supplier;
 
 import org.expresso.Expression;
-import org.expresso.ExpressionPossibility;
 import org.expresso.ExpressionType;
 import org.expresso.ExpressoGrammar;
 import org.expresso.ExpressoParser;
@@ -28,15 +27,15 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 
 	public Expression<S> parse(S stream, ExpressionType<? super S> component, boolean bestError)
 		throws IOException {
-		SortedTreeList<ExpressionPossibility<S>> toEvaluate = new SortedTreeList<>(false, ExpressionPossibility::compareTo);
+		SortedTreeList<Expression<S>> toEvaluate = new SortedTreeList<>(false, Expression::compareTo);
 		// SortedTreeList<ExpressionPossibility<S>> forks = new SortedTreeList<>(false, ExpressionPossibility::compareTo);
-		ExpressionPossibility<S> init = getParser(stream, 0, bestError, new int[0]).parseWith(component);
+		Expression<S> init = getParser(stream, 0, bestError, new int[0]).parseWith(component);
 		if (init != null)
 			toEvaluate.add(init);
-		ExpressionPossibility<S> bestComplete = null;
-		ExpressionPossibility<S> best = null;
+		Expression<S> bestComplete = null;
+		Expression<S> best = null;
 		while (!toEvaluate.isEmpty()) {
-			ExpressionPossibility<S> nextBest = toEvaluate.poll();
+			Expression<S> nextBest = toEvaluate.poll();
 			debug(() -> "Checking " + nextBest.getType() + ": " + nextBest);
 			boolean newBest = best == null || nextBest.compareTo(best) < 0;
 			if (newBest) {
@@ -51,22 +50,22 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 				break;
 			debug(() -> "Forking " + nextBest.getType() + ": " + nextBest);
 			adjustDepth(1);
-			Collection<? extends ExpressionPossibility<S>> pForks = nextBest.fork();
+			Collection<? extends Expression<S>> pForks = nextBest.fork();
 			adjustDepth(-1);
 			toEvaluate.addAll(pForks);
 		}
 
 		if (bestComplete != null)
-			return bestComplete.getExpression();
+			return bestComplete;
 		else if (best == null)
 			throw new IllegalStateException("No possibilities?!");
 		else if (bestError)
-			return best.getExpression();
+			return best;
 		else
 			return null; // Perhaps throw an exception using the best to give specific information about what might be wrong in the stream
 	}
 
-	private static boolean isSatisfied(ExpressionPossibility<?> best, BranchableStream<?, ?> stream) {
+	private static boolean isSatisfied(Expression<?> best, BranchableStream<?, ?> stream) {
 		return stream.isFullyDiscovered() && best.length() == stream.getDiscoveredLength();
 	}
 

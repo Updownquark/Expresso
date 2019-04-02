@@ -18,5 +18,5 @@ public interface ExpressionType<S extends BranchableStream<?, ?>> {
 	 * @return The parsed expression, or null if this type could not understand the information in the parser's stream
 	 * @throws IOException If an error occurs reading the stream
 	 */
-	<S2 extends S> ExpressionPossibility<S2> parse(ExpressoParser<S2> parser) throws IOException;
+	<S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException;
 }
