@@ -13,18 +13,32 @@ import org.qommons.collect.BetterSortedSet;
 import org.qommons.tree.BetterTreeSet;
 import org.qommons.tree.SortedTreeList;
 
+/**
+ * Does the work of parsing a stream
+ *
+ * @param <S> The type of the stream
+ */
 public class ParseSession<S extends BranchableStream<?, ?>> {
+	@SuppressWarnings("unused") // Not used currently, but seems like it belongs here
 	private final ExpressoGrammar<? super S> theGrammar;
 	private final BetterTreeSet<ExpressoParserImpl<S>> theParsers;
 	private boolean isDebugging;
 	private int theDebugIndent;
 
+	/** @param grammar The grammer to use to parse expressions */
 	public ParseSession(ExpressoGrammar<? super S> grammar) {
 		theGrammar = grammar;
 		theParsers = new BetterTreeSet<>(false, ParseSession::compareParseStates);
 		isDebugging = false;
 	}
 
+	/**
+	 * @param stream The stream whose content to parse
+	 * @param component The root component with which to parse the stream
+	 * @param bestError Whether to tolerate errors in the result
+	 * @return The best interpretation of the stream content
+	 * @throws IOException If an error occurs reading the stream data
+	 */
 	public Expression<S> parse(S stream, ExpressionType<? super S> component, boolean bestError)
 		throws IOException {
 		SortedTreeList<Expression<S>> toEvaluate = new SortedTreeList<>(false, Expression::compareTo);
@@ -62,18 +76,24 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 		else if (bestError)
 			return best;
 		else
-			return null; // Perhaps throw an exception using the best to give specific information about what might be wrong in the stream
+			return null; // TODO Perhaps throw an exception using the best to give specific information about what might be wrong
 	}
 
 	private static boolean isSatisfied(Expression<?> best, BranchableStream<?, ?> stream) {
 		return stream.isFullyDiscovered() && best.length() == stream.getDiscoveredLength();
 	}
 
+	/**
+	 * Debug operation
+	 * 
+	 * @param adjust The amount by which to adjust the session depth
+	 */
 	public void adjustDepth(int adjust) {
 		if (isDebugging)
 			theDebugIndent += adjust;
 	}
 
+	/** @param debug Provides a message to print during debugging */
 	public void debug(Supplier<String> debug) {
 		if (!isDebugging)
 			return;
