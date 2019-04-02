@@ -3,16 +3,29 @@ package org.expresso.types;
 import java.util.Iterator;
 import java.util.List;
 
+import org.expresso.Expression;
 import org.expresso.ExpressionType;
 import org.expresso.stream.BranchableStream;
+import org.qommons.BiTuple;
 
+/**
+ * An expression composed of one or more repetitions of another sequence of expressions
+ *
+ * @param <S> The type of the stream
+ */
 public class RepeatExpressionType<S extends BranchableStream<?, ?>> extends AbstractSequencedExpressionType<S> {
 	private final int theMinCount;
 	private final int theMaxCount;
 	private final org.expresso.types.SequenceExpressionType<S> theSequence;
 
+	/**
+	 * @param id The cache ID for this expression
+	 * @param min The minimum repetition count for the sequence needed to satisfy this expression
+	 * @param max The maximum number of times the sequence may be present in the stream
+	 * @param components The components for the sequence
+	 */
 	public RepeatExpressionType(int id, int min, int max, List<ExpressionType<S>> components) {
-		super(id, new InfiniteSequenceRepeater());
+		super(id, new InfiniteSequenceRepeater<>());
 		if (min > max)
 			throw new IllegalArgumentException("min (" + min + ") must be <= max (" + max + ")");
 		theMinCount = min;
@@ -21,21 +34,19 @@ public class RepeatExpressionType<S extends BranchableStream<?, ?>> extends Abst
 		((InfiniteSequenceRepeater<org.expresso.types.SequenceExpressionType<S>>) getSequence()).theValue = theSequence;
 	}
 
+	/** @return The minimum repetition count for the sequence needed to satisfy this expression */
 	public int getMinCount() {
 		return theMinCount;
 	}
 
+	/** @return The maximum number of times the sequence may be present in the stream */
 	public int getMaxCount() {
 		return theMaxCount;
 	}
 
-	public org.expresso.types.SequenceExpressionType<S> getComponent() {
+	/** @return The repeating sequence */
+	public SequenceExpressionType<S> getComponent() {
 		return theSequence;
-	}
-
-	@Override
-	protected int getInitComponentCount() {
-		return theMinCount == 0 ? 1 : theMinCount;
 	}
 
 	@Override
@@ -44,12 +55,24 @@ public class RepeatExpressionType<S extends BranchableStream<?, ?>> extends Abst
 	}
 
 	@Override
-	protected String getErrorForComponentCount(int componentCount) {
-		if (componentCount < theMinCount)
-			return "At least " + theMinCount + " " + theSequence + (theMinCount > 1 ? "s" : "") + " expected, but found " + componentCount;
-		else if (componentCount > theMaxCount)
-			return "No more than " + theMaxCount + " " + theSequence + (theMaxCount > 1 ? "s" : "") + " expected, but found "
-				+ componentCount;
+	public int getSpecificity() {
+		return theMinCount * theSequence.getSpecificity();
+	}
+
+	@Override
+	protected BiTuple<String, Integer> getErrorForComponents(List<? extends Expression<? extends S>> components) {
+		if (components.size() < theMinCount)
+			return new BiTuple<>(
+				"At least " + theMinCount + " " + theSequence + (theMinCount > 1 ? "s" : "") + " expected, but found " + components.size(),
+				theSequence.getSpecificity() * (theMinCount - components.size()));
+		else if (components.size() > theMaxCount) {
+			int weight = 0;
+			for (int i = theMaxCount; i < components.size(); i++)
+				weight += Math.abs(components.get(i).getMatchQuality());
+			// For more matches than allowed, the extra matches count against the match's quality
+			return new BiTuple<>("No more than " + theMaxCount + " " + theSequence + (theMaxCount > 1 ? "s" : "") + " expected, but found "
+				+ components.size(), weight * 2);
+		}
 		return null;
 	}
 

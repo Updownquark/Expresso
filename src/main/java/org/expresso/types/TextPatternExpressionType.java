@@ -13,11 +13,21 @@ import org.expresso.Expression;
 import org.expresso.ExpressoParser;
 import org.expresso.stream.CharSequenceStream;
 
+/**
+ * An expression type that matches text content via a regular expression ({@link Pattern})
+ *
+ * @param <S> The sub-type of text stream
+ */
 public class TextPatternExpressionType<S extends CharSequenceStream> extends AbstractExpressionType<S>
 	implements BareContentExpressionType<S> {
 	private final Pattern thePattern;
 	private final int theMaxLength;
 
+	/**
+	 * @param id The cache ID of the expression
+	 * @param maxLength The amount of text to pre-discover for this expression
+	 * @param pattern The pattern to match
+	 */
 	public TextPatternExpressionType(Integer id, int maxLength, Pattern pattern) {
 		super(id);
 		theMaxLength = maxLength;
@@ -26,12 +36,23 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 		thePattern = pattern;
 	}
 
+	/** @return This expression's pattern matcher */
 	public Pattern getPattern() {
 		return thePattern;
 	}
 
+	/** @return The amount of text to pre-discover for this expression */
 	public int getMaxLength() {
 		return theMaxLength;
+	}
+
+	@Override
+	public int getSpecificity() {
+		// Patterns have some specificity, but they may also match content that is not intended.
+		// Patterns may match content of different length, so it's not possible to account for that here.
+		// TODO Individual patterns may have different specificity.
+		// Is there some way to figure out how specific a particular pattern is?
+		return 2;
 	}
 
 	@Override
@@ -121,6 +142,11 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 		@Override
 		public int getComplexity() {
 			return 1;
+		}
+
+		@Override
+		public int getMatchQuality() {
+			return theMatcher.lookingAt() ? 2 : -2;
 		}
 
 		@Override

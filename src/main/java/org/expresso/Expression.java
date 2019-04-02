@@ -53,6 +53,12 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 	int getComplexity();
 
 	/**
+	 * @return A measure of how certain this expression's {@link #getType() type} is that this expression accurately represents the intent
+	 *         of the stream content
+	 */
+	int getMatchQuality();
+
+	/**
 	 * Prints a multi-line text representation of this possibility to a string builder
 	 * 
 	 * @param str The string builder to print to
@@ -94,8 +100,24 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 		return getStream().printContent(0, length(), null).toString();
 	}
 
+	/**
+	 * Compares this expression to another for likelihood that each expression matches the true intent of the stream content.
+	 * 
+	 * @param p2 The expression to compare this to
+	 * @return
+	 *         <ul>
+	 *         <li>&lt;0 if this expression is more likely to be the true intent of the stream content than <code>p2</code></li>
+	 *         <li>&gt;0 if this expression is less likely to be the true intent of the stream content than <code>p2</code></li>
+	 *         <li>0 if this expression and <code>p2</code> are equally likely to be the true intent of the stream content</li>
+	 *         </ul>
+	 */
 	@Override
 	default int compareTo(Expression<S> p2) {
+		int mq1 = getMatchQuality();
+		int mq2 = p2.getMatchQuality();
+		if (mq1 != mq2)
+			return mq2 - mq1;
+
 		// If one is more consistent (has fewer errors than the other), then obviously it is better
 		int ec1 = getErrorCount();
 		int ec2 = p2.getErrorCount();
@@ -193,6 +215,11 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 
 			@Override
 			public int getComplexity() {
+				return 0;
+			}
+
+			@Override
+			public int getMatchQuality() {
 				return 0;
 			}
 

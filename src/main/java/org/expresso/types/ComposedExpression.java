@@ -8,18 +8,49 @@ import org.expresso.Expression;
 import org.expresso.ExpressionType;
 import org.expresso.ExpressoParser;
 import org.expresso.stream.BranchableStream;
-import org.qommons.BiTuple;
 
+/**
+ * An (abstract) expression composed of zero or more components
+ *
+ * @param <S> The type of the stream
+ */
 public abstract class ComposedExpression<S extends BranchableStream<?, ?>> implements Expression<S> {
+	/** Represents an error in this expression that is not due directly to an error in a component */
+	protected static class CompositionError {
+		/** The position of the error in the composite expression */
+		public final int position;
+		/** The error message */
+		public final String error;
+		/** The weight of the error, applied (negatively) to the expression's {@link Expression#getMatchQuality() quality} */
+		public final int errorWeight;
+
+		/**
+		 * @param position The position of the error in the composite expression
+		 * @param error The error message
+		 * @param errorWeight The weight of the error, applied (negatively) to the expression's {@link Expression#getMatchQuality() quality}
+		 */
+		public CompositionError(int position, String error, int errorWeight) {
+			this.position = position;
+			this.error = error;
+			this.errorWeight = errorWeight;
+		}
+	}
+
 	private final ExpressionType<? super S> theType;
 	private final ExpressoParser<S> theParser;
 	private final List<? extends Expression<S>> theChildren;
 	private final int theLength;
 	private final Expression<S> theFirstError;
 	private final int theErrorCount;
-	private final BiTuple<Integer, String> theSelfError;
+	private final CompositionError theSelfError;
 	private final int theComplexity;
+	private final int theQuality;
 
+	/**
+	 * @param type The type of the expression
+	 * @param parser The parser this expression was parsed at
+	 * @param children The components
+	 */
 	public ComposedExpression(ExpressionType<? super S> type, ExpressoParser<S> parser, List<? extends Expression<S>> children) {
 		theType = type;
 		theParser = parser;
@@ -28,21 +59,26 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 		Expression<S> firstError = null;
 		int errorCount = 0;
 		int complexity = getSelfComplexity();
+		int quality = 0;
 		for (Expression<S> child : children) {
 			errorCount += child.getErrorCount();
 			complexity += child.getComplexity();
+			quality += child.getMatchQuality();
 			if (errorCount > 0 && firstError == null)
 				firstError = child.getFirstError();
 		}
 		theErrorCount = errorCount;
 		theComplexity = complexity;
 		theSelfError = getSelfError();
-		if (theSelfError != null)
+		if (theSelfError != null) {
 			errorCount++;
+			quality -= theSelfError.errorWeight;
+		}
 		if (theSelfError != null
-			&& (firstError == null || firstError.getStream().getPosition() + firstError.length() > theSelfError.getValue1()))
+			&& (firstError == null || firstError.getStream().getPosition() + firstError.length() > theSelfError.position))
 			firstError = this;
 		theFirstError = firstError;
+		theQuality = quality;
 	}
 
 	@Override
@@ -50,6 +86,7 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 		return theType;
 	}
 
+	/** @return The parser this expression was parsed at */
 	protected ExpressoParser<S> getParser() {
 		return theParser;
 	}
@@ -64,8 +101,22 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 		return theChildren;
 	}
 
+	/** @return The complexity that this type imparts apart from the complexity of the components */
 	protected abstract int getSelfComplexity();
 
+	/**
+	 * @return
+	 *         <p>
+	 *         The length of this expression.
+	 *         </p>
+	 *         <p>
+	 *         By default, this is the difference between the stream position and the stream position of the last component plus the last
+	 *         component's length.
+	 *         </p>
+	 *         <p>
+	 *         Subclasses may override this value if they have content beyond the last component.
+	 *         </p>
+	 */
 	protected int computeLength() {
 		if (getChildren().isEmpty())
 			return 0;
@@ -73,7 +124,11 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 		return last.length() + last.getStream().getPosition() - getStream().getPosition();
 	}
 
-	protected BiTuple<Integer, String> getSelfError() {
+	/**
+	 * @return Computes any errors in this component that are not directly due to an error in a component. Should be overridden by
+	 *         subclasses when this is possible.
+	 */
+	protected CompositionError getSelfError() {
 		return null;
 	}
 
@@ -94,17 +149,22 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 
 	@Override
 	public int getLocalErrorRelativePosition() {
-		return theSelfError == null ? -1 : theSelfError.getValue1();
+		return theSelfError == null ? -1 : theSelfError.position;
 	}
 
 	@Override
 	public String getLocalErrorMessage() {
-		return theSelfError == null ? null : theSelfError.getValue2();
+		return theSelfError == null ? null : theSelfError.error;
 	}
 
 	@Override
 	public int getComplexity() {
 		return theComplexity;
+	}
+
+	@Override
+	public int getMatchQuality() {
+		return theQuality;
 	}
 
 	@Override
@@ -138,10 +198,12 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 		return Objects.hash(getClass(), theType, getStream().getPosition(), length(), theChildren);
 	}
 
+	/** @return Whether this expression should print error information in its {@link #toString()} */
 	protected boolean shouldPrintErrorInfo() {
 		return false;
 	}
 
+	/** @return Whether this expression should print its stream content in its {@link #toString()} */
 	protected boolean shouldPrintContent() {
 		return false;
 	}

@@ -12,26 +12,46 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.expresso.ConfiguredExpressionType;
 import org.expresso.Expression;
 import org.expresso.ExpressionType;
 import org.expresso.ExpressoParser;
 import org.expresso.stream.BranchableStream;
 import org.qommons.tree.SortedTreeList;
 
+/**
+ * An expression that may be satisfied of any one of several components
+ *
+ * @param <S> The type of the stream
+ */
 public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends AbstractExpressionType<S> {
 	private final List<? extends ExpressionType<? super S>> theComponents;
 	final boolean isPrioritized;
+	private int theSpecificity;
 
+	/**
+	 * @param id The cache ID of the expression type
+	 * @param components The components, any of which may satisfy this expression for a stream
+	 */
 	public OneOfExpressionType(int id, List<? extends ExpressionType<? super S>> components) {
 		this(id, components, false);
 	}
 
+	/**
+	 * @param id The cache ID of the expression type
+	 * @param components The components, any of which may satisfy this expression for a stream
+	 * @param prioritized Whether the components are ordered by priority (typically {@link ConfiguredExpressionType#getPriority()})
+	 */
 	protected OneOfExpressionType(int id, List<? extends ExpressionType<? super S>> components, boolean prioritized) {
 		super(id);
 		theComponents = components;
 		isPrioritized = prioritized;
+		// Can't calculate the specificity here,
+		// because the component list may be populated by the grammar parser after this constructor is called
+		theSpecificity = -1;
 	}
 
+	/** @return The components, any of which may satisfy this expression for a stream */
 	public List<? extends ExpressionType<? super S>> getComponents() {
 		return theComponents;
 	}
@@ -45,6 +65,14 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 		Set<Expression<S2>> allVisited = new HashSet<>(possibilities);
 		Expression<S2> first = possibilities.poll();
 		return new OneOfPossibility<>(this, parser, first, possibilities, allVisited);
+	}
+
+	@Override
+	public int getSpecificity() {
+		if (theSpecificity == -1) {
+			theSpecificity = getComponents().stream().mapToInt(ExpressionType::getSpecificity).min().orElse(0);
+		}
+		return theSpecificity;
 	}
 
 	@Override
@@ -146,6 +174,11 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 		@Override
 		public int getComplexity() {
 			return theComponent.getComplexity() + 1;
+		}
+
+		@Override
+		public int getMatchQuality() {
+			return theComponent.getMatchQuality();
 		}
 
 		@Override

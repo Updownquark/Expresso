@@ -9,20 +9,37 @@ import java.util.Objects;
 
 import org.expresso.BareContentExpressionType;
 import org.expresso.Expression;
+import org.expresso.ExpressionType;
 import org.expresso.ExpressoParser;
 import org.expresso.stream.BranchableStream;
 
+/**
+ * Represents a piece of content that must be present in the stream exactly, without variation
+ *
+ * @param <C> The stream's chunk type
+ * @param <S> The type of the stream
+ */
 public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? super C>> extends AbstractExpressionType<S>
 	implements BareContentExpressionType<S> {
 	private final C theValue;
 
+	/**
+	 * @param id The cache ID of the expression
+	 * @param value The literal value to expect
+	 */
 	public LiteralExpressionType(int id, C value) {
 		super(id);
 		theValue = value;
 	}
 
+	/** @return This expression's literal value */
 	public C getValue() {
 		return theValue;
+	}
+
+	/** @return The {@link ExpressionType#getSpecificity() specificity} of this literal type, per unit of length */
+	protected int getUnitSpecificity() {
+		return 10;
 	}
 
 	/** @return The length of this matcher's value */
@@ -47,6 +64,15 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 		if (!parser.tolerateErrors() && possibility.getErrorCount() > 0)
 			return null;
 		return possibility;
+	}
+
+	@Override
+	public int getSpecificity() {
+		// Literals are very specific.
+		// The presence of a literal is a very strong indicator that an expression possibility is on the right track.
+		// The absence of an expected literal is a very strong indicator that an expression possibility was not intended.
+		// the specificity of a literal is proportional to its length
+		return getLength() * getUnitSpecificity();
 	}
 
 	@Override
@@ -121,6 +147,11 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 		@Override
 		public int getComplexity() {
 			return 1;
+		}
+
+		@Override
+		public int getMatchQuality() {
+			return (theLength - theType.getLength()) * theType.getUnitSpecificity();
 		}
 
 		@Override

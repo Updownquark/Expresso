@@ -4,9 +4,18 @@ import java.io.IOException;
 
 import org.expresso.stream.CharSequenceStream;
 
+/**
+ * A {@link LiteralExpressionType} for a {@link CharSequenceStream}
+ *
+ * @param <S> The sub-type of the text stream
+ */
 public class TextLiteralExpressionType<S extends CharSequenceStream> extends LiteralExpressionType<char[], S> {
 	private final String theText;
 
+	/**
+	 * @param id The cache ID for this expression type
+	 * @param text The text literal to expect in the stream
+	 */
 	public TextLiteralExpressionType(int id, String text) {
 		super(id, text.toCharArray());
 		theText = text;

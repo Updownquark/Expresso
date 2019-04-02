@@ -233,7 +233,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 					return type.id;
 				PreParsedClass clazz = declaredClasses.get(typeName);
 				if (clazz != null)
-					return clazz.clazz.id;
+					return clazz.clazz.getCacheId();
 				throw new IllegalArgumentException("Unrecognized type name: " + typeName);
 			}
 		};
@@ -506,6 +506,11 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		}
 
 		@Override
+		public int getSpecificity() {
+			return type.getSpecificity();
+		}
+
+		@Override
 		public String toString() {
 			return type == null ? name : type.toString();
 		}
@@ -538,6 +543,11 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		@Override
 		public <S2 extends S> ExpressionField<S2> parse(ExpressoParser<S2> parser) throws IOException {
 			return ExpressionFieldType.wrap(this, parser.parseWith(theWrapped));
+		}
+
+		@Override
+		public int getSpecificity() {
+			return theWrapped.getSpecificity();
 		}
 
 		@Override

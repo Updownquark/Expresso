@@ -19,4 +19,10 @@ public interface ExpressionType<S extends BranchableStream<?, ?>> {
 	 * @throws IOException If an error occurs reading the stream
 	 */
 	<S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException;
+
+	/**
+	 * @return How specific this expression is. Practically, this is how much of a detriment to an composite expression's
+	 *         {@link Expression#getMatchQuality() quality} it will be if this component is missing
+	 */
+	int getSpecificity();
 }

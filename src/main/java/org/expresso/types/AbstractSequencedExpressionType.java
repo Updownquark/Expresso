@@ -16,23 +16,40 @@ import org.expresso.ExpressoParser;
 import org.expresso.stream.BranchableStream;
 import org.qommons.BiTuple;
 
+/**
+ * An expression that must be satisfied by one or more specific expressions in order
+ *
+ * @param <S> The type of the stream
+ */
 public abstract class AbstractSequencedExpressionType<S extends BranchableStream<?, ?>> extends AbstractExpressionType<S> {
 	private final Iterable<? extends ExpressionType<? super S>> theSequence;
 
+	/**
+	 * @param id The cache ID for the sequence
+	 * @param sequence The components of the sequence
+	 */
 	public AbstractSequencedExpressionType(int id, Iterable<? extends ExpressionType<? super S>> sequence) {
 		super(id);
 		theSequence = sequence;
 	}
 
+	/** @return The components of this sequence */
 	protected Iterable<? extends ExpressionType<? super S>> getSequence() {
 		return theSequence;
 	}
 
-	protected abstract int getInitComponentCount();
-
+	/**
+	 * @param componentCount The number of components matched
+	 * @return Whether the given number of components is enough to completely satisfy this sequence
+	 */
 	protected abstract boolean isComplete(int componentCount);
 
-	protected abstract String getErrorForComponentCount(int componentCount);
+	/**
+	 * @param components The components matched
+	 * @return null if The given component count is fine for this expression type. Otherwise, a tuple containing an error message and error
+	 *         weight to apply (negatively) to the match's {@link Expression#getMatchQuality() quality}.
+	 */
+	protected abstract BiTuple<String, Integer> getErrorForComponents(List<? extends Expression<? extends S>> components);
 
 	@Override
 	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
@@ -52,7 +69,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 			repetitions.add(repetition);
 			branched = branched.advance(repetition.length());
 		}
-		if (!parser.tolerateErrors() && getErrorForComponentCount(repetitions.size()) != null)
+		if (!parser.tolerateErrors() && getErrorForComponents(repetitions) != null)
 			return null;
 		return new SequencePossibility<>(this, parser, Collections.unmodifiableList(repetitions));
 	}
@@ -84,12 +101,12 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		}
 
 		@Override
-		protected BiTuple<Integer, String> getSelfError() {
-			String msg = getType().getErrorForComponentCount(getChildren().size());
-			if (msg != null)
-				return new BiTuple<>(length(), msg);
-			else
+		protected CompositionError getSelfError() {
+			BiTuple<String, Integer> error = getType().getErrorForComponents(getChildren());
+			if (error == null)
 				return null;
+			else
+				return new CompositionError(length(), error.getValue1(), error.getValue2());
 		}
 
 		@Override

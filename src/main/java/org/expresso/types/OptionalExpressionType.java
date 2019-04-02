@@ -13,7 +13,17 @@ import org.expresso.ExpressionType;
 import org.expresso.ExpressoParser;
 import org.expresso.stream.BranchableStream;
 
+/**
+ * An expression whose sequence may be present as a component in the stream, but also may be absent without invalidating the composite
+ * parent
+ *
+ * @param <S> The type of the stream
+ */
 public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends SequenceExpressionType<S> {
+	/**
+	 * @param id The cache ID for this expression type
+	 * @param components The components of the sequence
+	 */
 	public OptionalExpressionType(int id, List<ExpressionType<S>> components) {
 		super(id, components);
 	}
@@ -37,8 +47,8 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 		private final boolean isEmpty;
 		private final boolean isFirst;
 
-		OptionalPossibility(OptionalExpressionType<? super S> type, ExpressoParser<S> parser, Expression<S> option,
-			boolean empty, boolean first) {
+		OptionalPossibility(OptionalExpressionType<? super S> type, ExpressoParser<S> parser, Expression<S> option, boolean empty,
+			boolean first) {
 			super(type, parser, Collections.unmodifiableList(Arrays.asList(option)));
 			theOption = option;
 			isEmpty = empty;

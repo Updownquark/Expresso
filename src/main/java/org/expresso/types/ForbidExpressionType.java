@@ -11,11 +11,19 @@ import org.expresso.Expression;
 import org.expresso.ExpressionType;
 import org.expresso.ExpressoParser;
 import org.expresso.stream.BranchableStream;
-import org.qommons.BiTuple;
 
+/**
+ * Represents content that should <B>NOT</b> be present in the stream at a certain place
+ *
+ * @param <S> The type of the stream
+ */
 public class ForbidExpressionType<S extends BranchableStream<?, ?>> extends AbstractExpressionType<S> {
 	private final ExpressionType<S> theForbidden;
 
+	/**
+	 * @param id The cache ID for the expression type
+	 * @param forbidden The expression that should not be present in the stream
+	 */
 	public ForbidExpressionType(int id, ExpressionType<S> forbidden) {
 		super(id);
 		theForbidden = forbidden;
@@ -30,6 +38,11 @@ public class ForbidExpressionType<S extends BranchableStream<?, ?>> extends Abst
 			return Expression.empty(parser.getStream(), this);
 		else
 			return new ForbiddenPossibility<>(this, parser, forbidden);
+	}
+
+	@Override
+	public int getSpecificity() {
+		return 0;
 	}
 
 	@Override
@@ -66,9 +79,9 @@ public class ForbidExpressionType<S extends BranchableStream<?, ?>> extends Abst
 		}
 
 		@Override
-		protected BiTuple<Integer, String> getSelfError() {
+		protected CompositionError getSelfError() {
 			if (theForbidden.getErrorCount() == 0)
-				return new BiTuple<>(0, theForbidden.getType() + " not allowed here");
+				return new CompositionError(0, theForbidden.getType() + " not allowed here", -theForbidden.getMatchQuality());
 			else
 				return null;
 		}

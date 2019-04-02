@@ -13,10 +13,19 @@ import org.expresso.ExpressionType;
 import org.expresso.ExpressoParser;
 import org.expresso.stream.BranchableStream;
 
+/**
+ * An expression that contains any content up to (and including) a given expression
+ *
+ * @param <S> The type of the stream
+ */
 public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends AbstractExpressionType<S>
 	implements BareContentExpressionType<S> {
 	private final ExpressionType<S> theTerminal;
 
+	/**
+	 * @param id The cache ID of the expression
+	 * @param terminal The terminal expression type
+	 */
 	public LeadUpExpressionType(int id, ExpressionType<S> terminal) {
 		super(id);
 		theTerminal = terminal;
@@ -37,6 +46,11 @@ public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends Abst
 			Expression<S2> terminal = parser.parseWith(theTerminal);
 			return terminal == null ? null : new LeadUpPossibility<>(this, parser, theTerminal, terminal);
 		}
+	}
+
+	@Override
+	public int getSpecificity() {
+		return theTerminal.getSpecificity();
 	}
 
 	@Override

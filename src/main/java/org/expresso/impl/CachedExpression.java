@@ -94,6 +94,11 @@ class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S
 	}
 
 	@Override
+	public int getMatchQuality() {
+		return thePossibility.getMatchQuality();
+	}
+
+	@Override
 	public boolean equals(Object o) {
 		if (this == o)
 			return true;
