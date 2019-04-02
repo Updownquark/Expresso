@@ -29,7 +29,7 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 	public ParseSession(ExpressoGrammar<? super S> grammar) {
 		theGrammar = grammar;
 		theParsers = new BetterTreeSet<>(false, ParseSession::compareParseStates);
-		isDebugging = false;
+		isDebugging = true;
 	}
 
 	/**
@@ -43,7 +43,7 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 		throws IOException {
 		SortedTreeList<Expression<S>> toEvaluate = new SortedTreeList<>(false, Expression::compareTo);
 		// SortedTreeList<ExpressionPossibility<S>> forks = new SortedTreeList<>(false, ExpressionPossibility::compareTo);
-		Expression<S> init = getParser(stream, 0, bestError, new int[0]).parseWith(component);
+		Expression<S> init = getParser(stream, 0, true, new int[0]).parseWith(component);
 		if (init != null)
 			toEvaluate.add(init);
 		Expression<S> bestComplete = null;
@@ -65,6 +65,15 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 			debug(() -> "Forking " + nextBest.getType() + ": " + nextBest);
 			adjustDepth(1);
 			Collection<? extends Expression<S>> pForks = nextBest.fork();
+			if (isDebugging) {
+				debug(() -> "Produced:");
+				int i = 0;
+				for (Expression<S> fork : pForks) {
+					int fI = i;
+					debug(() -> "[" + fI + "]:" + fork);
+					i++;
+				}
+			}
 			adjustDepth(-1);
 			toEvaluate.addAll(pForks);
 		}

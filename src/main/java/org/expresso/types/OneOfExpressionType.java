@@ -85,7 +85,7 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 		SortedTreeList<Expression<S2>> possibilities = new SortedTreeList<>(false, Expression::compareTo);
 		for (ExpressionType<? super S> component : theComponents) {
 			Expression<S2> possibility = parser.parseWith(component);
-			if (possibility == null) {
+			if (possibility == null || possibility.length() == 0) {
 			} else if (!parser.tolerateErrors() && possibility.getErrorCount() > 0) {
 			} else if (allVisited.add(possibility))
 				possibilities.add(possibility);
@@ -206,7 +206,12 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 		public StringBuilder print(StringBuilder str, int indent, String metadata) {
 			for (int i = 0; i < indent; i++)
 				str.append('\t');
-			str.append(theType).append(metadata).append('\n');
+			str.append(theType).append(metadata);
+			if (length() == 0)
+				str.append("(empty)");
+			else
+				str.append(": ").append(printContent());
+			str.append('\n');
 			theComponent.print(str, indent + 1, "");
 			return str;
 		}

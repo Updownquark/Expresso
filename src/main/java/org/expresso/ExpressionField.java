@@ -119,6 +119,11 @@ public interface ExpressionField<S extends BranchableStream<?, ?>> extends Expre
 		}
 
 		@Override
+		public StringBuilder print(StringBuilder str, int indent, String metadata) {
+			return ExpressionField.super.print(str, indent, metadata + getType().getFields().toString());
+		}
+
+		@Override
 		public boolean equals(Object o) {
 			if (o == this)
 				return true;
@@ -135,7 +140,7 @@ public interface ExpressionField<S extends BranchableStream<?, ?>> extends Expre
 
 		@Override
 		public String toString() {
-			return getStream().printContent(0, length(), null).toString();
+			return print(new StringBuilder(), 0, "").toString();
 		}
 	}
 }

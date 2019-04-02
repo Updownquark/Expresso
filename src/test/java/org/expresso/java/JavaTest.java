@@ -49,7 +49,7 @@ public class JavaTest {
 	}
 
 	/** Tests parsing a simple variable name (vbl) */
-	@Test
+	@Test(timeout = 1000)
 	public void testVariable() {
 		Expression<CharSequenceStream> result = parse("vbl", "result-producer", true);
 		result = result.unwrap();
@@ -58,24 +58,37 @@ public class JavaTest {
 	}
 
 	/** Test parsing a field invocation (vbl.field) */
-	@Test
+	@Test(timeout = 1000)
 	public void testField() {
 		Expression<CharSequenceStream> result = parse("vbl.field", "result-producer", true).unwrap();
 		Assert.assertEquals("field-ref", ((ConfiguredExpressionType<?>) result.getType()).getName());
-		Assert.assertEquals("vbl", result.getField("target", "value").getFirst().printContent());
+		Assert.assertEquals("vbl", result.getField("target").getFirst().printContent());
 		Assert.assertEquals("field", result.getField("name").getFirst().printContent());
 		Assert.assertEquals(0, result.getField("method").size());
 	}
 
 	/** Tests parsing a nested field invocation (vbl.field1.field2) */
-	@Test
+	@Test(timeout = 1000)
 	public void testDoubleField() {
 		Expression<CharSequenceStream> result = parse("vbl.field1.field2", "result-producer", true).unwrap();
 		Assert.assertEquals("field-ref", ((ConfiguredExpressionType<?>) result.getType()).getName());
-		Expression<CharSequenceStream> inner = result.getField("target", "value").getFirst().getWrapped().unwrap();
-		Assert.assertEquals("field-ref", ((ConfiguredExpressionType<?>) inner.getType()).getName());
-		Assert.assertEquals("vbl", inner.getField("target", "value").getFirst().printContent());
-		Assert.assertEquals("field1", inner.getField("name").getFirst().printContent());
+		Expression<CharSequenceStream> inner = result.getField("target").getFirst().getWrapped().unwrap();
+		String targetType = ((ConfiguredExpressionType<?>) inner.getChildren().get(0).getType()).getName();
+		switch (targetType) {
+		case "field-ref":
+			Assert.assertEquals("vbl", inner.getField("target", "value").getFirst().printContent());
+			Assert.assertEquals("field1", inner.getField("name").getFirst().printContent());
+			break;
+		case "basic-type":
+			Deque<ExpressionField<CharSequenceStream>> typeNames = inner.getField("name");
+			Assert.assertEquals(2, typeNames.size());
+			Assert.assertEquals("vbl", typeNames.getFirst().printContent());
+			Assert.assertEquals("field1", typeNames.getLast().printContent());
+			break;
+		default:
+			Assert.assertTrue("Unrecognized target type: " + targetType, false);
+			break;
+		}
 		Assert.assertEquals("field2", result.getField("name").getFirst().printContent());
 		Assert.assertEquals(0, result.getField("method").size());
 	}
@@ -88,7 +101,7 @@ public class JavaTest {
 	 * I may change the type later to make more sense, but, it doesn't matter here.
 	 * </p>
 	 */
-	@Test
+	@Test(timeout = 1000)
 	public void testConstructor() {
 		Expression<CharSequenceStream> result = parse("new Integer(5, b)", "result-producer", true).unwrap();
 		Assert.assertEquals("constructor", ((ConfiguredExpressionType<?>) result.getType()).getName());
@@ -101,7 +114,7 @@ public class JavaTest {
 	}
 
 	/** Test parsing a constructor with generic type arguments (new java.util.ArrayList&lt;Integer>(5)) */
-	@Test
+	@Test(timeout = 1000)
 	public void testGenericConstructor() {
 		Expression<CharSequenceStream> result = parse("new java.util.ArrayList<java.lang.Integer>(5)", "result-producer", true).unwrap();
 		Assert.assertEquals("constructor", ((ConfiguredExpressionType<?>) result.getType()).getName());
@@ -114,13 +127,13 @@ public class JavaTest {
 	}
 
 	/** Tests a multi-argument static method invocation (list.addAll(java.util.Arrays.asList(1, 2, 3, 4, 5))) */
-	@Test
+	@Test(timeout = 1000)
 	public void testMethod() {
 		Expression<CharSequenceStream> result = parse("java.util.Arrays.asList(1, 2, 3, 4, 5)", "result-producer", true).unwrap();
 	}
 
 	/** Tests a nested method invocation (list.addAll(java.util.Arrays.asList(1, 2, 3, 4, 5))) */
-	// @Test
+	@Test(timeout = 1000)
 	public void testDoubleMethod() {
 		Expression<CharSequenceStream> result = parse("list.addAll(java.util.Arrays.asList(1, 2, 3, 4, 5))", "result-producer", false)
 			.unwrap();
@@ -137,7 +150,7 @@ public class JavaTest {
 	 * }
 	 * </pre>
 	 */
-	@Test
+	@Test(timeout = 1000)
 	public void testBlock() {
 		String expression = "{\n";
 		expression += "java.util.ArrayList<Integer> list;\n";

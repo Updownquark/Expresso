@@ -67,13 +67,13 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 			if (errorCount > 0 && firstError == null)
 				firstError = child.getFirstError();
 		}
-		theErrorCount = errorCount;
 		theComplexity = complexity;
 		theSelfError = getSelfError();
 		if (theSelfError != null) {
 			errorCount++;
 			quality -= theSelfError.errorWeight;
 		}
+		theErrorCount = errorCount;
 		if (theSelfError != null
 			&& (firstError == null || firstError.getStream().getPosition() + firstError.length() > theSelfError.position))
 			firstError = this;
@@ -219,11 +219,17 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 				str.append(theFirstError.getLocalErrorRelativePosition());
 			else
 				str.append("-1");
-			str.append(", ").append(getComplexity()).append("): ");
+			str.append(", ").append(getMatchQuality()).append("): ");
 		}
-		if (shouldPrintContent())
-			getStream().printContent(0, length(), str);
+		if (shouldPrintContent()) {
+			if (length() > 0)
+				getStream().printContent(0, length(), str);
+			else
+				str.append("(empty)");
+		}
 		for (Expression<S> child : theChildren) {
+			if (child.length() == 0 && child.getType().getSpecificity() == 0)
+				continue; // Optional and not present, ignore
 			str.append('\n');
 			child.print(str, indent + 1, "");
 		}

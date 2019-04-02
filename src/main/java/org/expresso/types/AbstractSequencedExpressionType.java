@@ -62,7 +62,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 			if (repetition == null)
 				break;
 			if (repetition.getErrorCount() > 0) {
-				if (parser.tolerateErrors() && !isComplete(repetitions.size()))
+				if (repetition.length() > 0 && parser.tolerateErrors() && !isComplete(repetitions.size()))
 					repetitions.add(repetition);
 				break;
 			}
@@ -84,7 +84,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		}
 
 		private SequencePossibility(AbstractSequencedExpressionType<? super S> type, ExpressoParser<S> parser,
-			List<? extends Expression<S>> repetitions, boolean allowMoreReps, boolean allowFewerReps) {
+			List<? extends Expression<S>> repetitions, boolean allowFewerReps, boolean allowMoreReps) {
 			super(type, parser, repetitions);
 			this.allowFewerReps = allowFewerReps;
 			this.allowMoreReps = allowMoreReps;
@@ -142,7 +142,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 					if (sequenceIter.hasNext()) {
 						// 3. Append more repetitions to the sequence
 						ExpressionType<? super S> nextComponent = sequenceIter.next();
-						Expression<S> nextPossibility = getParser().advance(length()).parseWith(nextComponent);
+						Expression<S> nextPossibility = getParser().advance(len).parseWith(nextComponent);
 						if (nextPossibility != null) {
 							List<Expression<S>> repetitions = new ArrayList<>(getChildren().size() + 1);
 							repetitions.addAll(getChildren());

@@ -49,9 +49,18 @@ public class SequenceExpressionType<S extends BranchableStream<?, ?>> extends Ab
 	protected BiTuple<String, Integer> getErrorForComponents(List<? extends Expression<? extends S>> components) {
 		if (components.size() < getComponents().size()) {
 			int missingWeight = 0;
-			for (int i = components.size(); i < getComponents().size(); i++)
-				missingWeight += getComponents().get(i).getSpecificity();
-			return new BiTuple<>(getComponents().get(components.size()) + " expected", missingWeight);
+			ExpressionType<S> missingComponent = null;
+			for (int i = components.size(); i < getComponents().size(); i++) {
+				int spec = getComponents().get(i).getSpecificity();
+				if (spec > 0) {
+					if (missingComponent == null)
+						missingComponent = getComponents().get(i);
+					missingWeight += spec;
+				}
+			}
+			if (missingComponent == null)
+				return null;
+			return new BiTuple<>(missingComponent + " expected", missingWeight);
 		}
 		return null;
 	}

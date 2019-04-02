@@ -69,7 +69,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		if (union == theExcludedTypes)
 			return this;
 		try {
-			theSession.debug(() -> "Excluding " + Arrays.toString(expressionIds));
+			// theSession.debug(() -> "Excluding " + Arrays.toString(expressionIds));
 			return theSession.getParser(theStream, 0, isErrorTolerated, union);
 		} catch (IOException e) {
 			throw new IllegalStateException("Should not happen--not advancing stream", e);
@@ -101,13 +101,13 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 			return new CachedExpression<>(component);
 		});
 		if (newCache[0]) {
-			theSession.debug(() -> component.toString() + ": cache " + System.identityHashCode(cached));
+			theSession.debug(() -> component.toString());
 			theSession.adjustDepth(1);
 			cached.setPossibility(component.parse(this));
 			theSession.adjustDepth(-1);
-		} else
-			theSession.debug(() -> component + ": Used cache " + System.identityHashCode(cached)//
-				+ (cached.asPossibility() == null ? " (empty)" : ""));
+		} else {
+			theSession.debug(() -> component + (cached.asPossibility() == null ? " (empty)" : ""));
+		}
 		return cached.asPossibility();
 	}
 
