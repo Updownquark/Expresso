@@ -3,20 +3,22 @@ package org.expresso.java;
 import java.io.IOException;
 import java.util.Deque;
 
-import org.expresso.ConfiguredExpressionType;
-import org.expresso.DefaultGrammarParser;
-import org.expresso.Expression;
-import org.expresso.ExpressionField;
-import org.expresso.ExpressionType;
-import org.expresso.ExpressoGrammar;
-import org.expresso.ExpressoGrammarParser;
 import org.expresso.stream.CharSequenceStream;
+import org.expresso3.ConfiguredExpressionType;
+import org.expresso3.DefaultGrammarParser;
+import org.expresso3.Expression;
+import org.expresso3.ExpressionField;
+import org.expresso3.ExpressionType;
+import org.expresso3.ExpressoGrammar;
+import org.expresso3.ExpressoGrammarParser;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 /** Tests the Expresso parser using the embedded Java grammar */
 public class JavaTest {
+	private static final long TIMEOUT = 1000; // 1s
+
 	private ExpressoGrammar<CharSequenceStream> theParser;
 
 	/**
@@ -38,18 +40,21 @@ public class JavaTest {
 			throw new IllegalArgumentException("No such type or class: " + type);
 		Expression<CharSequenceStream> result;
 		try {
-			result = theParser.parse(CharSequenceStream.from(expression), component, !checkForErrors);
+			result = theParser.parse(CharSequenceStream.from(expression), component);
 		} catch (IOException e) {
 			throw new IllegalStateException(e);
 		}
-		if (result.getErrorCount() > 0)
-			Assert.assertEquals(result.getFirstError().getLocalErrorMessage(), 0, result.getErrorCount());
+		if (checkForErrors) {
+			Assert.assertTrue("No result!", result != null);
+			if (result.getErrorCount() > 0)
+				Assert.assertEquals(result.getFirstError().getLocalErrorMessage(), 0, result.getErrorCount());
+		}
 		Assert.assertEquals("Incomplete match", expression.length(), result.length());
 		return result;
 	}
 
 	/** Tests parsing a simple variable name (vbl) */
-	@Test(timeout = 1000)
+	@Test(timeout = TIMEOUT)
 	public void testVariable() {
 		Expression<CharSequenceStream> result = parse("vbl", "result-producer", true);
 		result = result.unwrap();
@@ -58,7 +63,7 @@ public class JavaTest {
 	}
 
 	/** Test parsing a field invocation (vbl.field) */
-	@Test(timeout = 1000)
+	@Test(timeout = TIMEOUT)
 	public void testField() {
 		Expression<CharSequenceStream> result = parse("vbl.field", "result-producer", true).unwrap();
 		Assert.assertEquals("field-ref", ((ConfiguredExpressionType<?>) result.getType()).getName());
@@ -68,7 +73,7 @@ public class JavaTest {
 	}
 
 	/** Tests parsing a nested field invocation (vbl.field1.field2) */
-	@Test(timeout = 1000)
+	@Test(timeout = TIMEOUT)
 	public void testDoubleField() {
 		Expression<CharSequenceStream> result = parse("vbl.field1.field2", "result-producer", true).unwrap();
 		Assert.assertEquals("field-ref", ((ConfiguredExpressionType<?>) result.getType()).getName());
@@ -101,7 +106,7 @@ public class JavaTest {
 	 * I may change the type later to make more sense, but, it doesn't matter here.
 	 * </p>
 	 */
-	@Test(timeout = 1000)
+	@Test(timeout = TIMEOUT)
 	public void testConstructor() {
 		Expression<CharSequenceStream> result = parse("new Integer(5, b)", "result-producer", true).unwrap();
 		Assert.assertEquals("constructor", ((ConfiguredExpressionType<?>) result.getType()).getName());
@@ -114,7 +119,7 @@ public class JavaTest {
 	}
 
 	/** Test parsing a constructor with generic type arguments (new java.util.ArrayList&lt;Integer>(5)) */
-	@Test(timeout = 1000)
+	@Test(timeout = TIMEOUT)
 	public void testGenericConstructor() {
 		Expression<CharSequenceStream> result = parse("new java.util.ArrayList<java.lang.Integer>(5)", "result-producer", true).unwrap();
 		Assert.assertEquals("constructor", ((ConfiguredExpressionType<?>) result.getType()).getName());
@@ -127,13 +132,13 @@ public class JavaTest {
 	}
 
 	/** Tests a multi-argument static method invocation (list.addAll(java.util.Arrays.asList(1, 2, 3, 4, 5))) */
-	@Test(timeout = 1000)
+	@Test(timeout = TIMEOUT)
 	public void testMethod() {
 		Expression<CharSequenceStream> result = parse("java.util.Arrays.asList(1, 2, 3, 4, 5)", "result-producer", true).unwrap();
 	}
 
 	/** Tests a nested method invocation (list.addAll(java.util.Arrays.asList(1, 2, 3, 4, 5))) */
-	@Test(timeout = 1000)
+	@Test(timeout = TIMEOUT)
 	public void testDoubleMethod() {
 		Expression<CharSequenceStream> result = parse("list.addAll(java.util.Arrays.asList(1, 2, 3, 4, 5))", "result-producer", false)
 			.unwrap();
@@ -150,7 +155,7 @@ public class JavaTest {
 	 * }
 	 * </pre>
 	 */
-	@Test(timeout = 1000)
+	@Test(timeout = TIMEOUT)
 	public void testBlock() {
 		String expression = "{\n";
 		expression += "java.util.ArrayList<Integer> list;\n";
