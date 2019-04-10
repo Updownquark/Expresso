@@ -3,18 +3,19 @@ package org.expresso3;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Deque;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 
 import org.expresso.stream.BranchableStream;
+import org.qommons.collect.BetterList;
+import org.qommons.tree.BetterTreeList;
 
 /**
  * Represents a possible interpretation of content at a particular place in a stream
  *
  * @param <S> The type of the stream
  */
-public interface Expression<S extends BranchableStream<?, ?>> extends Comparable<Expression<S>> {
+public interface Expression<S extends BranchableStream<?, ?>> extends Comparable<Expression<?>> {
 	/** @return The expression type whose interpretation this is */
 	ExpressionType<? super S> getType();
 
@@ -28,10 +29,11 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 	List<? extends Expression<S>> getChildren();
 
 	/**
+	 * @param parser TODO
 	 * @return Another interpretation of the stream by this expresssion's type
 	 * @throws IOException If an error occurs reading the stream
 	 */
-	Expression<S> nextMatch() throws IOException;
+	Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException;
 
 	/** @return The number of errors in this possibility */
 	int getErrorCount();
@@ -47,9 +49,6 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 
 	/** @return An expression equivalent to this with possibly condensed structure */
 	Expression<S> unwrap();
-
-	/** @return The complexity of this expression */
-	int getComplexity();
 
 	/**
 	 * @return A measure of how certain this expression's {@link #getType() type} is that this expression accurately represents the intent
@@ -69,17 +68,17 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 
 	/**
 	 * @param fields The nested fields to get
-	 * @return A deque with all expressions matching the given field path
+	 * @return A list with all expressions matching the given field path
 	 */
-	default Deque<ExpressionField<S>> getField(String... fields) {
+	default BetterList<ExpressionField<S>> getField(String... fields) {
 		if (fields.length == 0)
 			throw new IllegalArgumentException("Fields expected");
-		Deque<Expression<S>> result = new LinkedList<>();
-		Deque<Expression<S>> lastFieldResult = new LinkedList<>();
+		BetterList<Expression<S>> result = new BetterTreeList<>(false);
+		BetterList<Expression<S>> lastFieldResult = new BetterTreeList<>(false);
 		result.add(this);
 		for (String field : fields) {
 			// We could clear out lastFieldResult and add all the results to it, then clear the results, but this is more efficient
-			Deque<Expression<S>> temp = result;
+			BetterList<Expression<S>> temp = result;
 			result = lastFieldResult;
 			lastFieldResult = temp;
 			result.clear();
@@ -91,12 +90,30 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 					FieldSearcher.findFields(lfr, field, result);
 			}
 		}
-		return (Deque<ExpressionField<S>>) (Deque<?>) result;
+		return (BetterList<ExpressionField<S>>) (Deque<?>) result;
 	}
 
 	/** @return The stream content that this expression represents */
-	default String printContent() {
-		return getStream().printContent(0, length(), null).toString();
+	default String printContent(boolean inline) {
+		StringBuilder str = getStream().printContent(0, length(), null);
+		if (inline) {
+			for (int i = 0; i < str.length(); i++) {
+				char c = str.charAt(i);
+				switch (c) {
+				case '\n':
+					str.setCharAt(i, '\\');
+					str.insert(i + 1, 'n');
+					i++;
+					break;
+				case '\t':
+					str.setCharAt(i, '\\');
+					str.insert(i + 1, 't');
+					i++;
+					break;
+				}
+			}
+		}
+		return str.toString();
 	}
 
 	/**
@@ -111,7 +128,7 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 	 *         </ul>
 	 */
 	@Override
-	default int compareTo(Expression<S> p2) {
+	default int compareTo(Expression<?> p2) {
 		int mq1 = getMatchQuality();
 		int mq2 = p2.getMatchQuality();
 		if (mq1 != mq2)
@@ -123,8 +140,8 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 		if (ec1 != ec2)
 			return ec1 - ec2;
 
-		Expression<S> firstErr1 = getFirstError();
-		Expression<S> firstErr2 = p2.getFirstError();
+		Expression<?> firstErr1 = getFirstError();
+		Expression<?> firstErr2 = p2.getFirstError();
 		int len1 = length();
 		int len2 = p2.length();
 
@@ -141,12 +158,6 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 			else if (firstErr2 == null)
 				return 1;
 		}
-
-		// Use Occam's razor
-		int c1 = getComplexity();
-		int c2 = p2.getComplexity();
-		if (c1 != c2)
-			return c1 - c2;
 
 		// If both are incomplete but one thinks it might understand more, give it a chance
 		if (len1 != len2)
@@ -183,7 +194,7 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 			}
 
 			@Override
-			public Expression<S> nextMatch() throws IOException {
+			public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
 				return null;
 			}
 
@@ -210,11 +221,6 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 			@Override
 			public Expression<S> unwrap() {
 				return this;
-			}
-
-			@Override
-			public int getComplexity() {
-				return 0;
 			}
 
 			@Override

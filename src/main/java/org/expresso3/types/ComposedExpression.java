@@ -5,9 +5,9 @@ import java.util.List;
 import java.util.Objects;
 
 import org.expresso.stream.BranchableStream;
+import org.expresso.util.ExpressoUtils;
 import org.expresso3.Expression;
 import org.expresso3.ExpressionType;
-import org.expresso3.ExpressoParser;
 
 /**
  * An (abstract) expression composed of zero or more components
@@ -15,70 +15,27 @@ import org.expresso3.ExpressoParser;
  * @param <S> The type of the stream
  */
 public abstract class ComposedExpression<S extends BranchableStream<?, ?>> implements Expression<S> {
-	/** Represents an error in this expression that is not due directly to an error in a component */
-	protected static class CompositionError {
-		/** The position of the error in the composite expression */
-		public final int position;
-		/** The error message */
-		public final String error;
-		/** The weight of the error, applied (negatively) to the expression's {@link Expression#getMatchQuality() quality} */
-		public final int errorWeight;
-
-		/**
-		 * @param position The position of the error in the composite expression
-		 * @param error The error message
-		 * @param errorWeight The weight of the error, applied (negatively) to the expression's {@link Expression#getMatchQuality() quality}
-		 */
-		public CompositionError(int position, String error, int errorWeight) {
-			this.position = position;
-			this.error = error;
-			this.errorWeight = errorWeight;
-		}
-	}
-
 	private final ExpressionType<? super S> theType;
-	private final ExpressoParser<S> theParser;
+	private final S theStream;
 	private final List<? extends Expression<S>> theChildren;
-	private final int theLength;
-	private final Expression<S> theFirstError;
-	private final int theErrorCount;
-	private final CompositionError theSelfError;
-	private final int theComplexity;
-	private final int theQuality;
+	private int theLength;
+
+	private boolean isQualityComputed;
+	private Expression<S> theFirstError;
+	private int theErrorCount;
+	private CompositionError theSelfError;
+	private int theQuality;
 
 	/**
 	 * @param type The type of the expression
-	 * @param parser The parser this expression was parsed at
+	 * @param stream The stream this expression was parsed at
 	 * @param children The components
 	 */
-	public ComposedExpression(ExpressionType<? super S> type, ExpressoParser<S> parser, List<? extends Expression<S>> children) {
+	public ComposedExpression(ExpressionType<? super S> type, S stream, List<? extends Expression<S>> children) {
 		theType = type;
-		theParser = parser;
+		theStream = stream;
 		theChildren = Collections.unmodifiableList(children);
-		theLength = computeLength();
-		Expression<S> firstError = null;
-		int errorCount = 0;
-		int complexity = getSelfComplexity();
-		int quality = 0;
-		for (Expression<S> child : children) {
-			errorCount += child.getErrorCount();
-			complexity += child.getComplexity();
-			quality += child.getMatchQuality();
-			if (errorCount > 0 && firstError == null)
-				firstError = child.getFirstError();
-		}
-		theComplexity = complexity;
-		theSelfError = getSelfError();
-		if (theSelfError != null) {
-			errorCount++;
-			quality -= theSelfError.errorWeight;
-		}
-		theErrorCount = errorCount;
-		if (theSelfError != null
-			&& (firstError == null || firstError.getStream().getPosition() + firstError.length() > theSelfError.position))
-			firstError = this;
-		theFirstError = firstError;
-		theQuality = quality;
+		theLength = -1;
 	}
 
 	@Override
@@ -86,14 +43,9 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 		return theType;
 	}
 
-	/** @return The parser this expression was parsed at */
-	protected ExpressoParser<S> getParser() {
-		return theParser;
-	}
-
 	@Override
 	public S getStream() {
-		return theParser.getStream();
+		return theStream;
 	}
 
 	@Override
@@ -101,8 +53,25 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 		return theChildren;
 	}
 
-	/** @return The complexity that this type imparts apart from the complexity of the components */
-	protected abstract int getSelfComplexity();
+	/**
+	 * @return Computes any errors in this component that are not directly due to an error in a component. Should be overridden by
+	 *         subclasses when this is possible.
+	 */
+	protected CompositionError getSelfError() {
+		return null;
+	}
+
+	@Override
+	public int length() {
+		if (theLength < 0) {
+			theLength = computeLength();
+			if (theLength < 0) {
+				computeLength();
+				throw new IllegalStateException("Negative length: " + theLength);
+			}
+		}
+		return theLength;
+	}
 
 	/**
 	 * @return
@@ -118,53 +87,63 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 	 *         </p>
 	 */
 	protected int computeLength() {
-		if (getChildren().isEmpty())
-			return 0;
-		Expression<S> last = getChildren().get(getChildren().size() - 1);
-		return last.length() + last.getStream().getPosition() - getStream().getPosition();
-	}
-
-	/**
-	 * @return Computes any errors in this component that are not directly due to an error in a component. Should be overridden by
-	 *         subclasses when this is possible.
-	 */
-	protected CompositionError getSelfError() {
-		return null;
-	}
-
-	@Override
-	public int length() {
-		return theLength;
+		return ExpressoUtils.getLength(theStream.getPosition(), theChildren);
 	}
 
 	@Override
 	public Expression<S> getFirstError() {
+		computeQuality();
 		return theFirstError;
 	}
 
 	@Override
 	public int getErrorCount() {
+		computeQuality();
 		return theErrorCount;
 	}
 
 	@Override
 	public int getLocalErrorRelativePosition() {
+		computeQuality();
 		return theSelfError == null ? -1 : theSelfError.position;
 	}
 
 	@Override
 	public String getLocalErrorMessage() {
-		return theSelfError == null ? null : theSelfError.error;
-	}
-
-	@Override
-	public int getComplexity() {
-		return theComplexity;
+		computeQuality();
+		return theSelfError == null ? null : theSelfError.error.get();
 	}
 
 	@Override
 	public int getMatchQuality() {
+		computeQuality();
 		return theQuality;
+	}
+
+	private void computeQuality() {
+		if (isQualityComputed)
+			return;
+		isQualityComputed = true;
+		Expression<S> firstError = null;
+		int errorCount = 0;
+		int quality = 0;
+		for (Expression<S> child : theChildren) {
+			errorCount += child.getErrorCount();
+			quality += child.getMatchQuality();
+			if (errorCount > 0 && firstError == null)
+				firstError = child.getFirstError();
+		}
+		theSelfError = getSelfError();
+		if (theSelfError != null) {
+			errorCount++;
+			quality -= theSelfError.errorWeight;
+		}
+		theErrorCount = errorCount;
+		if (theSelfError != null
+			&& (firstError == null || firstError.getStream().getPosition() + firstError.length() > theSelfError.position))
+			firstError = this;
+		theFirstError = firstError;
+		theQuality = quality;
 	}
 
 	@Override

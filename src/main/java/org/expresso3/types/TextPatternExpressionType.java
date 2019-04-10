@@ -19,6 +19,8 @@ import org.expresso3.ExpressoParser;
  */
 public class TextPatternExpressionType<S extends CharSequenceStream> extends AbstractExpressionType<S>
 	implements BareContentExpressionType<S> {
+	private static final boolean LOOK_FOR_SHORTER_PATTERNS = false;
+
 	private final Pattern thePattern;
 	private final int theMaxLength;
 
@@ -125,7 +127,9 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 		}
 
 		@Override
-		public Expression<S> nextMatch() throws IOException {
+		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+			if (!LOOK_FOR_SHORTER_PATTERNS)
+				return null;
 			int length = length();
 			if (length < 1)
 				return null;
@@ -155,11 +159,6 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 		@Override
 		public String getLocalErrorMessage() {
 			return theMatcher.lookingAt() ? null : "Text matching " + getType().getPattern() + " expected";
-		}
-
-		@Override
-		public int getComplexity() {
-			return 1;
 		}
 
 		@Override

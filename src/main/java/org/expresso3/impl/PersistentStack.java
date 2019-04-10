@@ -5,12 +5,10 @@ import java.util.function.Supplier;
 
 public class PersistentStack<E> implements Supplier<E> {
 	private final PersistentStack<E> theParent;
-	private final int theSize;
 	private final E theValue;
 
 	public PersistentStack(PersistentStack<E> parent, E value) {
 		theParent = parent;
-		theSize = theParent == null ? 1 : theParent.theSize + 1;
 		theValue = value;
 	}
 
@@ -21,10 +19,6 @@ public class PersistentStack<E> implements Supplier<E> {
 	@Override
 	public E get() {
 		return theValue;
-	}
-
-	public int size() {
-		return theSize;
 	}
 
 	public E search(Predicate<? super E> filter) {
@@ -41,5 +35,19 @@ public class PersistentStack<E> implements Supplier<E> {
 			return true;
 		else
 			return action.test(this);
+	}
+
+	@Override
+	public String toString() {
+		return print(new StringBuilder()).toString();
+	}
+
+	private Object print(StringBuilder str) {
+		if (theParent != null) {
+			theParent.print(str);
+			str.append('\n');
+		}
+		str.append(theValue);
+		return str;
 	}
 }

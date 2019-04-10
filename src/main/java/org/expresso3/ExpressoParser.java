@@ -42,4 +42,11 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> {
 	 * @throws IOException If an error occurs reading the stream
 	 */
 	Expression<S> parseWith(ExpressionType<? super S> type) throws IOException;
+
+	/**
+	 * @param expression The expression to branch
+	 * @return Another interpretation of the stream by the expresssion's type
+	 * @throws IOException If an error occurs reading the stream
+	 */
+	Expression<S> nextMatch(Expression<S> expression) throws IOException;
 }

@@ -10,12 +10,16 @@ import org.expresso.stream.BranchableStream;
  * @param <S> The super type of stream that this component understands
  */
 public interface ExpressionType<S extends BranchableStream<?, ?>> {
+	// public static final ProgramTracker TRACKER = new ProgramTracker("Expresso Parsing");
+
 	/** @return An ID by which this type's results may be cached, or -1 if caching should not be used for this type */
 	int getId();
 
 	default boolean isCacheable() {
 		return false; // Most expressions should not be cached
 	}
+
+	Iterable<? extends ExpressionType<? super S>> getComponents();
 
 	/**
 	 * @param parser The parser to parse the expression from

@@ -22,13 +22,12 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 
 	@Override
 	public char charAt(int index) {
-		char [] holder = new char[1];
 		try {
-			doOn(index, (chunk, idx) -> holder[0] = chunk.getData()[idx], null);
+			Chunk chunk = getChunkAt(index);
+			return chunk.getData()[getPosition() + index - chunk.getOffset()];
 		} catch(IOException e) {
 			throw new IllegalStateException("Could not retrieve data for charAt", e);
 		}
-		return holder[0];
 	}
 
 	@Override

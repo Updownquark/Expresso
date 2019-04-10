@@ -2,7 +2,6 @@ package org.expresso3.types;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 import org.expresso.stream.BranchableStream;
@@ -26,12 +25,11 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 	}
 
 	@Override
-	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> session) throws IOException {
-		Expression<S2> superPossibility = super.parse(session);
-		boolean empty = superPossibility == null;
-		if (empty)
-			superPossibility = Expression.empty(session.getStream(), this);
-		return new OptionalPossibility<>(this, session, superPossibility, empty, true);
+	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
+		Expression<S2> superPossibility = super.parse(parser);
+		if (superPossibility == null)
+			superPossibility = Expression.empty(parser.getStream(), this);
+		return new OptionalPossibility<>(this, parser.getStream(), superPossibility);
 	}
 
 	@Override
@@ -41,15 +39,10 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 
 	private static class OptionalPossibility<S extends BranchableStream<?, ?>> extends ComposedExpression<S> {
 		private final Expression<S> theOption;
-		private final boolean isEmpty;
-		private final boolean isFirst;
 
-		OptionalPossibility(OptionalExpressionType<? super S> type, ExpressoParser<S> parser, Expression<S> option, boolean empty,
-			boolean first) {
-			super(type, parser, Collections.unmodifiableList(Arrays.asList(option)));
+		OptionalPossibility(OptionalExpressionType<? super S> type, S stream, Expression<S> option) {
+			super(type, stream, Arrays.asList(option));
 			theOption = option;
-			isEmpty = empty;
-			isFirst = first;
 		}
 
 		@Override
@@ -58,18 +51,12 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 		}
 
 		@Override
-		protected int getSelfComplexity() {
-			return 1;
-		}
-
-		@Override
-		public Expression<S> nextMatch() throws IOException {
-			Expression<S> optionNext = theOption.nextMatch();
+		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+			Expression<S> optionNext = parser.nextMatch(theOption);
 			if (optionNext != null)
-				return new OptionalPossibility<>(getType(), getParser(), optionNext, false, false);
-			if (!isFirst && !isEmpty)
-				new OptionalPossibility<>(getType(), getParser(), Expression.empty(getParser().getStream(), theOption.getType()), true,
-					false);
+				return new OptionalPossibility<>(getType(), parser.getStream(), optionNext);
+			if (theOption.length() > 0)
+				new OptionalPossibility<>(getType(), parser.getStream(), Expression.empty(parser.getStream(), theOption.getType()));
 			return null;
 		}
 

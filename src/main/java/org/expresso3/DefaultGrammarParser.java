@@ -182,7 +182,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 			}
 		}
 
-		Map<String, ParsedExpressionType<S>> declaredTypes = new LinkedHashMap<>();
+		Map<String, ConfiguredReferenceExpressionType<S>> declaredTypes = new LinkedHashMap<>();
 		// One run-though to populate the type references
 		for (QommonsConfig type : config.subConfigs()) {
 			if (type.getName().equals("classes"))
@@ -216,7 +216,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 			} else
 				typeClasses = BetterSortedSet.empty(ExpressionClass::compareTo);
 			int priority = type.getInt("priority", 0);
-			if (declaredTypes.put(typeName, new ParsedExpressionType<>(id[0]++, priority, typeName, typeClasses)) != null)
+			if (declaredTypes.put(typeName, new ConfiguredReferenceExpressionType<>(id[0]++, priority, typeName, typeClasses)) != null)
 				throw new IllegalArgumentException("Duplicate expressions named " + typeName);
 		}
 		for (PreParsedClass clazz : declaredClasses.values())
@@ -230,7 +230,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		PreGrammar preGrammar = new PreGrammar() {
 			@Override
 			public int getTypeId(String typeName) {
-				ParsedExpressionType<S> type = declaredTypes.get(typeName);
+				ConfiguredReferenceExpressionType<S> type = declaredTypes.get(typeName);
 				if (type != null)
 					return type.id;
 				PreParsedClass clazz = declaredClasses.get(typeName);
@@ -244,7 +244,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		for (QommonsConfig type : config.subConfigs()) {
 			if (type.getName().equals("classes"))
 				continue;
-			ParsedExpressionType<S> typeRef = declaredTypes.get(type.get("name"));
+			ConfiguredReferenceExpressionType<S> typeRef = declaredTypes.get(type.get("name"));
 			QommonsConfig[] componentConfigs = type.subConfigs();
 			List<ExpressionType<S>> components = new ArrayList<>(componentConfigs.length//
 				- (typeRef.classes.isEmpty() ? 1 : 2)); // "name" and "class"
@@ -256,7 +256,11 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 					throw new IllegalArgumentException("field attribute is not allowed on an expression");
 				ExpressionType<S> component;
 				try {
-					component = parseComponent(componentConfig, classes, declaredTypes, cachedExpressions, id, preGrammar, true, ignorable);
+					if (typeRef.doesExtend(ignorableClass))
+						component = parseComponent(componentConfig, classes, declaredTypes, cachedExpressions, id, preGrammar, true, null);
+					else
+						component = parseComponent(componentConfig, classes, declaredTypes, cachedExpressions, id, preGrammar, true,
+							ignorable);
 				} catch (RuntimeException e) {
 					throw new IllegalStateException(e.getMessage() + ":\n" + type, e);
 				}
@@ -266,7 +270,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 			for (ExpressionClass<S> clazz : typeRef.classes)
 				declaredClasses.get(clazz.getName()).addType(typeRef.type);
 		}
-		for (ParsedExpressionType<S> typeRef : declaredTypes.values()) {
+		for (ConfiguredReferenceExpressionType<S> typeRef : declaredTypes.values()) {
 			types.add(typeRef.type);
 			typesByName.put(typeRef.name, typeRef.type);
 		}
@@ -274,7 +278,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 	}
 
 	private ExpressionType<S> parseComponent(QommonsConfig config, Map<String, ExpressionClass<S>> allClasses,
-		Map<String, ParsedExpressionType<S>> allTypes, Map<ExpressionType<S>, ExpressionType<S>> cachedExpressions, int[] id,
+		Map<String, ConfiguredReferenceExpressionType<S>> allTypes, Map<ExpressionType<S>, ExpressionType<S>> cachedExpressions, int[] id,
 		PreGrammar grammar, boolean throwIfNotFound, ExpressionType<S> ignorable) {
 		String componentType = config.getName();
 		String value = config.getValue();
@@ -298,7 +302,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 			}
 		}
 		GrammarComponent<S> rc;
-		ParsedExpressionType<S> type;
+		ConfiguredReferenceExpressionType<S> type;
 		ExpressionClass<S> clazz;
 		ExpressionType<S> found;
 		if ((rc = theComponents.get(componentType)) != null) {
@@ -358,7 +362,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		else
 			return null;
 		ExpressionType<S> exType = fields == null ? found
-			: new ExpressionTypeReference<>(found, Collections.unmodifiableNavigableSet(fields));
+			: new FieldMarkedExpressionType<>(found, Collections.unmodifiableNavigableSet(fields));
 		if (ignorable != null && found instanceof BareContentExpressionType)
 			exType = new SequenceExpressionType<>(id[0]++, Arrays.asList(ignorable, exType));
 		return exType;
@@ -486,18 +490,25 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		return components;
 	}
 
-	private static class ParsedExpressionType<S extends BranchableStream<?, ?>> implements ExpressionType<S> {
+	static class ConfiguredReferenceExpressionType<S extends BranchableStream<?, ?>> implements ExpressionType<S> {
 		private final int id;
 		private final int priority;
 		private final String name;
 		final BetterSortedSet<ExpressionClass<S>> classes;
 		ConfiguredExpressionType<S> type;
 
-		ParsedExpressionType(int id, int priority, String name, BetterSortedSet<ExpressionClass<S>> classes) {
+		ConfiguredReferenceExpressionType(int id, int priority, String name, BetterSortedSet<ExpressionClass<S>> classes) {
 			this.id = id;
 			this.priority = priority;
 			this.name = name;
 			this.classes = classes;
+		}
+
+		boolean doesExtend(ExpressionClass<S> clazz) {
+			for (ExpressionClass<S> c : classes)
+				if (c.doesExtend(clazz))
+					return true;
+			return false;
 		}
 
 		void initialize(ExpressoGrammar<S> grammar, List<ExpressionType<S>> components) {
@@ -511,12 +522,13 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 
 		@Override
 		public boolean isCacheable() {
-			return type.isCacheable();
+			return false;
 		}
 
 		@Override
 		public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
-			return type.parse(parser);
+			Expression<S2> ex = parser.parseWith(type);
+			return ex == null ? null : new WrappedExpression<>(this, ex);
 		}
 
 		@Override
@@ -525,16 +537,111 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		}
 
 		@Override
+		public Iterable<? extends ExpressionType<? super S>> getComponents() {
+			return Collections.unmodifiableList(Arrays.asList(type));
+		}
+
+		@Override
 		public String toString() {
 			return type == null ? name : type.toString();
 		}
 	}
 
-	private static class ExpressionTypeReference<S extends BranchableStream<?, ?>> implements ExpressionFieldType<S> {
+	static class WrappedExpression<S extends BranchableStream<?, ?>> implements Expression<S> {
+		private final ExpressionType<? super S> theType;
+		private final Expression<S> theWrapped;
+
+		WrappedExpression(ExpressionType<? super S> type, Expression<S> wrapped) {
+			theType = type;
+			theWrapped = wrapped;
+		}
+
+		@Override
+		public ExpressionType<? super S> getType() {
+			return theType;
+		}
+
+		@Override
+		public S getStream() {
+			return theWrapped.getStream();
+		}
+
+		@Override
+		public int length() {
+			return theWrapped.length();
+		}
+
+		@Override
+		public List<? extends Expression<S>> getChildren() {
+			return Collections.unmodifiableList(Arrays.asList(theWrapped));
+		}
+
+		@Override
+		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+			Expression<S> ex = parser.nextMatch(theWrapped);
+			return ex == null ? null : new WrappedExpression<>(theType, ex);
+		}
+
+		@Override
+		public int getErrorCount() {
+			return theWrapped.getErrorCount();
+		}
+
+		@Override
+		public Expression<S> getFirstError() {
+			return theWrapped.getFirstError();
+		}
+
+		@Override
+		public int getLocalErrorRelativePosition() {
+			return theWrapped.getLocalErrorRelativePosition();
+		}
+
+		@Override
+		public String getLocalErrorMessage() {
+			return theWrapped.getLocalErrorMessage();
+		}
+
+		@Override
+		public Expression<S> unwrap() {
+			return theWrapped.unwrap();
+		}
+
+		@Override
+		public int getMatchQuality() {
+			return theWrapped.getMatchQuality();
+		}
+
+		@Override
+		public StringBuilder print(StringBuilder str, int indent, String metadata) {
+			return theWrapped.print(str, indent, metadata);
+		}
+
+		@Override
+		public int hashCode() {
+			return theWrapped.hashCode();
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			else if (!(obj instanceof WrappedExpression))
+				return false;
+			return theWrapped.equals(((WrappedExpression<?>) obj).theWrapped);
+		}
+
+		@Override
+		public String toString() {
+			return theWrapped.toString();
+		}
+	}
+
+	static class FieldMarkedExpressionType<S extends BranchableStream<?, ?>> implements ExpressionFieldType<S> {
 		private final ExpressionType<S> theWrapped;
 		private final NavigableSet<String> theFields;
 
-		ExpressionTypeReference(ExpressionType<S> wrapped, NavigableSet<String> fields) {
+		FieldMarkedExpressionType(ExpressionType<S> wrapped, NavigableSet<String> fields) {
 			theWrapped = wrapped;
 			theFields = fields;
 		}
@@ -567,6 +674,11 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		@Override
 		public int getSpecificity() {
 			return theWrapped.getSpecificity();
+		}
+
+		@Override
+		public Iterable<? extends ExpressionType<? super S>> getComponents() {
+			return Collections.unmodifiableList(Arrays.asList(theWrapped));
 		}
 
 		@Override

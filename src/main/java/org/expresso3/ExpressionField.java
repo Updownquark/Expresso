@@ -55,17 +55,12 @@ public interface ExpressionField<S extends BranchableStream<?, ?>> extends Expre
 	}
 
 	@Override
-	default Expression<S> nextMatch() throws IOException {
-		Expression<S> wrapFork = getWrapped().nextMatch();
+	default Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+		Expression<S> wrapFork = parser.nextMatch(getWrapped());
 		if (wrapFork == null)
 			return null;
 		else
 			return new SimpleExpressionField<>(getType(), wrapFork);
-	}
-
-	@Override
-	default int getComplexity() {
-		return getWrapped().getComplexity();
 	}
 
 	@Override
@@ -80,10 +75,11 @@ public interface ExpressionField<S extends BranchableStream<?, ?>> extends Expre
 
 	@Override
 	default Expression<S> unwrap() {
-		Expression<S> wrappedUnwrapped = getWrapped().unwrap();
-		if (wrappedUnwrapped != null && wrappedUnwrapped != getWrapped())
-			return new SimpleExpressionField<>(getType(), wrappedUnwrapped);
-		return this;
+		// Expression<S> wrappedUnwrapped = getWrapped().unwrap();
+		// if (wrappedUnwrapped != null && wrappedUnwrapped != getWrapped())
+		// return new SimpleExpressionField<>(getType(), wrappedUnwrapped);
+		// return this;
+		return getWrapped().unwrap();
 	}
 
 	/**
@@ -112,11 +108,6 @@ public interface ExpressionField<S extends BranchableStream<?, ?>> extends Expre
 		@Override
 		public Expression<S> getWrapped() {
 			return theWrapped;
-		}
-
-		@Override
-		public StringBuilder print(StringBuilder str, int indent, String metadata) {
-			return ExpressionField.super.print(str, indent, metadata + getType().getFields().toString());
 		}
 
 		@Override

@@ -1,5 +1,7 @@
 package org.expresso3;
 
+import java.util.Collections;
+
 import org.expresso.stream.BranchableStream;
 
 /**
@@ -8,4 +10,8 @@ import org.expresso.stream.BranchableStream;
  * @param <S> The super-type of stream the expression type can parse
  */
 public interface BareContentExpressionType<S extends BranchableStream<?, ?>> extends ExpressionType<S> {
+	@Override
+	default Iterable<? extends ExpressionType<? super S>> getComponents() {
+		return Collections.emptyList();
+	}
 }

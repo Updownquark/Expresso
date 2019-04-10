@@ -6,6 +6,7 @@ import java.util.List;
 import org.expresso.stream.BranchableStream;
 import org.expresso3.Expression;
 import org.expresso3.ExpressionType;
+import org.expresso3.ExpressoParser;
 
 class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S> {
 	private final ExpressionType<? super S> theType;
@@ -42,9 +43,9 @@ class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S
 	}
 
 	@Override
-	public Expression<S> nextMatch() throws IOException {
+	public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
 		if (theNextMatch == null) {
-			Expression<S> next = thePossibility.nextMatch();
+			Expression<S> next = thePossibility.nextMatch(parser);
 			theNextMatch = new CachedExpression<S>(theType).setPossibility(next);
 		}
 		return theNextMatch.asPossibility();
@@ -78,11 +79,6 @@ class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S
 	@Override
 	public Expression<S> unwrap() {
 		return thePossibility.unwrap();
-	}
-
-	@Override
-	public int getComplexity() {
-		return thePossibility.getComplexity();
 	}
 
 	@Override

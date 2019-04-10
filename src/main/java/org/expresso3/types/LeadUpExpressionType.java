@@ -34,7 +34,7 @@ public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends Abst
 		while (branched != null) {
 			Expression<S2> terminal = parser.parseWith(theTerminal);
 			if (terminal != null)
-				return new LeadUpPossibility<>(this, parser, theTerminal, terminal);
+				return new LeadUpPossibility<>(this, parser.getStream(), theTerminal, terminal);
 			branched = branched.advance(1);
 		}
 		return null;
@@ -46,6 +46,11 @@ public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends Abst
 	}
 
 	@Override
+	public Iterable<? extends ExpressionType<? super S>> getComponents() {
+		return Collections.unmodifiableList(Arrays.asList(theTerminal));
+	}
+
+	@Override
 	public String toString() {
 		return "..." + theTerminal;
 	}
@@ -54,9 +59,9 @@ public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends Abst
 		private final ExpressionType<? super S> theTerminal;
 		private final Expression<S> theTerminalPossibility;
 
-		LeadUpPossibility(LeadUpExpressionType<? super S> type, ExpressoParser<S> parser, ExpressionType<? super S> terminal,
+		LeadUpPossibility(LeadUpExpressionType<? super S> type, S stream, ExpressionType<? super S> terminal,
 			Expression<S> terminalPossibility) {
-			super(type, parser, Collections.unmodifiableList(Arrays.asList(terminalPossibility)));
+			super(type, stream, Arrays.asList(terminalPossibility));
 			theTerminal = terminal;
 			theTerminalPossibility = terminalPossibility;
 		}
@@ -67,15 +72,10 @@ public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends Abst
 		}
 
 		@Override
-		protected int getSelfComplexity() {
-			return 1;
-		}
-
-		@Override
-		public Expression<S> nextMatch() throws IOException {
-			Expression<S> next = theTerminalPossibility.nextMatch();
+		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+			Expression<S> next = parser.nextMatch(theTerminalPossibility);
 			if (next != null)
-				return new LeadUpPossibility<>(getType(), getParser(), theTerminal, next);
+				return new LeadUpPossibility<>(getType(), parser.getStream(), theTerminal, next);
 			return null;
 		}
 	}

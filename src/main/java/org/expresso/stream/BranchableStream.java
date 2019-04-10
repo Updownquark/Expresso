@@ -17,6 +17,8 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 	protected class Chunk {
 		private final int theChunkIndex;
 
+		private final int theOffset;
+
 		private C theData;
 
 		private int theLength;
@@ -25,13 +27,14 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 
 		private boolean isLast;
 
-		Chunk(int chunkIndex) {
+		Chunk(int chunkIndex, int offset) {
 			theChunkIndex = chunkIndex;
-			theData = createChunk(theChunkSize);
+			theData = createChunk(theStreamInfo.chunkSize);
+			theOffset = offset;
 		}
 
 		void getMore() throws IOException {
-			if (theLength == theChunkSize)
+			if (theLength == theStreamInfo.chunkSize)
 				throw new IllegalStateException("No more data to get for this chunk");
 			int nextLen = getNextData(theData, theLength);
 			while (nextLen == 0) {
@@ -42,14 +45,18 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 				}
 			}
 			if (nextLen < 0) {
+				theStreamInfo.isFullyDiscovered = true;
 				isLast = true;
 				return;
 			}
-			if (nextLen < theChunkSize - theLength)
+			theStreamInfo.theDiscoveredLength += nextLen;
+			if (nextLen < theStreamInfo.chunkSize - theLength) {
+				theStreamInfo.isFullyDiscovered = true;
 				isLast = true;
+			}
 			theLength += nextLen;
-			if (theLength == theChunkSize)
-				theNextChunk = new Chunk(theChunkIndex + 1);
+			if (theLength == theStreamInfo.chunkSize)
+				theNextChunk = new Chunk(theChunkIndex + 1, theOffset + theStreamInfo.chunkSize);
 		}
 
 		/** @return The amount of data populated into this chunk */
@@ -66,30 +73,37 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 		public C getData() {
 			return theData;
 		}
+
+		public int getOffset() {
+			return theOffset;
+		}
 	}
 
-	private final BranchableStream<D, C> theRoot;
-
-	private final int theChunkSize;
+	private final StreamInfo<D, C> theStreamInfo;
 
 	private Chunk theChunk;
 
 	/** This stream's position within the current chunk */
-	private int thePosition;
+	private int theChunkPosition;
+	private int theAbsolutePosition;
 
 	/** @param chunkSize The chunk size for this stream's cache */
 	protected BranchableStream(int chunkSize) {
 		if (chunkSize <= 0)
 			throw new IllegalArgumentException("Positive chunk size expected, not " + chunkSize);
-		theRoot = this;
-		theChunkSize = chunkSize;
-		theChunk = new Chunk(0);
-		thePosition = 0;
+		theStreamInfo = new StreamInfo<>(chunkSize, this);
+		theChunk = new Chunk(0, 0);
+		theChunkPosition = 0;
+	}
+
+	private void setPosition(int chunkPosition) {
+		theChunkPosition = chunkPosition;
+		theAbsolutePosition = theChunk.theOffset + theChunkPosition;
 	}
 
 	/** @return The current position in this stream */
 	public int getPosition() {
-		return theChunk.theChunkIndex * theChunkSize + thePosition;
+		return theAbsolutePosition;
 	}
 
 	@Override
@@ -105,14 +119,7 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 
 	/** @return The amount of data that is available to this stream without further queries to the data source */
 	public int getDiscoveredLength() {
-		Chunk chunk = theChunk;
-		int length = 0;
-		while (chunk != null) {
-			length += chunk.length();
-			chunk = chunk.theNextChunk;
-		}
-		length -= thePosition;
-		return length;
+		return theStreamInfo.theDiscoveredLength - getPosition();
 	}
 
 	/**
@@ -132,16 +139,18 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 	public int discoverTo(int length) throws IOException {
 		if (length < 0)
 			throw new IndexOutOfBoundsException("" + length);
-		if (isFullyDiscovered()) {
+		else if (getDiscoveredLength() >= length)
+			return length;
+		else if (isFullyDiscovered()) {
 			int realLength = getDiscoveredLength();
 			if (realLength > length)
 				realLength = length;
 			return realLength;
 		}
 		Chunk chunk = theChunk;
-		int realLength = -thePosition;
+		int realLength = -theChunkPosition;
 		while (length >= realLength + chunk.length()) {
-			if (chunk.length() == theChunkSize) {
+			if (chunk.length() == theStreamInfo.chunkSize) {
 				realLength += chunk.length();
 				chunk = chunk.getNext();
 			} else if (chunk.isLast)
@@ -149,7 +158,7 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 			else
 				chunk.getMore();
 		}
-		return realLength + chunk.length() - thePosition;
+		return realLength + chunk.length() - theChunkPosition;
 	}
 
 	/**
@@ -182,22 +191,37 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 		if (isFullyDiscovered() && spaces == getDiscoveredLength()) {
 			// doOn will throw an out of bounds exception here, but this is acceptable--makes this stream zero-length
 			while (theChunk.getNext() != null) {
-				int newEnd = thePosition + spaces;
+				int newEnd = theChunkPosition + spaces;
 				if (newEnd > theChunk.length())
 					newEnd = theChunk.length();
 				theChunk = theChunk.getNext();
-				advancedPast(theChunk.getData(), thePosition, newEnd);
+				advancedPast(theChunk.getData(), theChunkPosition, newEnd);
 			}
-			thePosition = theChunk.length();
+			setPosition(theChunk.length());
 		} else {
-			doOn(spaces, (chunk, idx) -> {
-				theChunk = chunk;
-				thePosition = idx;
-				return null;
-			}, (chunk, start, end) -> {
-				advancedPast(chunk, start, end);
-				return null;
-			});
+			Chunk chunk = theChunk;
+			int length = -theChunkPosition;
+			boolean firstChunk = true;
+			while (chunk != null && spaces >= length + chunk.length()) {
+				if (chunk.length() == theStreamInfo.chunkSize) {
+					length += chunk.length();
+					int start = firstChunk ? theChunkPosition : 0;
+					advancedPast(chunk.getData(), start, chunk.length());
+					chunk = chunk.getNext();
+					firstChunk = false;
+				} else if (chunk.isLast)
+					throw new IndexOutOfBoundsException(spaces + " of " + (length + chunk.length()));
+				else
+					chunk.getMore();
+			}
+			if (chunk == null)
+				throw new IndexOutOfBoundsException(spaces + " of " + length);
+			int targetPos = spaces - length;
+			int start = firstChunk ? theChunkPosition : 0;
+			if (start != targetPos)
+				advancedPast(chunk.getData(), start, targetPos);
+			theChunk = chunk;
+			setPosition(spaces - length);
 		}
 	}
 
@@ -210,6 +234,25 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 	 * @param end The end position +1 of the data being passed
 	 */
 	protected void advancedPast(C chunk, int start, int end) {}
+
+	protected Chunk getChunkAt(int index) throws IOException {
+		if (index < 0)
+			throw new IndexOutOfBoundsException("" + index);
+		Chunk chunk = theChunk;
+		int length = -theChunkPosition;
+		while (chunk != null && index >= length + chunk.length()) {
+			if (chunk.length() == theStreamInfo.chunkSize) {
+				length += chunk.length();
+				chunk = chunk.getNext();
+			} else if (chunk.isLast)
+				throw new IndexOutOfBoundsException(index + " of " + (length + chunk.length()));
+			else
+				chunk.getMore();
+		}
+		if (chunk == null)
+			throw new IndexOutOfBoundsException(index + " of " + length);
+		return chunk;
+	}
 
 	/**
 	 * Performs some operation on a data point
@@ -226,13 +269,13 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 		if (index < 0)
 			throw new IndexOutOfBoundsException("" + index);
 		Chunk chunk = theChunk;
-		int length = -thePosition;
+		int length = -theChunkPosition;
 		boolean firstChunk = true;
 		while (chunk != null && index >= length + chunk.length()) {
-			if (chunk.length() == theChunkSize) {
+			if (chunk.length() == theStreamInfo.chunkSize) {
 				length += chunk.length();
 				if (skip != null) {
-					int start = firstChunk ? thePosition : 0;
+					int start = firstChunk ? theChunkPosition : 0;
 					skip.apply(chunk.getData(), start, chunk.length());
 				}
 				chunk = chunk.getNext();
@@ -246,7 +289,7 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 			throw new IndexOutOfBoundsException(index + " of " + length);
 		int targetPos = index - length;
 		if (skip != null) {
-			int start = firstChunk ? thePosition : 0;
+			int start = firstChunk ? theChunkPosition : 0;
 			if (start != targetPos)
 				skip.apply(chunk.getData(), start, targetPos);
 		}
@@ -255,10 +298,7 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 
 	/** @return Whether this stream has discovered all its available content or not */
 	public boolean isFullyDiscovered() {
-		Chunk c = theChunk;
-		while (!c.isLast && c.theNextChunk != null)
-			c = c.theNextChunk;
-		return c.isLast;
+		return theStreamInfo.isFullyDiscovered;
 	}
 
 	/**
@@ -324,8 +364,8 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 	public StringBuilder printContent(int start, int end, StringBuilder printTo) {
 		if (printTo == null)
 			printTo = new StringBuilder(Math.min(end - start, getDiscoveredLength()));
-		int chunkStart = thePosition + start;
-		int chunkEnd = thePosition + end;
+		int chunkStart = theChunkPosition + start;
+		int chunkEnd = theChunkPosition + end;
 		Chunk chunk = theChunk;
 		while (chunk != null && chunkStart < chunkEnd) {
 			printChunk(chunk.getData(), chunkStart, Math.min(chunkEnd, chunk.length()), printTo);
@@ -337,11 +377,11 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 
 	@Override
 	public String toString() {
-		StringBuilder str = theRoot.printContent(0, theChunk.theChunkIndex * theChunkSize + thePosition, null);
+		StringBuilder str = theStreamInfo.root.printContent(0, theChunk.theChunkIndex * theStreamInfo.chunkSize + theChunkPosition, null);
 		Chunk chunk = theChunk;
 		str.append('\u2021'); // Double-dagger for the position
-		if (thePosition != chunk.length())
-			printChunk(chunk.getData(), thePosition, chunk.length(), str);
+		if (theChunkPosition != chunk.length())
+			printChunk(chunk.getData(), theChunkPosition, chunk.length(), str);
 		while (!chunk.isLast && chunk.getNext() != null) {
 			chunk = chunk.getNext();
 			printChunk(chunk.getData(), 0, chunk.length(), str);

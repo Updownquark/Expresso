@@ -4,9 +4,9 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.expresso.stream.BranchableStream;
+import org.expresso.util.ExpressoUtils;
 import org.expresso3.Expression;
 import org.expresso3.ExpressionType;
-import org.qommons.BiTuple;
 
 /**
  * An expression composed of one or more repetitions of another sequence of expressions
@@ -31,7 +31,7 @@ public class RepeatExpressionType<S extends BranchableStream<?, ?>> extends Abst
 		theMinCount = min;
 		theMaxCount = max;
 		theSequence = new SequenceExpressionType<>(-1, components);
-		((InfiniteSequenceRepeater<SequenceExpressionType<S>>) getSequence()).theValue = theSequence;
+		((InfiniteSequenceRepeater<SequenceExpressionType<S>>) getComponents()).theValue = theSequence;
 	}
 
 	/** @return The minimum repetition count for the sequence needed to satisfy this expression */
@@ -60,18 +60,33 @@ public class RepeatExpressionType<S extends BranchableStream<?, ?>> extends Abst
 	}
 
 	@Override
-	protected BiTuple<String, Integer> getErrorForComponents(List<? extends Expression<? extends S>> components) {
-		if (components.size() < theMinCount)
-			return new BiTuple<>(
-				"At least " + theMinCount + " " + theSequence + (theMinCount > 1 ? "s" : "") + " expected, but found " + components.size(),
-				theSequence.getSpecificity() * (theMinCount - components.size()));
-		else if (components.size() > theMaxCount) {
+	protected CompositionError getErrorForComponents(List<? extends Expression<? extends S>> components) {
+		if (components.size() < theMinCount) {
+			// TrackNode r1Node = TRACKER.start("repeat1");
+			// TrackNode posNode = TRACKER.start("length");
+			int pos = ExpressoUtils.getLength(0, components);
+			// posNode.end();
+			int weight = theSequence.getSpecificity() * (theMinCount - components.size());
+			// r1Node.end();
+			return new CompositionError(pos, () -> {
+				return new StringBuilder("At least ").append(theMinCount).append(' ').append(theSequence).append(theMinCount > 1 ? "s" : "")
+					.append(" expected, but found ").append(components.size()).toString();
+			}, weight);
+		} else if (components.size() > theMaxCount) {
+			// TrackNode r2Node = TRACKER.start("repeat2");
 			int weight = 0;
+			// TrackNode posNode = TRACKER.start("length");
+			int pos = theMaxCount == 0 ? 0 : ExpressoUtils.getEnd(components.get(theMaxCount - 1));
+			// posNode.end();
 			for (int i = theMaxCount; i < components.size(); i++)
 				weight += Math.abs(components.get(i).getMatchQuality());
+
 			// For more matches than allowed, the extra matches count against the match's quality
-			return new BiTuple<>("No more than " + theMaxCount + " " + theSequence + (theMaxCount > 1 ? "s" : "") + " expected, but found "
-				+ components.size(), weight * 2);
+			// r2Node.end();
+			return new CompositionError(pos, () -> {
+				return new StringBuilder("No more than ").append(theMaxCount).append(' ').append(theSequence)
+					.append(theMaxCount > 1 ? "s" : "").append(" expected, but found ").append(components.size()).toString();
+			}, weight * 2);
 		}
 		return null;
 	}
@@ -95,30 +110,24 @@ public class RepeatExpressionType<S extends BranchableStream<?, ?>> extends Abst
 
 		@Override
 		public Iterator<E> iterator() {
-			return new InifiniteRepeatingIterator<>(theValue);
+			return new ISIterator();
 		}
 
 		@Override
 		public String toString() {
 			return theValue + "*";
 		}
-	}
 
-	private static class InifiniteRepeatingIterator<E> implements Iterator<E> {
-		private final E theValue;
+		private class ISIterator implements Iterator<E> {
+			@Override
+			public boolean hasNext() {
+				return true;
+			}
 
-		InifiniteRepeatingIterator(E value) {
-			theValue = value;
-		}
-
-		@Override
-		public boolean hasNext() {
-			return true;
-		}
-
-		@Override
-		public E next() {
-			return theValue;
+			@Override
+			public E next() {
+				return theValue;
+			}
 		}
 	}
 }

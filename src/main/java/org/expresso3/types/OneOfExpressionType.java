@@ -2,6 +2,7 @@ package org.expresso3.types;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
@@ -51,6 +52,7 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 	}
 
 	/** @return The components, any of which may satisfy this expression for a stream */
+	@Override
 	public BetterList<? extends ExpressionType<? super S>> getComponents() {
 		return theComponents;
 	}
@@ -59,15 +61,22 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
 		boolean[] recursive = new boolean[1];
 		ExpressoParser<S2> stopRecurse = parser.useCache(this, null, () -> recursive[0] = true);
-		PersistentStack<ElementId> recursiveComponents = null;
+		PersistentStack<List<ElementId>> recursiveComponents = null;
+		List<ElementId> adjRecComps = new LinkedList<>();
 		for (CollectionElement<? extends ExpressionType<? super S>> component : theComponents.elements()) {
-			Expression<S2> possibility = stopRecurse.parseWith(component.get());
+			Expression<S2> possibility = stopRecurse.parseWith(//
+				component.get());
 			if (recursive[0]) {
 				recursive[0] = false;
-				recursiveComponents = new PersistentStack<>(recursiveComponents, component.getElementId());
+				adjRecComps.add(component.getElementId());
 			}
-			if (possibility != null)
-				return new OneOfPossibility<>(this, parser, possibility, component.getElementId(), recursiveComponents);
+			if (possibility != null) {
+				if (!adjRecComps.isEmpty()) {
+					recursiveComponents = new PersistentStack<>(recursiveComponents, adjRecComps);
+					adjRecComps = new LinkedList<>();
+				}
+				return new OneOfPossibility<>(this, parser.getStream(), possibility, component.getElementId(), recursiveComponents);
+			}
 		}
 		return null;
 	}
@@ -97,15 +106,15 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 
 	private static class OneOfPossibility<S extends BranchableStream<?, ?>> implements Expression<S> {
 		private final OneOfExpressionType<? super S> theType;
-		private final ExpressoParser<S> theParser;
+		private final S theStream;
 		private final Expression<S> theComponent;
 		private final ElementId theComponentId;
-		private final PersistentStack<ElementId> theRecursiveComponents;
+		private final PersistentStack<List<ElementId>> theRecursiveComponents;
 
-		OneOfPossibility(OneOfExpressionType<? super S> type, ExpressoParser<S> parser, Expression<S> component, ElementId componentId,
-			PersistentStack<ElementId> recursiveComponents) {
+		OneOfPossibility(OneOfExpressionType<? super S> type, S stream, Expression<S> component, ElementId componentId,
+			PersistentStack<List<ElementId>> recursiveComponents) {
 			theType = type;
-			theParser = parser;
+			theStream = stream;
 			theComponent = component;
 			theComponentId = componentId;
 			theRecursiveComponents = recursiveComponents;
@@ -118,7 +127,7 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 
 		@Override
 		public S getStream() {
-			return theParser.getStream();
+			return theStream;
 		}
 
 		@Override
@@ -132,48 +141,66 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 		}
 
 		@Override
-		public Expression<S> nextMatch() throws IOException {
+		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
 			final Expression<S>[] next = new Expression[1];
 			boolean[] recursive = new boolean[1];
-			ExpressoParser<S> stopRecurse = theParser.useCache(theType, this, () -> recursive[0] = true);
 			// First, try to use a higher-priority recursive component with this expression as the recursive result
-			IOException[] ex = new IOException[1];
-			if (theRecursiveComponents != null && theRecursiveComponents.searchStacks(stack -> {
-				ExpressionType<? super S> component = theType.getComponents().getElement(stack.get()).get();
-				try {
-					next[0] = stopRecurse.parseWith(component);
-				} catch (IOException e) {
-					ex[0] = e;
-					return true;
-				}
-				if (recursive[0] && next[0] != null) {
-					next[0] = new OneOfPossibility<>(theType, theParser, next[0], theComponentId, stack);
-					return true;
-				} else
+			if (theRecursiveComponents != null) {
+				ExpressoParser<S> stopRecurse = parser.useCache(theType, this, () -> recursive[0] = true);
+				IOException[] ex = new IOException[1];
+				if (theRecursiveComponents.searchStacks(stack -> {
+					List<ElementId> adjRecComps = new LinkedList<>();
+					for (ElementId compId : stack.get()) {
+						ExpressionType<? super S> component = theType.getComponents().getElement(compId).get();
+						try {
+							next[0] = stopRecurse.parseWith(component);
+						} catch (IOException e) {
+							ex[0] = e;
+							return true;
+						}
+						if (recursive[0] && next[0] != null) {
+							if (compId.equals(theComponentId) && theComponent.equals(next[0]))
+								next[0] = null;
+							else {
+								next[0] = new OneOfPossibility<>(theType, parser.getStream(), next[0], compId,
+									adjRecComps.isEmpty() ? stack.getParent() : new PersistentStack<>(stack.getParent(), adjRecComps));
+								return true;
+							}
+						} else if (recursive[0])
+							adjRecComps.add(compId);
+					}
 					return false;
-			})) {
-				if (ex[0] != null)
-					throw ex[0];
-				return next[0];
+				})) {
+					if (ex[0] != null)
+						throw ex[0];
+					return next[0];
+				}
 			}
 			// Next, try to branch the component itself
-			next[0] = theComponent.nextMatch();
+			ExpressoParser<S> stopRecurse = parser.useCache(theType, null, () -> recursive[0] = true);
+			next[0] = stopRecurse.nextMatch(theComponent);
 			if (next[0] != null)
-				return new OneOfPossibility<>(theType, theParser, next[0], theComponentId, theRecursiveComponents);
+				return new OneOfPossibility<>(theType, parser.getStream(), next[0], theComponentId, theRecursiveComponents);
 			// Last, see if there are other options in the one-of
 			CollectionElement<? extends ExpressionType<? super S>> nextComponent = theType.getComponents()
 				.getAdjacentElement(theComponentId, true);
 			if (nextComponent != null) {
-				PersistentStack<ElementId> recursiveComponents = null;
+				PersistentStack<List<ElementId>> recursiveComponents = theRecursiveComponents;
+				List<ElementId> adjRecComps = new LinkedList<>();
 				while (nextComponent != null) {
 					next[0] = stopRecurse.parseWith(nextComponent.get());
 					if (recursive[0]) {
 						recursive[0] = false;
-						recursiveComponents = new PersistentStack<>(recursiveComponents, nextComponent.getElementId());
+						adjRecComps.add(nextComponent.getElementId());
 					}
-					if (next[0] != null)
-						return new OneOfPossibility<>(theType, theParser, next[0], nextComponent.getElementId(), recursiveComponents);
-					nextComponent = theType.getComponents().getAdjacentElement(theComponentId, true);
+					if (next[0] != null) {
+						if (!adjRecComps.isEmpty()) {
+							recursiveComponents = new PersistentStack<>(recursiveComponents, adjRecComps);
+						}
+						return new OneOfPossibility<>(theType, parser.getStream(), next[0], nextComponent.getElementId(),
+							recursiveComponents);
+					}
+					nextComponent = theType.getComponents().getAdjacentElement(nextComponent.getElementId(), true);
 				}
 			}
 			return null;
@@ -197,11 +224,6 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 		@Override
 		public String getLocalErrorMessage() {
 			return null;
-		}
-
-		@Override
-		public int getComplexity() {
-			return theComponent.getComplexity() + 1;
 		}
 
 		@Override
@@ -238,7 +260,7 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 			if (length() == 0)
 				str.append("(empty)");
 			else
-				str.append(": ").append(printContent());
+				str.append(": ").append(printContent(true));
 			str.append('\n');
 			theComponent.print(str, indent + 1, "");
 			return str;
