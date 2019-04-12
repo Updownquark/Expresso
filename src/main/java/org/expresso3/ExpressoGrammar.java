@@ -62,6 +62,9 @@ public class ExpressoGrammar<S extends BranchableStream<?, ?>> {
 	 * 
 	 * @param stream The stream to parse
 	 * @param type The type (in this grammar) to parse from
+	 * @param minQuality The minimum quality to expect from the resulting match. 0 is a perfect match, less is worse. Worse matches take
+	 *        longer to parse, so a smaller (negative) value here will terminate parsing earlier (returning either null or the best match
+	 *        encountered so far, which may not represent the entire stream's content).
 	 * @return The parsed expression
 	 * @throws IOException If an error occurs parsing the stream
 	 */

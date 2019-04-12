@@ -29,20 +29,20 @@ public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends Abst
 	}
 
 	@Override
+	public int getEmptyQuality(int minQuality) {
+		return theTerminal.getEmptyQuality(minQuality);
+	}
+
+	@Override
 	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
 		ExpressoParser<S2> branched = parser;
 		while (branched != null) {
 			Expression<S2> terminal = parser.parseWith(theTerminal);
 			if (terminal != null)
-				return new LeadUpPossibility<>(this, parser.getStream(), theTerminal, terminal);
+				return new LeadUpPossibility<>(this, parser, theTerminal, terminal);
 			branched = branched.advance(1);
 		}
 		return null;
-	}
-
-	@Override
-	public int getSpecificity() {
-		return theTerminal.getSpecificity();
 	}
 
 	@Override
@@ -59,9 +59,9 @@ public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends Abst
 		private final ExpressionType<? super S> theTerminal;
 		private final Expression<S> theTerminalPossibility;
 
-		LeadUpPossibility(LeadUpExpressionType<? super S> type, S stream, ExpressionType<? super S> terminal,
+		LeadUpPossibility(LeadUpExpressionType<? super S> type, ExpressoParser<S> parser, ExpressionType<? super S> terminal,
 			Expression<S> terminalPossibility) {
-			super(type, stream, Arrays.asList(terminalPossibility));
+			super(type, parser, Arrays.asList(terminalPossibility));
 			theTerminal = terminal;
 			theTerminalPossibility = terminalPossibility;
 		}
@@ -73,9 +73,11 @@ public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends Abst
 
 		@Override
 		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+			if (theTerminalPossibility.isInvariant())
+				return null;
 			Expression<S> next = parser.nextMatch(theTerminalPossibility);
 			if (next != null)
-				return new LeadUpPossibility<>(getType(), parser.getStream(), theTerminal, next);
+				return new LeadUpPossibility<>(getType(), parser, theTerminal, next);
 			return null;
 		}
 	}

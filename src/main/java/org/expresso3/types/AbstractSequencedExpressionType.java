@@ -11,6 +11,7 @@ import org.expresso.util.ExpressoUtils;
 import org.expresso3.Expression;
 import org.expresso3.ExpressionType;
 import org.expresso3.ExpressoParser;
+import org.qommons.IntList;
 
 /**
  * An expression that must be satisfied by one or more specific expressions in order
@@ -21,6 +22,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 	private final Iterable<? extends ExpressionType<? super S>> theSequence;
 	private Iterator<? extends ExpressionType<? super S>> theSequenceIterator;
 	private final List<ExpressionType<? super S>> theSequenceCache;
+	private IntList theEmptyQuality;
 
 	/**
 	 * @param id The cache ID for the sequence
@@ -44,6 +46,27 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		return theSequence;
 	}
 
+	@Override
+	public int getEmptyQuality(int minQuality) {
+		if (theEmptyQuality == null)
+			theEmptyQuality = new IntList();
+		int eqIndex = -minQuality;
+		while (theEmptyQuality.size() <= eqIndex)
+			theEmptyQuality.add(1);
+		if (theEmptyQuality.get(eqIndex) > 0) {
+			theEmptyQuality.set(eqIndex, 0); // To prevent infinite recursion
+			int quality = minQuality;
+			for (ExpressionType<?> component : theSequence) {
+				int childQuality = component.getEmptyQuality(quality);
+				quality += childQuality;
+				if (quality < minQuality)
+					break;
+			}
+			theEmptyQuality.set(eqIndex, quality);
+		}
+		return theEmptyQuality.get(eqIndex);
+	}
+
 	/**
 	 * @param componentCount The number of components matched
 	 * @return Whether the given number of components is enough to completely satisfy this sequence
@@ -55,7 +78,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 	 * @return null if The given component count is fine for this expression type. Otherwise, a tuple containing an error message and error
 	 *         weight to apply (negatively) to the match's {@link Expression#getMatchQuality() quality}.
 	 */
-	protected abstract CompositionError getErrorForComponents(List<? extends Expression<? extends S>> components);
+	protected abstract CompositionError getErrorForComponents(List<? extends Expression<? extends S>> components, int minQuality);
 
 	@Override
 	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
@@ -117,6 +140,8 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 						return null; // All possibilities exhausted
 					// Try a different branch of a previous element in the sequence
 					Expression<S2> last = repetitions.removeLast();
+					if (last.isInvariant())
+						return null; // Can't back up any farther
 					int lastPos = ExpressoUtils.getLength(parser.getStream().getPosition(), repetitions);
 					childQuality -= last.getMatchQuality();
 					branched = parser.advance(lastPos);
@@ -164,7 +189,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		// TrackNode bisNode = TRACKER.start("buildIfSatisfactory");
 		try {
 			// TrackNode efcNode = TRACKER.start("errorForComponents");
-			CompositionError error = getErrorForComponents(repetitions);
+			CompositionError error = getErrorForComponents(repetitions, parser.getQualityLevel());
 			// efcNode.end();
 			int quality = error == null ? 0 : -error.errorWeight;
 			int threshold = parser.getQualityLevel();
@@ -174,7 +199,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 			if (quality < threshold)
 				return null;
 			// TrackNode createNode = TRACKER.start("create");
-			SequencePossibility<S2> seq = new SequencePossibility<>(this, parser.getStream(), repetitions);
+			SequencePossibility<S2> seq = new SequencePossibility<>(this, parser, repetitions);
 			// createNode.end();
 			if (seq.getMatchQuality() >= parser.getQualityLevel())
 				return seq;
@@ -186,8 +211,8 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 	}
 
 	private static class SequencePossibility<S extends BranchableStream<?, ?>> extends ComposedExpression<S> {
-		SequencePossibility(AbstractSequencedExpressionType<? super S> type, S stream, List<Expression<S>> repetitions) {
-			super(type, stream, repetitions);
+		SequencePossibility(AbstractSequencedExpressionType<? super S> type, ExpressoParser<S> parser, List<Expression<S>> repetitions) {
+			super(type, parser, repetitions);
 		}
 
 		@Override
@@ -196,8 +221,8 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		}
 
 		@Override
-		protected CompositionError getSelfError() {
-			return getType().getErrorForComponents(getChildren());
+		protected CompositionError getSelfError(ExpressoParser<S> parser) {
+			return getType().getErrorForComponents(getChildren(), parser.getQualityLevel());
 		}
 
 		@Override

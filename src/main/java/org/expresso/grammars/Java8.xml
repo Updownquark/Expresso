@@ -335,8 +335,6 @@
 		<one-of>
 			<literal>void</literal>
 			<literal>boolean</literal>
-			<literal>true</literal>
-			<literal>false</literal>
 			<literal>char</literal>
 			<literal>byte</literal>
 			<literal>short</literal>
@@ -645,20 +643,13 @@
 			</repeat>
 		</option>
 	</expression>
-	<expression name="constructor" class="statement-content,result-producer"> <!-- Invocation, not declaration -->
-		<literal>new</literal>
-		<repeat min="1">
-			<ignorable />
-		</repeat>
-		<type field="type" />
+	<!-- Non-initially-recursive operators -->
+	<expression name="parenthetic" priority="500" class="result-producer">
 		<literal>(</literal>
-		<argument-list field="arguments" />
+		<result-producer field="content" />
 		<literal>)</literal>
-		<option>
-			<block field="anonymous-body" />
-		</option>
 	</expression>
-	<expression name="lambda" class="result-producer">
+	<expression name="lambda" priority="500" class="result-producer">
 		<one-of>
 			<identifier field="parameter-name" />
 			<sequence>
@@ -692,7 +683,20 @@
 			<result-producer field="value" />
 		</one-of>
 	</expression>
-	<expression name="array-initializer" class="result-producer">
+	<expression name="constructor" priority="500" class="statement-content,result-producer"> <!-- Invocation, not declaration -->
+		<literal>new</literal>
+		<repeat min="1">
+			<ignorable />
+		</repeat>
+		<type field="type" />
+		<literal>(</literal>
+		<argument-list field="arguments" />
+		<literal>)</literal>
+		<option>
+			<block field="anonymous-body" />
+		</option>
+	</expression>
+	<expression name="array-initializer" priority="500" class="result-producer">
 		<literal>new</literal>
 		<repeat min="1">
 			<ignorable />
@@ -708,6 +712,185 @@
 			<argument-list field="elements" />
 			<literal>}</literal>
 		</option>
+	</expression>
+	<expression name="function-invocation" priority="400" class="statement-content,result-producer">
+		<identifier field="name" />
+		<literal field="method">(</literal>
+		<argument-list field="arguments" />
+		<literal>)</literal>
+	</expression>
+	<!-- Initially-recursive operators -->
+	<expression name="array-element" priority="250" class="binary,assignable,result-producer">
+		<result-producer field="array" />
+		<literal field="open-bracket">[</literal>
+		<result-producer field="index" />
+		<literal>]</literal>
+	</expression>
+	<expression name="field-ref" priority="250" class="assignable,result-producer">
+		<one-of field="target">
+			<result-producer field="value" />
+			<concrete-type field="type" />
+		</one-of>
+		<literal>.</literal>
+		<identifier field="name" />
+	</expression>
+	<expression name="method" priority="250" class="statement-content,result-producer">
+		<one-of field="target">
+			<result-producer field="value" />
+			<concrete-type field="type" />
+		</one-of>
+		<literal>.</literal>
+		<function-invocation field="method" />
+	</expression>
+	<expression name="resolution" priority="240" class="result-producer">
+		<result-producer field="target" />
+		<literal>::</literal>
+		<identifier field="name" />
+	</expression>
+	<expression name="post-increment" priority="230" class="unary,assignment,result-producer">
+		<result-producer field="operand" />
+		<literal field="name">++</literal>
+	</expression>
+	<expression name="post-decrement" priority="230" class="unary,assignment,result-producer">
+		<result-producer field="operand" />
+		<literal field="name">--</literal>
+	</expression>
+	<expression name="pre-increment" priority="220" class="unary,assignment,result-producer">
+		<literal field="name">++</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="pre-decrement" priority="220" class="unary,assignment,result-producer">
+		<literal field="name">--</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="posit" priority="220" class="unary,result-producer">
+		<literal field="name">+</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="negate" priority="220" class="unary,result-producer">
+		<literal field="name">-</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="not" priority="220" class="unary,result-producer">
+		<literal field="name">!</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="bitwise-not" priority="220" class="unary,result-producer">
+		<literal field="name">~</literal>
+		<result-producer field="operand" />
+	</expression>
+	<expression name="cast" priority="220" class="binary,result-producer">
+		<literal>(</literal>
+		<type field="type" />
+		<literal>)</literal>
+		<result-producer field="value" />
+	</expression>
+	<expression name="multiply" priority="210" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">*</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="divide" priority="210" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">/</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="modulo" priority="210" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">%</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="add" priority="200" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">+</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="subtract" priority="200" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">-</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="left-shift" priority="190" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">&lt;&lt;</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="right-shift" priority="190" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">&gt;&gt;</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="unsigned-right-shift" priority="190" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">&gt;&gt;&gt;</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="instanceof" priority="180" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">instanceof</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="less-equal" priority="180" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">&lt;=</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="less" priority="180" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">&lt;</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="greater-equal" priority="180" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">&gt;=</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="greater" priority="180" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">&gt;</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="equal" priority="170" class="logical,binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">==</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="not-equal" priority="170" class="logical,binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">!=</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="and1" priority="160" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">&amp;</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="xor" priority="150" class="logical,binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">^</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="or1" priority="140" class="binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">|</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="and2" priority="130" class="logical,binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">&amp;&amp;</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="or2" priority="120" class="logical,binary,result-producer">
+		<result-producer field="left" />
+		<literal field="name">||</literal>
+		<result-producer field="right" />
+	</expression>
+	<expression name="conditional" priority="110" class="ternary,result-producer">
+		<result-producer field="condition" />
+		<literal>?</literal>
+		<result-producer field="affirmative" />
+		<literal>:</literal>
+		<result-producer field="negative" />
 	</expression>
 	<expression name="assign" priority="100" class="assignment,binary,result-producer">
 		<assignable field="variable" />
@@ -768,188 +951,5 @@
 		<assignable field="variable" />
 		<literal field="name">&gt;&gt;&gt;=</literal>
 		<result-producer field="operand" />
-	</expression>
-	<expression name="conditional" priority="110" class="ternary,result-producer">
-		<result-producer field="condition" />
-		<literal>?</literal>
-		<result-producer field="affirmative" />
-		<literal>:</literal>
-		<result-producer field="negative" />
-	</expression>
-	<expression name="or2" priority="120" class="logical,binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">||</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="and2" priority="130" class="logical,binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">&amp;&amp;</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="or1" priority="140" class="binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">|</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="xor" priority="150" class="logical,binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">^</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="and1" priority="160" class="binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">&amp;</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="equal" priority="170" class="logical,binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">==</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="not-equal" priority="170" class="logical,binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">!=</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="instanceof" priority="180" class="binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">instanceof</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="less-equal" priority="180" class="binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">&lt;=</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="less" priority="180" class="binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">&lt;</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="greater-equal" priority="180" class="binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">&gt;=</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="greater" priority="180" class="binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">&gt;</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="left-shift" priority="190" class="binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">&lt;&lt;</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="right-shift" priority="190" class="binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">&gt;&gt;</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="unsigned-right-shift" priority="190" class="binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">&gt;&gt;&gt;</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="add" priority="200" class="binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">+</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="subtract" priority="200" class="binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">-</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="multiply" priority="210" class="binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">*</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="divide" priority="210" class="binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">/</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="modulo" priority="210" class="binary,result-producer">
-		<result-producer field="left" />
-		<literal field="name">%</literal>
-		<result-producer field="right" />
-	</expression>
-	<expression name="posit" priority="220" class="unary,result-producer">
-		<literal field="name">+</literal>
-		<result-producer field="operand" />
-	</expression>
-	<expression name="negate" priority="220" class="unary,result-producer">
-		<literal field="name">-</literal>
-		<result-producer field="operand" />
-	</expression>
-	<expression name="not" priority="220" class="unary,result-producer">
-		<literal field="name">!</literal>
-		<result-producer field="operand" />
-	</expression>
-	<expression name="bitwise-not" priority="220" class="unary,result-producer">
-		<literal field="name">~</literal>
-		<result-producer field="operand" />
-	</expression>
-	<expression name="pre-increment" priority="220" class="unary,assignment,result-producer">
-		<literal field="name">++</literal>
-		<result-producer field="operand" />
-	</expression>
-	<expression name="pre-decrement" priority="220" class="unary,assignment,result-producer">
-		<literal field="name">--</literal>
-		<result-producer field="operand" />
-	</expression>
-	<expression name="post-increment" priority="230" class="unary,assignment,result-producer">
-		<result-producer field="operand" />
-		<literal field="name">++</literal>
-	</expression>
-	<expression name="post-decrement" priority="230" class="unary,assignment,result-producer">
-		<result-producer field="operand" />
-		<literal field="name">--</literal>
-	</expression>
-	<expression name="cast" priority="220" class="binary,result-producer">
-		<literal>(</literal>
-		<type field="type" />
-		<literal>)</literal>
-		<result-producer field="value" />
-	</expression>
-	<expression name="parenthetic" priority="250" class="result-producer">
-		<literal>(</literal>
-		<result-producer field="content" />
-		<literal>)</literal>
-	</expression>
-	<expression name="array index" priority="250" class="binary,assignable,result-producer">
-		<result-producer field="array" />
-		<literal field="open-bracket">[</literal>
-		<result-producer field="index" />
-		<literal>]</literal>
-	</expression>
-	<expression name="function-invocation" priority="250" class="statement-content,result-producer">
-		<identifier field="name" />
-		<literal field="method">(</literal>
-		<argument-list field="arguments" />
-		<literal>)</literal>
-	</expression>
-	<expression name="field-ref" priority="250" class="assignable,result-producer">
-		<one-of field="target">
-			<result-producer field="value" />
-			<concrete-type field="type" />
-		</one-of>
-		<literal>.</literal>
-		<identifier field="name" />
-	</expression>
-	<expression name="method" priority="251" class="statement-content,result-producer">
-		<one-of field="target">
-			<result-producer field="value" />
-			<concrete-type field="type" />
-		</one-of>
-		<literal>.</literal>
-		<function-invocation field="method" />
-	</expression>
-	<expression name="resolution" priority="240" class="result-producer">
-		<result-producer field="target" />
-		<literal>::</literal>
-		<identifier field="name" />
 	</expression>
 </expresso>

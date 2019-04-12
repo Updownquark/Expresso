@@ -29,7 +29,12 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 		Expression<S2> superPossibility = super.parse(parser);
 		if (superPossibility == null)
 			superPossibility = Expression.empty(parser.getStream(), this);
-		return new OptionalPossibility<>(this, parser.getStream(), superPossibility);
+		return new OptionalPossibility<>(this, parser, superPossibility);
+	}
+
+	@Override
+	public int getEmptyQuality(int minQuality) {
+		return 0;
 	}
 
 	@Override
@@ -40,8 +45,8 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 	private static class OptionalPossibility<S extends BranchableStream<?, ?>> extends ComposedExpression<S> {
 		private final Expression<S> theOption;
 
-		OptionalPossibility(OptionalExpressionType<? super S> type, S stream, Expression<S> option) {
-			super(type, stream, Arrays.asList(option));
+		OptionalPossibility(OptionalExpressionType<? super S> type, ExpressoParser<S> parser, Expression<S> option) {
+			super(type, parser, Arrays.asList(option));
 			theOption = option;
 		}
 
@@ -52,11 +57,13 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 
 		@Override
 		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+			if (theOption.isInvariant())
+				return null;
 			Expression<S> optionNext = parser.nextMatch(theOption);
 			if (optionNext != null)
-				return new OptionalPossibility<>(getType(), parser.getStream(), optionNext);
+				return new OptionalPossibility<>(getType(), parser, optionNext);
 			if (theOption.length() > 0)
-				new OptionalPossibility<>(getType(), parser.getStream(), Expression.empty(parser.getStream(), theOption.getType()));
+				new OptionalPossibility<>(getType(), parser, Expression.empty(parser.getStream(), theOption.getType()));
 			return null;
 		}
 

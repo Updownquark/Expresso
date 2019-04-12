@@ -34,6 +34,18 @@ public class RepeatExpressionType<S extends BranchableStream<?, ?>> extends Abst
 		((InfiniteSequenceRepeater<SequenceExpressionType<S>>) getComponents()).theValue = theSequence;
 	}
 
+	@Override
+	public int getEmptyQuality(int minQuality) {
+		if (theMinCount == 0)
+			return 0;
+		else {
+			int quality = minQuality;
+			for (int i = 0; i < theMinCount; i++)
+				quality += theSequence.getEmptyQuality(quality);
+			return quality;
+		}
+	}
+
 	/** @return The minimum repetition count for the sequence needed to satisfy this expression */
 	public int getMinCount() {
 		return theMinCount;
@@ -55,18 +67,14 @@ public class RepeatExpressionType<S extends BranchableStream<?, ?>> extends Abst
 	}
 
 	@Override
-	public int getSpecificity() {
-		return theMinCount * theSequence.getSpecificity();
-	}
-
-	@Override
-	protected CompositionError getErrorForComponents(List<? extends Expression<? extends S>> components) {
+	protected CompositionError getErrorForComponents(List<? extends Expression<? extends S>> components, int minQuality) {
 		if (components.size() < theMinCount) {
 			// TrackNode r1Node = TRACKER.start("repeat1");
 			// TrackNode posNode = TRACKER.start("length");
 			int pos = ExpressoUtils.getLength(0, components);
 			// posNode.end();
-			int weight = theSequence.getSpecificity() * (theMinCount - components.size());
+			int missing = theMinCount - components.size();
+			int weight = missing * -theSequence.getEmptyQuality(minQuality == 0 ? 0 : (minQuality / missing) - 1);
 			// r1Node.end();
 			return new CompositionError(pos, () -> {
 				return new StringBuilder("At least ").append(theMinCount).append(' ').append(theSequence).append(theMinCount > 1 ? "s" : "")

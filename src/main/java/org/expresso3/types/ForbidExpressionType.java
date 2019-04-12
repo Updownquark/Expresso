@@ -27,19 +27,19 @@ public class ForbidExpressionType<S extends BranchableStream<?, ?>> extends Abst
 	}
 
 	@Override
+	public int getEmptyQuality(int minQuality) {
+		return 0;
+	}
+
+	@Override
 	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
 		Expression<S2> forbidden = parser.parseWith(theForbidden);
 		if (forbidden == null)
 			return Expression.empty(parser.getStream(), this);
-		ForbiddenPossibility<S2> p = new ForbiddenPossibility<>(this, parser.getStream(), forbidden);
+		ForbiddenPossibility<S2> p = new ForbiddenPossibility<>(this, parser, forbidden);
 		if (p.getMatchQuality() >= parser.getQualityLevel())
 			return p;
 		return null;
-	}
-
-	@Override
-	public int getSpecificity() {
-		return 0;
 	}
 
 	@Override
@@ -55,8 +55,8 @@ public class ForbidExpressionType<S extends BranchableStream<?, ?>> extends Abst
 	private static class ForbiddenPossibility<S extends BranchableStream<?, ?>> extends ComposedExpression<S> {
 		private final Expression<S> theForbidden;
 
-		ForbiddenPossibility(ForbidExpressionType<? super S> type, S stream, Expression<S> forbidden) {
-			super(type, stream, Arrays.asList(forbidden));
+		ForbiddenPossibility(ForbidExpressionType<? super S> type, ExpressoParser<S> parser, Expression<S> forbidden) {
+			super(type, parser, Arrays.asList(forbidden));
 			theForbidden = forbidden;
 		}
 
@@ -67,17 +67,19 @@ public class ForbidExpressionType<S extends BranchableStream<?, ?>> extends Abst
 
 		@Override
 		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+			if (theForbidden.isInvariant())
+				return null;
 			Expression<S> fMatch = parser.nextMatch(theForbidden);
 			if (fMatch == null)
 				return null;
-			ForbiddenPossibility<S> next = new ForbiddenPossibility<>(getType(), parser.getStream(), fMatch);
+			ForbiddenPossibility<S> next = new ForbiddenPossibility<>(getType(), parser, fMatch);
 			if (next.getMatchQuality() >= parser.getQualityLevel())
 				return next;
 			return null;
 		}
 
 		@Override
-		protected CompositionError getSelfError() {
+		protected CompositionError getSelfError(ExpressoParser<S> parser) {
 			// theForbidden field is not initialized yet, need to use the children
 			Expression<S> forbidden = getChildren().get(0);
 			if (forbidden.getErrorCount() == 0)

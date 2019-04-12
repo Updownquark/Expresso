@@ -13,7 +13,10 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> {
 	/** @return The stream being parsed */
 	S getStream();
 
+	/** @return The minimum quality of matches parsed with this parser */
 	int getQualityLevel();
+
+	int getDepth();
 
 	/**
 	 * @param spaces The number of spaces to advance
@@ -28,13 +31,17 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> {
 	 */
 	ExpressoParser<S> exclude(int... expressionIds);
 
+	ExpressoParser<S> withState(ExpressionType<? super S> type, Object datum);
+
+	Object getState(ExpressionType<? super S> type);
+
 	/**
 	 * @param type The expression type to substitute cache for
 	 * @param result The possibility to return for the type
 	 * @return A parser for the same place in the stream that will always return the given possibility when parsing the given expression
 	 *         type
 	 */
-	ExpressoParser<S> useCache(ExpressionType<? super S> type, Expression<S> result, Runnable onHit);
+	// ExpressoParser<S> useCache(ExpressionType<? super S> type, Expression<S> result, Consumer<ExpressoParser<S>> onHit);
 
 	/**
 	 * @param type The expression type to parse with

@@ -8,6 +8,7 @@ import org.expresso.stream.BranchableStream;
 import org.expresso.util.ExpressoUtils;
 import org.expresso3.Expression;
 import org.expresso3.ExpressionType;
+import org.expresso3.ExpressoParser;
 
 /**
  * An (abstract) expression composed of zero or more components
@@ -25,17 +26,19 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 	private int theErrorCount;
 	private CompositionError theSelfError;
 	private int theQuality;
+	private boolean isInvariant;
 
 	/**
 	 * @param type The type of the expression
-	 * @param stream The stream this expression was parsed at
+	 * @param parser The parser parsing this expression
 	 * @param children The components
 	 */
-	public ComposedExpression(ExpressionType<? super S> type, S stream, List<? extends Expression<S>> children) {
+	public ComposedExpression(ExpressionType<? super S> type, ExpressoParser<S> parser, List<? extends Expression<S>> children) {
 		theType = type;
-		theStream = stream;
+		theStream = parser.getStream();
 		theChildren = Collections.unmodifiableList(children);
 		theLength = -1;
+		theSelfError = getSelfError(parser);
 	}
 
 	@Override
@@ -57,7 +60,7 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 	 * @return Computes any errors in this component that are not directly due to an error in a component. Should be overridden by
 	 *         subclasses when this is possible.
 	 */
-	protected CompositionError getSelfError() {
+	protected CompositionError getSelfError(ExpressoParser<S> parser) {
 		return null;
 	}
 
@@ -120,6 +123,12 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 		return theQuality;
 	}
 
+	@Override
+	public boolean isInvariant() {
+		computeQuality();
+		return isInvariant;
+	}
+
 	private void computeQuality() {
 		if (isQualityComputed)
 			return;
@@ -127,13 +136,16 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 		Expression<S> firstError = null;
 		int errorCount = 0;
 		int quality = 0;
+		boolean invariant = false;
 		for (Expression<S> child : theChildren) {
 			errorCount += child.getErrorCount();
 			quality += child.getMatchQuality();
 			if (errorCount > 0 && firstError == null)
 				firstError = child.getFirstError();
+			if (child.isInvariant())
+				invariant = true;
 		}
-		theSelfError = getSelfError();
+		isInvariant = invariant;
 		if (theSelfError != null) {
 			errorCount++;
 			quality -= theSelfError.errorWeight;
@@ -207,7 +219,7 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 				str.append("(empty)");
 		}
 		for (Expression<S> child : theChildren) {
-			if (child.length() == 0 && child.getType().getSpecificity() == 0)
+			if (child.length() == 0 && child.getErrorCount() == 0)
 				continue; // Optional and not present, ignore
 			str.append('\n');
 			child.print(str, indent + 1, "");

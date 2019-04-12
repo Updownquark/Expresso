@@ -42,6 +42,13 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 		return true;
 	}
 
+	@Override
+	public int getEmptyQuality(int minQuality) {
+		// TODO it might be possible for some patterns to come up empty,
+		// but it would be very difficult to analyze the pattern to determine this.
+		return -2;
+	}
+
 	/** @return This expression's pattern matcher */
 	public Pattern getPattern() {
 		return thePattern;
@@ -50,15 +57,6 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 	/** @return The amount of text to pre-discover for this expression */
 	public int getMaxLength() {
 		return theMaxLength;
-	}
-
-	@Override
-	public int getSpecificity() {
-		// Patterns have some specificity, but they may also match content that is not intended.
-		// Patterns may match content of different length, so it's not possible to account for that here.
-		// TODO Individual patterns may have different specificity.
-		// Is there some way to figure out how specific a particular pattern is?
-		return 10;
 	}
 
 	@Override
@@ -164,6 +162,11 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 		@Override
 		public int getMatchQuality() {
 			return theMatcher.lookingAt() ? 0 : -2;
+		}
+
+		@Override
+		public boolean isInvariant() {
+			return false;
 		}
 
 		@Override

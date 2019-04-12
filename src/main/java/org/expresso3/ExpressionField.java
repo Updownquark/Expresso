@@ -69,6 +69,11 @@ public interface ExpressionField<S extends BranchableStream<?, ?>> extends Expre
 	}
 
 	@Override
+	default boolean isInvariant() {
+		return getWrapped().isInvariant();
+	}
+
+	@Override
 	default StringBuilder print(StringBuilder str, int indent, String metadata) {
 		return getWrapped().print(str, indent, metadata + getType().getFields());
 	}

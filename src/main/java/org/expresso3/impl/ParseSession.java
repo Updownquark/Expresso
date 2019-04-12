@@ -26,6 +26,7 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 	private final Map<ExpressoParserImpl.Template, ExpressoParserImpl<S>> theParsers;
 	private ExpressoDebugger theDebugger;
 	private int theQualityLevel;
+	private int theDepth;
 
 	/** @param grammar The grammar to use to parse expressions */
 	public ParseSession(ExpressoGrammar<? super S> grammar) {
@@ -67,11 +68,25 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 			}
 			theParsers.clear(); // Clear the cache between rounds
 			theQualityLevel--;
+			if (theQualityLevel < minQuality)
+				break;
 		}
 		// node.end();
 		// ExpressionType.TRACKER.printData();
 		// ExpressionType.TRACKER.clear();
 		return best;
+	}
+
+	public int getDepth() {
+		return theDepth;
+	}
+
+	public void descend() {
+		theDepth++;
+	}
+
+	public void ascend() {
+		theDepth--;
 	}
 
 	public ExpressoDebugger getDebugger() {
@@ -100,12 +115,6 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 			theParsers.put(key, parser);
 		}
 		return parser;
-	}
-
-	private static int compareParseStates(ExpressoParserImpl<?> p1, ExpressoParserImpl<?> p2) {
-		if (p1 == p2)
-			return 0;
-		return compareParseStates(p1.getStream().getPosition(), p1.getExcludedTypes(), p2.getStream().getPosition(), p2.getExcludedTypes());
 	}
 
 	private static int compareParseStates(int position1, int[] excludedTypes1, int position2, int[] excludedTypes2) {

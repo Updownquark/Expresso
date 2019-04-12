@@ -50,7 +50,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	private final ParseSession<S> theSession;
 	private final S theStream;
 	private final int[] theExcludedTypes;
-	private final PersistentStack<CacheOverride<S>> theCacheOverride;
+	private final PersistentStack<ComponentStateInfo<S>> theStates;
 	private final Map<Integer, CachedExpression<S>> theCache;
 
 	/**
@@ -59,11 +59,12 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	 * @param excludedTypes IDs of types that this parser will not return expressions for
 	 * @param cacheOverride Cache overrides for this parser
 	 */
-	public ExpressoParserImpl(ParseSession<S> session, S stream, int[] excludedTypes, PersistentStack<CacheOverride<S>> cacheOverride) {
+	public ExpressoParserImpl(ParseSession<S> session, S stream, int[] excludedTypes,
+		PersistentStack<ComponentStateInfo<S>> cacheOverride) {
 		theSession = session;
 		theStream = stream;
 		theExcludedTypes = excludedTypes;
-		theCacheOverride = cacheOverride;
+		theStates = cacheOverride;
 		theCache = new HashMap<>();
 	}
 
@@ -83,6 +84,11 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	}
 
 	@Override
+	public int getDepth() {
+		return theSession.getDepth();
+	}
+
+	@Override
 	public ExpressoParser<S> advance(int spaces) throws IOException {
 		if (spaces == 0)
 			return this;
@@ -95,7 +101,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		int[] union = union(theExcludedTypes, expressionIds);
 		if (union == theExcludedTypes)
 			return this;
-		else if (theCacheOverride == null) {
+		else if (theStates == null) {
 			try {
 				// theSession.debug(() -> "Excluding " + Arrays.toString(expressionIds));
 				return theSession.getParser(theStream, 0, union);
@@ -103,17 +109,33 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				throw new IllegalStateException("Should not happen--not advancing stream", e);
 			}
 		} else
-			return new ExpressoParserImpl<>(theSession, theStream, union, theCacheOverride);
+			return new ExpressoParserImpl<>(theSession, theStream, union, theStates);
 	}
 
 	@Override
-	public ExpressoParser<S> useCache(ExpressionType<? super S> component, Expression<S> result, Runnable onHit) {
+	public ExpressoParser<S> withState(ExpressionType<? super S> type, Object datum) {
 		return new ExpressoParserImpl<>(theSession, theStream, theExcludedTypes,
-			new PersistentStack<>(theCacheOverride, new CacheOverride<>(component, result, onHit)));
+			new PersistentStack<>(theStates, new ComponentStateInfo<>(type, datum)));
 	}
+
+	@Override
+	public Object getState(ExpressionType<? super S> type) {
+		ComponentStateInfo<S> override = theStates == null ? null : theStates.search(tuple -> tuple.type == type);
+		if (override != null)
+			return override.value;
+		else
+			return null;
+	}
+
+	// @Override
+	// public ExpressoParser<S> useCache(ExpressionType<? super S> component, Expression<S> result, Consumer<ExpressoParser<S>> onHit) {
+	// return new ExpressoParserImpl<>(theSession, theStream, theExcludedTypes,
+	// new PersistentStack<>(theCacheOverride, new CacheOverride<>(component, result, onHit)));
+	// }
 
 	@Override
 	public Expression<S> parseWith(ExpressionType<? super S> component) throws IOException {
+		theSession.descend();
 		DebugExpressionParsing debug = theSession.getDebugger().begin(component, theStream, null);
 		try {
 			int cacheId = component.getId();
@@ -124,12 +146,6 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 			} else if (theExcludedTypes != null && Arrays.binarySearch(theExcludedTypes, cacheId) >= 0) {
 				debug.finished(null, DebugResultMethod.Excluded);
 				return null;
-			}
-			CacheOverride<S> override = theCacheOverride == null ? null : theCacheOverride.search(tuple -> tuple.type == component);
-			if (override != null) {
-				override.hit();
-				debug.finished(override.result, DebugResultMethod.RecursiveInterrupt);
-				return override.result;
 			}
 			if (!component.isCacheable()) {
 				Expression<S> result = component.parse(this);
@@ -152,11 +168,14 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		} catch (RuntimeException e) {
 			theSession.getDebugger().suspend();
 			throw e;
+		} finally {
+			theSession.ascend();
 		}
 	}
 
 	@Override
 	public Expression<S> nextMatch(Expression<S> expression) throws IOException {
+		theSession.descend();
 		DebugExpressionParsing debug = theSession.getDebugger().begin(expression.getType(), theStream, expression);
 		try {
 			int cacheId = expression.getType().getId();
@@ -168,19 +187,14 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				debug.finished(null, DebugResultMethod.Excluded);
 				return null;
 			}
-			CacheOverride<S> override = theCacheOverride == null ? null
-				: theCacheOverride.search(tuple -> tuple.type == expression.getType());
-			if (override != null) {
-				override.hit();
-				debug.finished(null, DebugResultMethod.RecursiveInterrupt);
-				return null; // Only a single match possible, so no "next" match
-			}
 			Expression<S> match = expression.nextMatch(this);
 			debug.finished(match, DebugResultMethod.Parsed);
 			return match;
 		} catch (RuntimeException e) {
 			theSession.getDebugger().suspend();
 			throw e;
+		} finally {
+			theSession.ascend();
 		}
 	}
 
@@ -232,25 +246,18 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		return theStream.toString();
 	}
 
-	static class CacheOverride<S extends BranchableStream<?, ?>> {
+	static class ComponentStateInfo<S extends BranchableStream<?, ?>> {
 		final ExpressionType<? super S> type;
-		final Expression<S> result;
-		final Runnable onHit;
+		final Object value;
 
-		public CacheOverride(ExpressionType<? super S> type, Expression<S> result, Runnable onHit) {
+		public ComponentStateInfo(ExpressionType<? super S> type, Object value) {
 			this.type = type;
-			this.result = result;
-			this.onHit = onHit;
-		}
-
-		public void hit() {
-			if (onHit != null)
-				onHit.run();
+			this.value = value;
 		}
 
 		@Override
 		public String toString() {
-			return type + "->" + result;
+			return type + "->" + value;
 		}
 	}
 }

@@ -7,6 +7,8 @@ import java.awt.EventQueue;
 import java.awt.Font;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.time.Instant;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.function.Supplier;
@@ -47,60 +49,86 @@ import com.google.common.reflect.TypeToken;
 
 import net.miginfocom.swing.MigLayout;
 
+/** A graphical debugger */
 public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 	static class ParsingState {
 		static final TypeToken<ParsingState> TYPE = TypeTokens.get().of(ParsingState.class);
 
-		final ParsingState parent;
-		final ExpressionType<?> component;
-		final ObservableCollection<ParsingState> children;
-		final Iterator<? extends ExpressionType<?>> childIter;
-		final SimpleObservable<Void> stateChange;
+		final ParsingState theParent;
+		final ExpressionType<?> theExpressionType;
+		final ObservableCollection<ParsingState> theChildren;
+		final boolean variableChildren;
+		final Iterator<? extends ExpressionType<?>> theChildIter;
+		final SimpleObservable<Void> theStateChange;
 		BranchableStream<?, ?> theStream;
 		Expression<?> theResult;
 		DebugResultMethod theMethod;
+		Instant theLastParseTime;
 		boolean isParsing;
 
+		boolean isBreakpoint;
+
 		ParsingState(ParsingState parent, ExpressionType<?> component) {
-			this.parent = parent;
-			this.component = component;
-			stateChange = new SimpleObservable<>();
+			this.theParent = parent;
+			this.theExpressionType = component;
+			theStateChange = new SimpleObservable<>();
 			Iterable<? extends ExpressionType<?>> componentChildren = component.getComponents();
-			children = ObservableCollection.create(TYPE, new BetterTreeList<>(false)).flow().refreshEach(state -> state.stateChange)
+			theChildren = ObservableCollection.create(TYPE, new BetterTreeList<>(false)).flow().refreshEach(state -> state.theStateChange)
 				.collect();
-			childIter = componentChildren.iterator();
+			variableChildren = !(componentChildren instanceof Collection);
+			theChildIter = componentChildren.iterator();
 		}
 
 		ParsingState getChild(int streamPos, ExpressionType<?> component) {
-			int pos = theStream.getPosition();
-			boolean useNext = pos == streamPos;
-			for (ParsingState child : children) {
-				if (useNext) {
-					if (child.component == component)
+			// This might be a little hacky, but we know that "variable children" means a repeat operation.
+			// Otherwise, we can assume all the child component types will be different
+			if (!variableChildren) {
+				while (theChildIter.hasNext())
+					theChildren.add(new ParsingState(this, theChildIter.next()));
+				for (ParsingState child : theChildren) {
+					if (child.theExpressionType == component)
 						return child;
-					else if (child.theResult != null && child.theResult.length() > 0)
-						return null;
-				} else if (child.theResult != null)
-					pos += child.theResult.length();
-				if (pos == streamPos)
-					useNext = true;
-				else if (pos > streamPos)
+					else if (child.theResult != null && child.theStream.getPosition() == streamPos) {
+						// The parser didn't use this match for some reason
+						child.theResult = null;
+						if (child.theLastParseTime.compareTo(theLastParseTime) < 0)
+							child.theMethod = null;
+						else
+							child.theMethod = DebugResultMethod.Excluded;
+						child.theStateChange.onNext(null);
+					}
+				}
+			} else {
+				int pos = theStream.getPosition();
+				boolean useNext = pos == streamPos;
+				for (ParsingState child : theChildren) {
+					if (useNext) {
+						if (child.theExpressionType == component)
+							return child;
+						else if (child.theResult != null && child.theResult.length() > 0)
+							return null;
+					} else if (child.theResult != null)
+						pos += child.theResult.length();
+					if (pos == streamPos)
+						useNext = true;
+					else if (pos > streamPos)
+						return child;
+				}
+				if (!useNext)
 					return null;
+				if (theChildIter.hasNext())
+					theChildren.add(new ParsingState(this, theChildIter.next()));
+				if (theChildren.getLast().theExpressionType == component)
+					return theChildren.getLast();
 			}
-			if (!useNext)
-				return null;
-			if (childIter.hasNext())
-				children.add(new ParsingState(this, childIter.next()));
-			if (children.getLast().component == component)
-				return children.getLast();
-			else
-				return null;
+			return null;
 		}
 
 		ParsingState into(BranchableStream<?, ?> stream) {
+			theLastParseTime = Instant.now();
 			theStream = stream;
 			isParsing = true;
-			stateChange.onNext(null);
+			theStateChange.onNext(null);
 			return this;
 		}
 
@@ -108,28 +136,34 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 			isParsing = false;
 			theResult = result;
 			theMethod = methodUsed;
-			stateChange.onNext(null);
+			theStateChange.onNext(null);
+			for (ParsingState child : theChildren.reverse())
+				if (child.theLastParseTime != null && child.theLastParseTime.compareTo(theLastParseTime) < 0)
+					child.reset(null);
 		}
 
 		void reset(BranchableStream<?, ?> stream) {
 			isParsing = false;
 			theStream = stream;
-			stateChange.onNext(null);
+			theResult = null;
+			theMethod = null;
+			theLastParseTime = null;
+			theStateChange.onNext(null);
 		}
 
 		@Override
 		public String toString() {
-			if (component instanceof BareContentExpressionType || component instanceof GrammarExpressionType)
-				return component.toString();
-			else if (component instanceof ExpressionFieldType)
-				return "Field " + ((ExpressionFieldType<?>) component).getFields();
-			String name = component.getClass().getSimpleName();
+			if (theExpressionType instanceof BareContentExpressionType || theExpressionType instanceof GrammarExpressionType)
+				return theExpressionType.toString();
+			else if (theExpressionType instanceof ExpressionFieldType)
+				return "Field " + ((ExpressionFieldType<?>) theExpressionType).getFields();
+			String name = theExpressionType.getClass().getSimpleName();
 			if (name.endsWith("Type")) {
 				name = name.substring(0, name.length() - 4);
 				if (name.endsWith("Expression"))
 					name = name.substring(0, name.length() - 10);
-				if (component instanceof ExpressionFieldType)
-					name += " " + ((ExpressionFieldType<?>) component).getFields();
+				if (theExpressionType instanceof ExpressionFieldType)
+					name += " " + ((ExpressionFieldType<?>) theExpressionType).getFields();
 			}
 			return name;
 		}
@@ -159,6 +193,7 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 	private boolean isReallySuspended;
 	private final SettableValue<Boolean> isDebugging;
 
+	/** Creates the debugger */
 	public ExpressoDebugUI() {
 		super(new MigLayout("fill"));
 		theRoot = new SimpleSettableValue<>(ParsingState.class, true);
@@ -177,13 +212,13 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 	public void init(ExpressoGrammar<?> grammar, BranchableStream<?, ?> stream, ExpressionType<?> root) {
 		if (EventQueue.isDispatchThread())
 			throw new IllegalStateException("Cannot debug parsing on the EDT");
-		if (theRoot.get() != null && theRoot.get().component == root)
+		if (theRoot.get() != null && theRoot.get().theExpressionType == root)
 			theRoot.get().reset(stream);
 		else
 			theRoot.set(new ParsingState(null, root), null);
+		((ParseStackTreeModel) theStateTree.getModel()).rootChanged();
 
-		// Debug at root
-		theStepRequest = StepRequest.Into;
+		theStepRequest = StepRequest.Into; // Debug at root
 	}
 
 	@Override
@@ -198,16 +233,17 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 			return DebugExpressionParsing.IDLE;
 		else
 			state.into(stream);
-		while (!component.equals(state.component) && state.children.size() == 1) {
-			state = state.children.get(0);
+		while (!component.equals(state.theExpressionType) && state.theChildren.size() == 1) {
+			state = state.theChildren.get(0);
 		}
-		if (!component.equals(state.component)) {
+		if (!component.equals(state.theExpressionType)) {
 			System.err.println("Bad State!!");
 			suspend();
 		}
 		theStack.add(state);
 		{
-			boolean suspend = isSuspended.get();
+			boolean suspend = isSuspended.get() || state.isBreakpoint;
+			state.isBreakpoint = false;
 			if (!suspend && theStepRequest != null) {
 				switch (theStepRequest) {
 				case Into:
@@ -231,7 +267,8 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 			public void finished(Expression<?> expression, DebugResultMethod methodUsed) {
 				debugPrint(() -> "End " + component, true);
 				fState.out(expression, methodUsed);
-				boolean suspend = isSuspended.get();
+				boolean suspend = isSuspended.get() || fState.isBreakpoint;
+				fState.isBreakpoint = false;
 				if (!suspend && theStepRequest != null) {
 					switch (theStepRequest) {
 					case Into:
@@ -270,6 +307,10 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 		isReallySuspended = true;
 		isSuspended.set(true, null);
 		if (!theStack.isEmpty()) {
+			if (theSelection.get() == theStack.getLast()) {
+				// Refresh the selection, since it may have changed
+				theSelection.set(theStack.getLast(), null);
+			}
 			TreePath path = new TreePath(stackPath());
 			EventQueue.invokeLater(() -> {
 				theStateTree.setSelectionPath(path);
@@ -277,15 +318,20 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 			});
 		}
 		while (isSuspended.get()) {
-			try {
-				Thread.sleep(100);
-			} catch (InterruptedException e) {
+			// This loop is to capture the case where the user clicks "Debug" and then "Suspend" again right after
+			// The debugger will catch in the same place without progressing in the parsing
+			isReallySuspended = true;
+			while (isSuspended.get()) {
+				try {
+					Thread.sleep(100);
+				} catch (InterruptedException e) {
+				}
 			}
-		}
-		isReallySuspended = false;
-		if (isDebugging.get()) {
-			isDebugging.set(false, null);
-			BreakpointHere.breakpoint();
+			isReallySuspended = false;
+			if (isDebugging.get()) {
+				isDebugging.set(false, null);
+				BreakpointHere.breakpoint();
+			}
 		}
 	}
 
@@ -347,10 +393,14 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 					text = "";
 				} else {
 					text = state.toString();
-					if (state.theMethod != null) {
-						text += "(" + state.theMethod.toString();
-						if (state.theResult != null)
-							text += ", length=" + state.theResult.length() + ", " + state.theResult.getErrorCount() + " errors";
+					if (state.isBreakpoint)
+						text += "*";
+					DebugResultMethod method = state.theMethod;
+					if (method != null) {
+						text += "(" + method.toString();
+						Expression<?> result = state.theResult;
+						if (result != null)
+							text += ", length=" + result.length() + ", " + result.getErrorCount() + " errors";
 						text += ")";
 					}
 				}
@@ -388,47 +438,56 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 				}
 			}
 		});
-		
-		//Debug buttons
+
+		// Debug buttons
 		JButton stepOver = new JButton("Over");
 		JButton stepInto = new JButton("Into");
 		JButton stepOut = new JButton("Out");
 		JButton resume = new JButton("Resume");
 		JButton suspend = new JButton("Suspend");
 		JButton debug = new JButton("Debug");
+		JButton breakpoint = new JButton("BP");
 		buttonPanel.add(stepOver);
 		buttonPanel.add(stepInto);
 		buttonPanel.add(stepOut);
 		buttonPanel.add(resume);
 		buttonPanel.add(suspend);
 		buttonPanel.add(debug);
+		buttonPanel.add(breakpoint);
 
 		theSelection.changes().act(evt -> {
 			ParsingState state = evt.getNewValue();
+			breakpoint.setEnabled(state != null);
+			if (state != null) {
+				breakpoint.setText(state.isBreakpoint ? "BP Off" : "BP On");
+			} else
+				breakpoint.setText("BP");
 			boolean local = true;
 			if (state != null) {
 				while (state != null && state.theStream == null) {
 					local = false;
-					state = state.parent;
+					state = state.theParent;
 				}
 			} else
 				state = theRoot.get();
-			if (state != null && state.theStream != null) {
+			BranchableStream<?, ?> stream = state == null ? null : state.theStream;
+			if (stream != null) {
+				Expression<?> result = state.theResult;
 				StringBuilder text = new StringBuilder("<html>");
 				int len = text.length();
-				if (!local || state.theResult == null || state.theResult.length() == 0) {
+				if (!local || result == null || result.length() == 0) {
 					text.append(state.theStream.toString());
 					escapeHtml(text, len, text.length(), false);
 				} else {
-					theRoot.get().theStream.printContent(0, state.theResult.getStream().getPosition(), text);
+					theRoot.get().theStream.printContent(0, result.getStream().getPosition(), text);
 					escapeHtml(text, len, text.length(), false);
 					text.append("<b><font color=\"red\">");
 					len = text.length();
-					state.theStream.printContent(0, state.theResult.length(), text);
+					result.getStream().printContent(0, result.length(), text);
 					escapeHtml(text, len, text.length(), false);
 					text.append("</font></b>");
 					len = text.length();
-					state.theStream.printContent(state.theResult.length(), state.theStream.getDiscoveredLength(), text);
+					result.getStream().printContent(result.length(), state.theStream.getDiscoveredLength(), text);
 					escapeHtml(text, len, text.length(), false);
 				}
 				textArea.setText(text.toString());
@@ -460,6 +519,13 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 		debug.addActionListener(evt -> {
 			isDebugging.set(true, null);
 			resume();
+		});
+		breakpoint.addActionListener(evt -> {
+			ParsingState state = theSelection.get();
+			if (state != null) {
+				state.isBreakpoint = !state.isBreakpoint;
+				theSelection.set(state, evt);
+			}
 		});
 
 		isSuspended.changes().act(evt -> {
@@ -505,6 +571,11 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 		}
 	}
 
+	/**
+	 * Builds (and displays) a JFrame with this debugger panel as its content
+	 * 
+	 * @return The frame
+	 */
 	public JFrame buildFrame() {
 		JFrame frame = new JFrame("Expresso Debugger UI");
 		frame.addComponentListener(new ComponentAdapter() {
@@ -540,10 +611,10 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 					if (ps == null)
 						return ObservableCollection.of(TypeTokens.get().of(ParsingState.class));
 					else
-						return ps.children;
+						return ps.theChildren;
 				}));
 			} else
-				return ((ParsingState) parent).children;
+				return ((ParsingState) parent).theChildren;
 		}
 	}
 }

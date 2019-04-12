@@ -29,6 +29,11 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 		theValue = value;
 	}
 
+	@Override
+	public int getEmptyQuality(int minQuality) {
+		return -getLength();
+	}
+
 	/** @return This expression's literal value */
 	public C getValue() {
 		return theValue;
@@ -56,15 +61,6 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 		if (possibility.getMatchQuality() >= parser.getQualityLevel())
 			return possibility;
 		return null;
-	}
-
-	@Override
-	public int getSpecificity() {
-		// Literals are very specific.
-		// The presence of a literal is a very strong indicator that an expression possibility is on the right track.
-		// The absence of an expected literal is a very strong indicator that an expression possibility was not intended.
-		// the specificity of a literal is proportional to its length
-		return getLength();
 	}
 
 	@Override
@@ -140,6 +136,11 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 			if (theLength == 0)
 				return -1000000;
 			return -(theType.getLength() - theLength);
+		}
+
+		@Override
+		public boolean isInvariant() {
+			return false;
 		}
 
 		@Override

@@ -490,7 +490,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		return components;
 	}
 
-	static class ConfiguredReferenceExpressionType<S extends BranchableStream<?, ?>> implements ExpressionType<S> {
+	public static class ConfiguredReferenceExpressionType<S extends BranchableStream<?, ?>> implements ExpressionType<S> {
 		private final int id;
 		private final int priority;
 		private final String name;
@@ -526,14 +526,14 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		}
 
 		@Override
-		public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
-			Expression<S2> ex = parser.parseWith(type);
-			return ex == null ? null : new WrappedExpression<>(this, ex);
+		public int getEmptyQuality(int minQuality) {
+			return type.getEmptyQuality(minQuality);
 		}
 
 		@Override
-		public int getSpecificity() {
-			return type.getSpecificity();
+		public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
+			Expression<S2> ex = parser.parseWith(type);
+			return ex == null ? null : new WrappedExpression<>(this, ex);
 		}
 
 		@Override
@@ -547,7 +547,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		}
 	}
 
-	static class WrappedExpression<S extends BranchableStream<?, ?>> implements Expression<S> {
+	public static class WrappedExpression<S extends BranchableStream<?, ?>> implements Expression<S> {
 		private final ExpressionType<? super S> theType;
 		private final Expression<S> theWrapped;
 
@@ -613,6 +613,11 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		}
 
 		@Override
+		public boolean isInvariant() {
+			return theWrapped.isInvariant();
+		}
+
+		@Override
 		public StringBuilder print(StringBuilder str, int indent, String metadata) {
 			return theWrapped.print(str, indent, metadata);
 		}
@@ -637,7 +642,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		}
 	}
 
-	static class FieldMarkedExpressionType<S extends BranchableStream<?, ?>> implements ExpressionFieldType<S> {
+	public static class FieldMarkedExpressionType<S extends BranchableStream<?, ?>> implements ExpressionFieldType<S> {
 		private final ExpressionType<S> theWrapped;
 		private final NavigableSet<String> theFields;
 
@@ -662,6 +667,11 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		}
 
 		@Override
+		public int getEmptyQuality(int minQuality) {
+			return theWrapped.getEmptyQuality(minQuality);
+		}
+
+		@Override
 		public NavigableSet<String> getFields() {
 			return theFields;
 		}
@@ -669,11 +679,6 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		@Override
 		public <S2 extends S> ExpressionField<S2> parse(ExpressoParser<S2> parser) throws IOException {
 			return ExpressionFieldType.wrap(this, parser.parseWith(theWrapped));
-		}
-
-		@Override
-		public int getSpecificity() {
-			return theWrapped.getSpecificity();
 		}
 
 		@Override

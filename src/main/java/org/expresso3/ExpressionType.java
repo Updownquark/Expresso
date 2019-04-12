@@ -15,10 +15,15 @@ public interface ExpressionType<S extends BranchableStream<?, ?>> {
 	/** @return An ID by which this type's results may be cached, or -1 if caching should not be used for this type */
 	int getId();
 
+	/** @return Whether expressions of this type should be cached to avoid re-evaluation at the same position */
 	default boolean isCacheable() {
 		return false; // Most expressions should not be cached
 	}
 
+	/** @return The best-possible {@link Expression#getMatchQuality() quality} of a match for this type that is zero-length */
+	int getEmptyQuality(int minQuality);
+
+	/** @return The component expression types that this type uses */
 	Iterable<? extends ExpressionType<? super S>> getComponents();
 
 	/**
@@ -27,10 +32,4 @@ public interface ExpressionType<S extends BranchableStream<?, ?>> {
 	 * @throws IOException If an error occurs reading the stream
 	 */
 	<S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException;
-
-	/**
-	 * @return How specific this expression is. Practically, this is how much of a detriment to an composite expression's
-	 *         {@link Expression#getMatchQuality() quality} it will be if this component is missing
-	 */
-	int getSpecificity();
 }
