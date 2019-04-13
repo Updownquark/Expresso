@@ -17,11 +17,12 @@ public interface ExpressionFieldType<S extends BranchableStream<?, ?>> extends E
 	NavigableSet<String> getFields();
 
 	@Override
-	default int getCacheId() {
+	default int getId() {
 		return -1;
 	}
 
 	/**
+	 * @param <S> The type of the stream being parsed
 	 * @param type The field type
 	 * @param possibility The possibility to wrap
 	 * @return The wrapped field possibility

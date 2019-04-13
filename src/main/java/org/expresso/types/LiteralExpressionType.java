@@ -1,15 +1,12 @@
 package org.expresso.types;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
 import org.expresso.BareContentExpressionType;
 import org.expresso.Expression;
-import org.expresso.ExpressionType;
 import org.expresso.ExpressoParser;
 import org.expresso.stream.BranchableStream;
 
@@ -32,14 +29,14 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 		theValue = value;
 	}
 
+	@Override
+	public int getEmptyQuality(int minQuality) {
+		return -getLength();
+	}
+
 	/** @return This expression's literal value */
 	public C getValue() {
 		return theValue;
-	}
-
-	/** @return The {@link ExpressionType#getSpecificity() specificity} of this literal type, per unit of length */
-	protected int getUnitSpecificity() {
-		return 10;
 	}
 
 	/** @return The length of this matcher's value */
@@ -61,18 +58,9 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 	@Override
 	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
 		LiteralPossibility<C, S2> possibility = new LiteralPossibility<>(this, parser);
-		if (!parser.tolerateErrors() && possibility.getErrorCount() > 0)
-			return null;
-		return possibility;
-	}
-
-	@Override
-	public int getSpecificity() {
-		// Literals are very specific.
-		// The presence of a literal is a very strong indicator that an expression possibility is on the right track.
-		// The absence of an expected literal is a very strong indicator that an expression possibility was not intended.
-		// the specificity of a literal is proportional to its length
-		return getLength() * getUnitSpecificity();
+		if (possibility.getMatchQuality() >= parser.getQualityLevel())
+			return possibility;
+		return null;
 	}
 
 	@Override
@@ -114,11 +102,13 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 		}
 
 		@Override
-		public Collection<? extends Expression<S>> fork() throws IOException {
-			if (theLength > 1)
-				return Arrays.asList(new LiteralPossibility<>(theType, theParser, theLength - 1));
-			else
-				return Collections.emptyList();
+		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+			if (theLength == 0)
+				return null;
+			LiteralPossibility<C, S> p = new LiteralPossibility<>(theType, theParser, theLength - 1);
+			if (p.getMatchQuality() >= theParser.getQualityLevel())
+				return p;
+			return null;
 		}
 
 		@Override
@@ -138,20 +128,19 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 
 		@Override
 		public String getLocalErrorMessage() {
-			if (theLength == getType().getLength())
-				return null;
-			else
-				return "\"" + getType() + "\" expected";
-		}
-
-		@Override
-		public int getComplexity() {
-			return 1;
+			return "\"" + getType() + "\" expected";
 		}
 
 		@Override
 		public int getMatchQuality() {
-			return (theLength - theType.getLength()) * theType.getUnitSpecificity();
+			if (theLength == 0)
+				return -1000000;
+			return -(theType.getLength() - theLength);
+		}
+
+		@Override
+		public boolean isInvariant() {
+			return false;
 		}
 
 		@Override

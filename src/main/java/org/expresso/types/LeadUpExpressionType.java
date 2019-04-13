@@ -1,11 +1,8 @@
 package org.expresso.types;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.stream.Collectors;
 
 import org.expresso.BareContentExpressionType;
 import org.expresso.Expression;
@@ -32,25 +29,25 @@ public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends Abst
 	}
 
 	@Override
-	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
-		if (!parser.tolerateErrors()) {
-			ExpressoParser<S2> branched = parser;
-			while (branched != null) {
-				Expression<S2> terminal = parser.parseWith(theTerminal);
-				if (terminal != null && terminal.getErrorCount() == 0)
-					return new LeadUpPossibility<>(this, parser, theTerminal, terminal);
-				branched = branched.advance(1);
-			}
-			return null;
-		} else {
-			Expression<S2> terminal = parser.parseWith(theTerminal);
-			return terminal == null ? null : new LeadUpPossibility<>(this, parser, theTerminal, terminal);
-		}
+	public int getEmptyQuality(int minQuality) {
+		return theTerminal.getEmptyQuality(minQuality);
 	}
 
 	@Override
-	public int getSpecificity() {
-		return theTerminal.getSpecificity();
+	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
+		ExpressoParser<S2> branched = parser;
+		while (branched != null) {
+			Expression<S2> terminal = parser.parseWith(theTerminal);
+			if (terminal != null)
+				return new LeadUpPossibility<>(this, parser, theTerminal, terminal);
+			branched = branched.advance(1);
+		}
+		return null;
+	}
+
+	@Override
+	public Iterable<? extends ExpressionType<? super S>> getComponents() {
+		return Collections.unmodifiableList(Arrays.asList(theTerminal));
 	}
 
 	@Override
@@ -64,7 +61,7 @@ public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends Abst
 
 		LeadUpPossibility(LeadUpExpressionType<? super S> type, ExpressoParser<S> parser, ExpressionType<? super S> terminal,
 			Expression<S> terminalPossibility) {
-			super(type, parser, Collections.unmodifiableList(Arrays.asList(terminalPossibility)));
+			super(type, parser, Arrays.asList(terminalPossibility));
 			theTerminal = terminal;
 			theTerminalPossibility = terminalPossibility;
 		}
@@ -75,30 +72,13 @@ public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends Abst
 		}
 
 		@Override
-		protected int getSelfComplexity() {
-			return 1;
-		}
-
-		@Override
-		public Collection<? extends Expression<S>> fork() throws IOException {
-			ExpressoParser<S> advanced = getParser().advance(1);
-			Expression<S> newTerminal = advanced == null ? null : advanced.parseWith(theTerminal);
-			Expression<S> mappedNewTerminal = newTerminal == null ? null
-				: new LeadUpPossibility<>(getType(), advanced, theTerminal, newTerminal);
-			Collection<? extends Expression<S>> terminalForks = theTerminalPossibility.fork();
-			Collection<? extends Expression<S>> mappedTerminalForks;
-			if (terminalForks.isEmpty())
-				mappedTerminalForks = terminalForks;
-			else
-				mappedTerminalForks = terminalForks.stream().map(fork -> new LeadUpPossibility<>(getType(), getParser(), theTerminal, fork))
-					.collect(Collectors.toCollection(() -> new ArrayList<>(terminalForks.size())));
-			if (newTerminal == null)
-				return mappedTerminalForks;
-			else if (mappedTerminalForks.isEmpty())
-				return Arrays.asList(mappedNewTerminal);
-			else
-				return new CompositeCollection<Expression<S>>().addComponent(Arrays.asList(mappedNewTerminal))
-					.addComponent(mappedTerminalForks);
+		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+			if (theTerminalPossibility.isInvariant())
+				return null;
+			Expression<S> next = parser.nextMatch(theTerminalPossibility);
+			if (next != null)
+				return new LeadUpPossibility<>(getType(), parser, theTerminal, next);
+			return null;
 		}
 	}
 }

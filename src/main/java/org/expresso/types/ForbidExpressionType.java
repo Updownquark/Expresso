@@ -1,11 +1,8 @@
 package org.expresso.types;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.stream.Collectors;
 
 import org.expresso.Expression;
 import org.expresso.ExpressionType;
@@ -30,19 +27,24 @@ public class ForbidExpressionType<S extends BranchableStream<?, ?>> extends Abst
 	}
 
 	@Override
+	public int getEmptyQuality(int minQuality) {
+		return 0;
+	}
+
+	@Override
 	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
 		Expression<S2> forbidden = parser.parseWith(theForbidden);
 		if (forbidden == null)
 			return Expression.empty(parser.getStream(), this);
-		else if (!parser.tolerateErrors() && forbidden.getErrorCount() > 0)
-			return Expression.empty(parser.getStream(), this);
-		else
-			return new ForbiddenPossibility<>(this, parser, forbidden);
+		ForbiddenPossibility<S2> p = new ForbiddenPossibility<>(this, parser, forbidden);
+		if (p.getMatchQuality() >= parser.getQualityLevel())
+			return p;
+		return null;
 	}
 
 	@Override
-	public int getSpecificity() {
-		return 0;
+	public Iterable<? extends ExpressionType<? super S>> getComponents() {
+		return Collections.unmodifiableList(Arrays.asList(theForbidden));
 	}
 
 	@Override
@@ -54,7 +56,7 @@ public class ForbidExpressionType<S extends BranchableStream<?, ?>> extends Abst
 		private final Expression<S> theForbidden;
 
 		ForbiddenPossibility(ForbidExpressionType<? super S> type, ExpressoParser<S> parser, Expression<S> forbidden) {
-			super(type, parser, Collections.unmodifiableList(Arrays.asList(forbidden)));
+			super(type, parser, Arrays.asList(forbidden));
 			theForbidden = forbidden;
 		}
 
@@ -64,24 +66,24 @@ public class ForbidExpressionType<S extends BranchableStream<?, ?>> extends Abst
 		}
 
 		@Override
-		public Collection<? extends Expression<S>> fork() throws IOException {
-			Collection<? extends Expression<S>> forbiddenForks = theForbidden.fork();
-			if (forbiddenForks.isEmpty())
-				return forbiddenForks;
-			else
-				return forbiddenForks.stream().map(fork -> new ForbiddenPossibility<>(getType(), getParser(), fork))
-					.collect(Collectors.toCollection(() -> new ArrayList<>(forbiddenForks.size())));
+		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+			if (theForbidden.isInvariant())
+				return null;
+			Expression<S> fMatch = parser.nextMatch(theForbidden);
+			if (fMatch == null)
+				return null;
+			ForbiddenPossibility<S> next = new ForbiddenPossibility<>(getType(), parser, fMatch);
+			if (next.getMatchQuality() >= parser.getQualityLevel())
+				return next;
+			return null;
 		}
 
 		@Override
-		protected int getSelfComplexity() {
-			return 1;
-		}
-
-		@Override
-		protected CompositionError getSelfError() {
-			if (theForbidden.getErrorCount() == 0)
-				return new CompositionError(0, theForbidden.getType() + " not allowed here", -theForbidden.getMatchQuality());
+		protected CompositionError getSelfError(ExpressoParser<S> parser) {
+			// theForbidden field is not initialized yet, need to use the children
+			Expression<S> forbidden = getChildren().get(0);
+			if (forbidden.getErrorCount() == 0)
+				return new CompositionError(0, () -> forbidden.getType() + " not allowed here", -forbidden.getMatchQuality());
 			else
 				return null;
 		}
@@ -102,7 +104,7 @@ public class ForbidExpressionType<S extends BranchableStream<?, ?>> extends Abst
 			Expression<S> err = theForbidden.getFirstError();
 			if (err == null && theForbidden.length() > 0)
 				err = this;
-			return null;
+			return err;
 		}
 	}
 }

@@ -1,20 +1,17 @@
 package org.expresso.impl;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.expresso.Expression;
 import org.expresso.ExpressionType;
+import org.expresso.ExpressoParser;
 import org.expresso.stream.BranchableStream;
 
 class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S> {
 	private final ExpressionType<? super S> theType;
 	private Expression<S> thePossibility;
-	private List<CachedExpression<S>> theForks;
+	private CachedExpression<S> theNextMatch;
 	private int cachedHash = -1;
 
 	CachedExpression(ExpressionType<? super S> type) {
@@ -46,16 +43,12 @@ class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S
 	}
 
 	@Override
-	public Collection<? extends Expression<S>> fork() throws IOException {
-		if (theForks == null) {
-			Collection<? extends Expression<S>> forks = thePossibility.fork();
-			if (forks.isEmpty())
-				theForks = Collections.emptyList();
-			else
-				theForks = forks.stream().map(fork -> new CachedExpression<S>(theType).setPossibility(fork))
-					.collect(Collectors.toCollection(() -> new ArrayList<>(forks.size())));
+	public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+		if (theNextMatch == null) {
+			Expression<S> next = thePossibility.nextMatch(parser);
+			theNextMatch = new CachedExpression<S>(theType).setPossibility(next);
 		}
-		return theForks;
+		return theNextMatch.asPossibility();
 	}
 
 	@Override
@@ -89,13 +82,13 @@ class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S
 	}
 
 	@Override
-	public int getComplexity() {
-		return thePossibility.getComplexity();
+	public int getMatchQuality() {
+		return thePossibility.getMatchQuality();
 	}
 
 	@Override
-	public int getMatchQuality() {
-		return thePossibility.getMatchQuality();
+	public boolean isInvariant() {
+		return thePossibility.isInvariant();
 	}
 
 	@Override

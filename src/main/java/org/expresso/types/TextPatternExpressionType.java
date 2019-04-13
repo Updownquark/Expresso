@@ -1,7 +1,6 @@
 package org.expresso.types;
 
 import java.io.IOException;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -20,6 +19,8 @@ import org.expresso.stream.CharSequenceStream;
  */
 public class TextPatternExpressionType<S extends CharSequenceStream> extends AbstractExpressionType<S>
 	implements BareContentExpressionType<S> {
+	private static final boolean LOOK_FOR_SHORTER_PATTERNS = false;
+
 	private final Pattern thePattern;
 	private final int theMaxLength;
 
@@ -28,12 +29,24 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 	 * @param maxLength The amount of text to pre-discover for this expression
 	 * @param pattern The pattern to match
 	 */
-	public TextPatternExpressionType(Integer id, int maxLength, Pattern pattern) {
+	public TextPatternExpressionType(int id, int maxLength, Pattern pattern) {
 		super(id);
 		theMaxLength = maxLength;
 		if (pattern.pattern().length() == 0)
 			throw new IllegalArgumentException("Text pattern matchers cannot search for empty strings");
 		thePattern = pattern;
+	}
+
+	@Override
+	public boolean isCacheable() {
+		return true;
+	}
+
+	@Override
+	public int getEmptyQuality(int minQuality) {
+		// TODO it might be possible for some patterns to come up empty,
+		// but it would be very difficult to analyze the pattern to determine this.
+		return -2;
 	}
 
 	/** @return This expression's pattern matcher */
@@ -47,20 +60,11 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 	}
 
 	@Override
-	public int getSpecificity() {
-		// Patterns have some specificity, but they may also match content that is not intended.
-		// Patterns may match content of different length, so it's not possible to account for that here.
-		// TODO Individual patterns may have different specificity.
-		// Is there some way to figure out how specific a particular pattern is?
-		return 2;
-	}
-
-	@Override
-	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> session) throws IOException {
-		TextPatternPossibility<S2> possibility = new TextPatternPossibility<>(this, session);
-		if (!session.tolerateErrors() && possibility.getErrorCount() > 0)
-			return null;
-		return possibility;
+	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
+		TextPatternPossibility<S2> possibility = new TextPatternPossibility<>(this, parser);
+		if (possibility.getMatchQuality() >= parser.getQualityLevel())
+			return possibility;
+		return null;
 	}
 
 	@Override
@@ -94,6 +98,12 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 			theMatcher = theType.getPattern().matcher(parser.getStream());
 		}
 
+		TextPatternPossibility(TextPatternExpressionType<? super S> type, ExpressoParser<S> parser, Matcher matcher) throws IOException {
+			theType = type;
+			theParser = parser;
+			theMatcher = matcher;
+		}
+
 		@Override
 		public TextPatternExpressionType<? super S> getType() {
 			return theType;
@@ -115,8 +125,18 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 		}
 
 		@Override
-		public Collection<? extends Expression<S>> fork() throws IOException {
-			return Collections.emptyList();
+		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+			if (!LOOK_FOR_SHORTER_PATTERNS)
+				return null;
+			int length = length();
+			if (length < 1)
+				return null;
+			CharSequence subSequence = theParser.getStream().subSequence(0, length - 1);
+			Matcher matcher = theType.getPattern().matcher(subSequence);
+			TextPatternPossibility<S> possibility = new TextPatternPossibility<>(theType, theParser, matcher);
+			if (possibility.getMatchQuality() >= theParser.getQualityLevel())
+				return possibility;
+			return null;
 		}
 
 		@Override
@@ -131,7 +151,7 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 
 		@Override
 		public int getLocalErrorRelativePosition() {
-			return theMatcher.lookingAt() ? -1 : 0;
+			return theMatcher.lookingAt() ? -5 : 0;
 		}
 
 		@Override
@@ -140,13 +160,13 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 		}
 
 		@Override
-		public int getComplexity() {
-			return 1;
+		public int getMatchQuality() {
+			return theMatcher.lookingAt() ? 0 : -2;
 		}
 
 		@Override
-		public int getMatchQuality() {
-			return theMatcher.lookingAt() ? 2 : -2;
+		public boolean isInvariant() {
+			return false;
 		}
 
 		@Override

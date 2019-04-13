@@ -3,14 +3,8 @@ package org.expresso.java;
 import java.io.IOException;
 import java.util.function.Supplier;
 
+import org.expresso.*;
 import org.expresso.stream.CharSequenceStream;
-import org.expresso3.ConfiguredExpressionType;
-import org.expresso3.DefaultGrammarParser;
-import org.expresso3.Expression;
-import org.expresso3.ExpressionField;
-import org.expresso3.ExpressionType;
-import org.expresso3.ExpressoGrammar;
-import org.expresso3.ExpressoGrammarParser;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;

@@ -74,6 +74,7 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 			return theData;
 		}
 
+		/** @return This chunk's position offset from the beginning of the stream */
 		public int getOffset() {
 			return theOffset;
 		}
@@ -235,7 +236,13 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 	 */
 	protected void advancedPast(C chunk, int start, int end) {}
 
-	protected Chunk getChunkAt(int index) throws IOException {
+	/**
+	 * @param index The position index
+	 * @return The chunk at the given index
+	 * @throws IOException If an error occurs reading the data
+	 * @throws IndexOutOfBoundsException If the stream ends before the given index
+	 */
+	protected Chunk getChunkAt(int index) throws IOException, IndexOutOfBoundsException {
 		if (index < 0)
 			throw new IndexOutOfBoundsException("" + index);
 		Chunk chunk = theChunk;

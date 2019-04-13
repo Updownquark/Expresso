@@ -60,13 +60,16 @@ public class ExpressoGrammar<S extends BranchableStream<?, ?>> {
 	/**
 	 * Parses an expression from a stream
 	 * 
+	 * @param <SS> The type of the stream to parse
 	 * @param stream The stream to parse
 	 * @param type The type (in this grammar) to parse from
-	 * @param bestError If true, the parsing will attempt to parse the stream even with errors and return the best guess (may be slower)
+	 * @param minQuality The minimum quality to expect from the resulting match. 0 is a perfect match, less is worse. Worse matches take
+	 *        longer to parse, so a smaller (negative) value here will terminate parsing earlier (returning either null or the best match
+	 *        encountered so far, which may not represent the entire stream's content).
 	 * @return The parsed expression
 	 * @throws IOException If an error occurs parsing the stream
 	 */
-	public <SS extends S> Expression<SS> parse(SS stream, ExpressionType<S> type, boolean bestError) throws IOException {
-		return new ParseSession<SS>(this).parse(stream, type, bestError);
+	public <SS extends S> Expression<SS> parse(SS stream, ExpressionType<S> type, int minQuality) throws IOException {
+		return new ParseSession<SS>(this).parse(stream, type, minQuality);
 	}
 }

@@ -13,8 +13,8 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> {
 	/** @return The stream being parsed */
 	S getStream();
 
-	/** @return Whether parsing should tolerate and return error expressions */
-	boolean tolerateErrors();
+	/** @return The minimum quality of matches parsed with this parser */
+	int getQualityLevel();
 
 	/**
 	 * @param spaces The number of spaces to advance
@@ -30,12 +30,29 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> {
 	ExpressoParser<S> exclude(int... expressionIds);
 
 	/**
+	 * Allows expression types to insert data into a derived parser that will be available deeper in the stack
+	 * 
+	 * @param type The type to store data for
+	 * @param datum The data to store
+	 * @return The derived parser containing the data
+	 */
+	ExpressoParser<S> withState(ExpressionType<? super S> type, Object datum);
+
+	/**
+	 * Retrieves data stored with {@link #withState(ExpressionType, Object)}
+	 * 
+	 * @param type The type that the data was stored under
+	 * @return The stored data, or null if no data was stored in this parser
+	 */
+	Object getState(ExpressionType<? super S> type);
+
+	/**
 	 * @param type The expression type to substitute cache for
-	 * @param possibility The possibility to return for the type
+	 * @param result The possibility to return for the type
 	 * @return A parser for the same place in the stream that will always return the given possibility when parsing the given expression
 	 *         type
 	 */
-	ExpressoParser<S> useCache(ExpressionType<? super S> type, Expression<S> possibility);
+	// ExpressoParser<S> useCache(ExpressionType<? super S> type, Expression<S> result, Consumer<ExpressoParser<S>> onHit);
 
 	/**
 	 * @param type The expression type to parse with
@@ -43,4 +60,11 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> {
 	 * @throws IOException If an error occurs reading the stream
 	 */
 	Expression<S> parseWith(ExpressionType<? super S> type) throws IOException;
+
+	/**
+	 * @param expression The expression to branch
+	 * @return Another interpretation of the stream by the expresssion's type
+	 * @throws IOException If an error occurs reading the stream
+	 */
+	Expression<S> nextMatch(Expression<S> expression) throws IOException;
 }

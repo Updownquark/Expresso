@@ -1,23 +1,18 @@
 package org.expresso.types;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Queue;
-import java.util.Set;
-import java.util.stream.Collectors;
 
-import org.expresso.ConfiguredExpressionType;
 import org.expresso.Expression;
 import org.expresso.ExpressionType;
 import org.expresso.ExpressoParser;
 import org.expresso.stream.BranchableStream;
-import org.qommons.tree.SortedTreeList;
+import org.qommons.IntList;
+import org.qommons.collect.BetterList;
+import org.qommons.collect.CollectionElement;
+import org.qommons.collect.ElementId;
 
 /**
  * An expression that may be satisfied of any one of several components
@@ -25,54 +20,53 @@ import org.qommons.tree.SortedTreeList;
  * @param <S> The type of the stream
  */
 public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends AbstractExpressionType<S> {
-	private final List<? extends ExpressionType<? super S>> theComponents;
-	final boolean isPrioritized;
-	private int theSpecificity;
+	private final BetterList<? extends ExpressionType<? super S>> theComponents;
+	private IntList theEmptyQuality;
 
 	/**
 	 * @param id The cache ID of the expression type
 	 * @param components The components, any of which may satisfy this expression for a stream
 	 */
-	public OneOfExpressionType(int id, List<? extends ExpressionType<? super S>> components) {
-		this(id, components, false);
-	}
-
-	/**
-	 * @param id The cache ID of the expression type
-	 * @param components The components, any of which may satisfy this expression for a stream
-	 * @param prioritized Whether the components are ordered by priority (typically {@link ConfiguredExpressionType#getPriority()})
-	 */
-	protected OneOfExpressionType(int id, List<? extends ExpressionType<? super S>> components, boolean prioritized) {
+	public OneOfExpressionType(int id, BetterList<? extends ExpressionType<? super S>> components) {
 		super(id);
 		theComponents = components;
-		isPrioritized = prioritized;
-		// Can't calculate the specificity here,
-		// because the component list may be populated by the grammar parser after this constructor is called
-		theSpecificity = -1;
 	}
 
 	/** @return The components, any of which may satisfy this expression for a stream */
-	public List<? extends ExpressionType<? super S>> getComponents() {
+	@Override
+	public BetterList<? extends ExpressionType<? super S>> getComponents() {
 		return theComponents;
 	}
 
 	@Override
-	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
-		Queue<Expression<S2>> possibilities = possibilities(//
-			parser.useCache(this, null), new HashSet<>());
-		if (possibilities.isEmpty())
-			return null;
-		Set<Expression<S2>> allVisited = new HashSet<>(possibilities);
-		Expression<S2> first = possibilities.poll();
-		return new OneOfPossibility<>(this, parser, first, possibilities, allVisited);
+	public int getEmptyQuality(int minQuality) {
+		if (theEmptyQuality == null)
+			theEmptyQuality = new IntList();
+		int eqIndex = -minQuality;
+		while (theEmptyQuality.size() <= eqIndex)
+			theEmptyQuality.add(1);
+		if (theEmptyQuality.get(eqIndex) > 0) {
+			theEmptyQuality.set(eqIndex, 0); // To prevent infinite recursion
+			int quality = Integer.MIN_VALUE;
+			for (ExpressionType<?> component : theComponents) {
+				quality = Math.max(quality, component.getEmptyQuality(minQuality));
+				if (quality == 0)
+					break;
+			}
+			theEmptyQuality.set(eqIndex, quality);
+		}
+		return theEmptyQuality.get(eqIndex);
 	}
 
 	@Override
-	public int getSpecificity() {
-		if (theSpecificity == -1) {
-			theSpecificity = getComponents().stream().mapToInt(ExpressionType::getSpecificity).min().orElse(0);
+	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
+		for (CollectionElement<? extends ExpressionType<? super S>> component : theComponents.elements()) {
+			Expression<S2> possibility = parser.parseWith(//
+				component.get());
+			if (possibility != null)
+				return new OneOfPossibility<>(this, possibility, component.getElementId());
 		}
-		return theSpecificity;
+		return null;
 	}
 
 	@Override
@@ -80,33 +74,28 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 		return "OneOf" + theComponents;
 	}
 
-	<S2 extends S> Queue<Expression<S2>> possibilities(ExpressoParser<S2> parser, Set<Expression<S2>> allVisited)
-		throws IOException {
-		SortedTreeList<Expression<S2>> possibilities = new SortedTreeList<>(false, Expression::compareTo);
-		for (ExpressionType<? super S> component : theComponents) {
-			Expression<S2> possibility = parser.parseWith(component);
-			if (possibility == null || possibility.length() == 0) {
-			} else if (!parser.tolerateErrors() && possibility.getErrorCount() > 0) {
-			} else if (allVisited.add(possibility))
-				possibilities.add(possibility);
+	<S2 extends S> Expression<S2> recurse(Expression<S2> expression, ElementId componentId, ExpressoParser<S2> parser) throws IOException {
+		CollectionElement<? extends ExpressionType<? super S>> component = theComponents.getAdjacentElement(componentId, true);
+		while (component != null) {
+			ElementId compId = component.getElementId();
+
+			Expression<S2> recursed = parser.parseWith(component.get());
+			if (recursed != null)
+				return new OneOfPossibility<>(this, recursed, component.getElementId());
+			component = theComponents.getAdjacentElement(compId, true);
 		}
-		return possibilities;
+		return null;
 	}
 
 	private static class OneOfPossibility<S extends BranchableStream<?, ?>> implements Expression<S> {
 		private final OneOfExpressionType<? super S> theType;
-		private final ExpressoParser<S> theParser;
 		private final Expression<S> theComponent;
-		private final Collection<Expression<S>> otherPossibilities;
-		private final Set<Expression<S>> allVisited;
+		private final ElementId theComponentId;
 
-		OneOfPossibility(OneOfExpressionType<? super S> type, ExpressoParser<S> parser, Expression<S> component,
-			Collection<Expression<S>> otherPossibilities, Set<Expression<S>> allVisited) {
+		OneOfPossibility(OneOfExpressionType<? super S> type, Expression<S> component, ElementId componentId) {
 			theType = type;
-			theParser = parser;
 			theComponent = component;
-			this.otherPossibilities = otherPossibilities;
-			this.allVisited = allVisited;
+			theComponentId = componentId;
 		}
 
 		@Override
@@ -116,7 +105,7 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 
 		@Override
 		public S getStream() {
-			return theParser.getStream();
+			return theComponent.getStream();
 		}
 
 		@Override
@@ -130,25 +119,22 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 		}
 
 		@Override
-		public Collection<? extends Expression<S>> fork() throws IOException {
-			CompositeCollection<Expression<S>> forked = new CompositeCollection<>();
-			if (!otherPossibilities.isEmpty()) {
-				forked.addComponent(otherPossibilities.stream().map(this::singletonPossibility)
-					.collect(Collectors.toCollection(() -> new ArrayList<>(otherPossibilities.size()))));
-			}
-			Collection<? extends Expression<S>> componentForks = theComponent.fork();
-			if (!componentForks.isEmpty()) {
-				forked.addComponent(componentForks.stream().filter(allVisited::add).map(this::singletonPossibility)
-					.collect(Collectors.toCollection(() -> new ArrayList<>(componentForks.size()))));
-			}
-			Queue<Expression<S>> dive = theType.possibilities(theParser.useCache(theType, this), allVisited);
-			if (!dive.isEmpty())
-				forked.addComponent(Arrays.asList(new OneOfPossibility<>(theType, theParser, dive.poll(), dive, allVisited)));
-			return forked;
-		}
+		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+			Expression<S> next = parser.nextMatch(theComponent);
+			if (next != null)
+				return new OneOfPossibility<>(theType, next, theComponentId);
+			
+			CollectionElement<? extends ExpressionType<? super S>> component = theType.getComponents().getAdjacentElement(theComponentId,
+				true);
+			while (component != null) {
+				ElementId compId = component.getElementId();
 
-		OneOfPossibility<S> singletonPossibility(Expression<S> possibility) {
-			return new OneOfPossibility<>(theType, theParser, possibility, Collections.emptyList(), allVisited);
+				Expression<S> recursed = parser.parseWith(component.get());
+				if (recursed != null)
+					return new OneOfPossibility<>(theType, recursed, component.getElementId());
+				component = theType.getComponents().getAdjacentElement(compId, true);
+			}
+			return null;
 		}
 
 		@Override
@@ -172,13 +158,13 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 		}
 
 		@Override
-		public int getComplexity() {
-			return theComponent.getComplexity() + 1;
+		public int getMatchQuality() {
+			return theComponent.getMatchQuality();
 		}
 
 		@Override
-		public int getMatchQuality() {
-			return theComponent.getMatchQuality();
+		public boolean isInvariant() {
+			return theComponent.isInvariant();
 		}
 
 		@Override
@@ -210,7 +196,7 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 			if (length() == 0)
 				str.append("(empty)");
 			else
-				str.append(": ").append(printContent());
+				str.append(": ").append(printContent(true));
 			str.append('\n');
 			theComponent.print(str, indent + 1, "");
 			return str;
@@ -219,6 +205,97 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 		@Override
 		public String toString() {
 			return print(new StringBuilder(), 0, "").toString();
+		}
+	}
+
+	static class InvariantExpression<S extends BranchableStream<?, ?>> implements Expression<S> {
+		private final Expression<S> theExpression;
+
+		InvariantExpression(Expression<S> expression) {
+			theExpression = expression;
+		}
+
+		@Override
+		public ExpressionType<? super S> getType() {
+			return theExpression.getType();
+		}
+
+		@Override
+		public S getStream() {
+			return theExpression.getStream();
+		}
+
+		@Override
+		public int length() {
+			return theExpression.length();
+		}
+
+		@Override
+		public List<? extends Expression<S>> getChildren() {
+			return theExpression.getChildren();
+		}
+
+		@Override
+		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+			return null;
+		}
+
+		@Override
+		public int getErrorCount() {
+			return theExpression.getErrorCount();
+		}
+
+		@Override
+		public Expression<S> getFirstError() {
+			return theExpression.getFirstError();
+		}
+
+		@Override
+		public int getLocalErrorRelativePosition() {
+			return theExpression.getLocalErrorRelativePosition();
+		}
+
+		@Override
+		public String getLocalErrorMessage() {
+			return theExpression.getLocalErrorMessage();
+		}
+
+		@Override
+		public Expression<S> unwrap() {
+			return theExpression.unwrap();
+		}
+
+		@Override
+		public int getMatchQuality() {
+			return theExpression.getMatchQuality();
+		}
+
+		@Override
+		public boolean isInvariant() {
+			return true;
+		}
+
+		@Override
+		public StringBuilder print(StringBuilder str, int indent, String metadata) {
+			return theExpression.print(str, indent, metadata);
+		}
+
+		@Override
+		public int hashCode() {
+			return theExpression.hashCode();
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (obj instanceof InvariantExpression)
+				return theExpression.equals(((InvariantExpression<?>) obj).theExpression);
+			else
+				return theExpression.equals(obj);
+		}
+
+		@Override
+		public String toString() {
+			return theExpression.toString();
 		}
 	}
 }

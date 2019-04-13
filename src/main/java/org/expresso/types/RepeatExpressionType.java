@@ -6,7 +6,7 @@ import java.util.List;
 import org.expresso.Expression;
 import org.expresso.ExpressionType;
 import org.expresso.stream.BranchableStream;
-import org.qommons.BiTuple;
+import org.expresso.util.ExpressoUtils;
 
 /**
  * An expression composed of one or more repetitions of another sequence of expressions
@@ -16,7 +16,7 @@ import org.qommons.BiTuple;
 public class RepeatExpressionType<S extends BranchableStream<?, ?>> extends AbstractSequencedExpressionType<S> {
 	private final int theMinCount;
 	private final int theMaxCount;
-	private final org.expresso.types.SequenceExpressionType<S> theSequence;
+	private final SequenceExpressionType<S> theSequence;
 
 	/**
 	 * @param id The cache ID for this expression
@@ -30,8 +30,20 @@ public class RepeatExpressionType<S extends BranchableStream<?, ?>> extends Abst
 			throw new IllegalArgumentException("min (" + min + ") must be <= max (" + max + ")");
 		theMinCount = min;
 		theMaxCount = max;
-		theSequence = new org.expresso.types.SequenceExpressionType<>(-1, components);
-		((InfiniteSequenceRepeater<org.expresso.types.SequenceExpressionType<S>>) getSequence()).theValue = theSequence;
+		theSequence = new SequenceExpressionType<>(-1, components);
+		((InfiniteSequenceRepeater<SequenceExpressionType<S>>) getComponents()).theValue = theSequence;
+	}
+
+	@Override
+	public int getEmptyQuality(int minQuality) {
+		if (theMinCount == 0)
+			return 0;
+		else {
+			int quality = minQuality;
+			for (int i = 0; i < theMinCount; i++)
+				quality += theSequence.getEmptyQuality(quality);
+			return quality;
+		}
 	}
 
 	/** @return The minimum repetition count for the sequence needed to satisfy this expression */
@@ -55,23 +67,34 @@ public class RepeatExpressionType<S extends BranchableStream<?, ?>> extends Abst
 	}
 
 	@Override
-	public int getSpecificity() {
-		return theMinCount * theSequence.getSpecificity();
-	}
-
-	@Override
-	protected BiTuple<String, Integer> getErrorForComponents(List<? extends Expression<? extends S>> components) {
-		if (components.size() < theMinCount)
-			return new BiTuple<>(
-				"At least " + theMinCount + " " + theSequence + (theMinCount > 1 ? "s" : "") + " expected, but found " + components.size(),
-				theSequence.getSpecificity() * (theMinCount - components.size()));
-		else if (components.size() > theMaxCount) {
+	protected CompositionError getErrorForComponents(List<? extends Expression<? extends S>> components, int minQuality) {
+		if (components.size() < theMinCount) {
+			// TrackNode r1Node = TRACKER.start("repeat1");
+			// TrackNode posNode = TRACKER.start("length");
+			int pos = ExpressoUtils.getLength(0, components);
+			// posNode.end();
+			int missing = theMinCount - components.size();
+			int weight = missing * -theSequence.getEmptyQuality(minQuality == 0 ? 0 : (minQuality / missing) - 1);
+			// r1Node.end();
+			return new CompositionError(pos, () -> {
+				return new StringBuilder("At least ").append(theMinCount).append(' ').append(theSequence).append(theMinCount > 1 ? "s" : "")
+					.append(" expected, but found ").append(components.size()).toString();
+			}, weight);
+		} else if (components.size() > theMaxCount) {
+			// TrackNode r2Node = TRACKER.start("repeat2");
 			int weight = 0;
+			// TrackNode posNode = TRACKER.start("length");
+			int pos = theMaxCount == 0 ? 0 : ExpressoUtils.getEnd(components.get(theMaxCount - 1));
+			// posNode.end();
 			for (int i = theMaxCount; i < components.size(); i++)
 				weight += Math.abs(components.get(i).getMatchQuality());
+
 			// For more matches than allowed, the extra matches count against the match's quality
-			return new BiTuple<>("No more than " + theMaxCount + " " + theSequence + (theMaxCount > 1 ? "s" : "") + " expected, but found "
-				+ components.size(), weight * 2);
+			// r2Node.end();
+			return new CompositionError(pos, () -> {
+				return new StringBuilder("No more than ").append(theMaxCount).append(' ').append(theSequence)
+					.append(theMaxCount > 1 ? "s" : "").append(" expected, but found ").append(components.size()).toString();
+			}, weight * 2);
 		}
 		return null;
 	}
@@ -95,30 +118,24 @@ public class RepeatExpressionType<S extends BranchableStream<?, ?>> extends Abst
 
 		@Override
 		public Iterator<E> iterator() {
-			return new InifiniteRepeatingIterator<>(theValue);
+			return new ISIterator();
 		}
 
 		@Override
 		public String toString() {
 			return theValue + "*";
 		}
-	}
 
-	private static class InifiniteRepeatingIterator<E> implements Iterator<E> {
-		private final E theValue;
+		private class ISIterator implements Iterator<E> {
+			@Override
+			public boolean hasNext() {
+				return true;
+			}
 
-		InifiniteRepeatingIterator(E value) {
-			theValue = value;
-		}
-
-		@Override
-		public boolean hasNext() {
-			return true;
-		}
-
-		@Override
-		public E next() {
-			return theValue;
+			@Override
+			public E next() {
+				return theValue;
+			}
 		}
 	}
 }
