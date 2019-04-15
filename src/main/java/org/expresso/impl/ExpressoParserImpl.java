@@ -18,10 +18,15 @@ import org.expresso.stream.BranchableStream;
  * @param <S> The type of the stream to parse
  */
 public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements ExpressoParser<S> {
+	/** A hash key representing a parser of this type */
 	public static class Template {
 		final int position;
 		final int[] excludedTypes;
 
+		/**
+		 * @param position The position in the stream
+		 * @param excludedTypes The types excluded from parsing
+		 */
 		public Template(int position, int[] excludedTypes) {
 			this.position = position;
 			this.excludedTypes = excludedTypes;

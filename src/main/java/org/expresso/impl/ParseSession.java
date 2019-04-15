@@ -39,6 +39,7 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 			setDebugger(null);
 	}
 
+	/** @return The current minimum quality level for matches parsed in this session */
 	public int getQualityLevel() {
 		return theQualityLevel;
 	}
@@ -76,10 +77,12 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 		return best;
 	}
 
+	/** @return The debugger being used to track parsing progress */
 	public ExpressoDebugger getDebugger() {
 		return theDebugger;
 	}
 
+	/** @param debugger The debugger to use to track parsing progress */
 	public void setDebugger(ExpressoDebugger debugger) {
 		if (debugger != null)
 			theDebugger = debugger;
