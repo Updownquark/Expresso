@@ -68,6 +68,11 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 		}
 
 		@Override
+		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
+			return null;
+		}
+
+		@Override
 		public StringBuilder print(StringBuilder str, int indent, String metadata) {
 			return theOption.print(str, indent, metadata + "(optional)");
 		}

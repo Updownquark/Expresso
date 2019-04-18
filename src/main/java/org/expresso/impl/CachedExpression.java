@@ -10,15 +10,16 @@ import org.expresso.stream.BranchableStream;
 
 class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S> {
 	private final ExpressionType<? super S> theType;
-	private Expression<S> thePossibility;
+	Expression<S> thePossibility;
 	private CachedExpression<S> theNextMatch;
+	private CachedExpression<S> theNextLowPriorityMatch;
 	private int cachedHash = -1;
 
-	CachedExpression(ExpressionType<? super S> type) {
+	private CachedExpression(ExpressionType<? super S> type) {
 		theType = type;
 	}
 
-	CachedExpression<S> setPossibility(Expression<S> possibility) {
+	protected CachedExpression<S> setPossibility(Expression<S> possibility) {
 		thePossibility = possibility;
 		return this;
 	}
@@ -42,13 +43,34 @@ class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S
 		return thePossibility.length();
 	}
 
+	boolean hasNextMatch() {
+		return theNextMatch != null;
+	}
+
 	@Override
 	public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
-		if (theNextMatch == null) {
-			Expression<S> next = thePossibility.nextMatch(parser);
-			theNextMatch = new CachedExpression<S>(theType).setPossibility(next);
-		}
-		return theNextMatch.asPossibility();
+		if (theNextMatch != null) {
+			return theNextMatch.asPossibility();
+		} else
+			return thePossibility.nextMatch(parser);
+	}
+
+	void cacheNext(Expression<S> next) {
+		if (theNextMatch == null)
+			theNextMatch = CachedExpression.<S> cacheFor(theType).setPossibility(next);
+	}
+
+	@Override
+	public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
+		if (theNextLowPriorityMatch != null) {
+			return theNextLowPriorityMatch.asPossibility();
+		} else
+			return thePossibility.nextMatchLowPriority(parser);
+	}
+
+	void cacheNextLowPriority(Expression<S> next) {
+		if (theNextLowPriorityMatch == null)
+			theNextLowPriorityMatch = CachedExpression.<S> cacheFor(getType()).setPossibility(next);
 	}
 
 	@Override
@@ -129,5 +151,9 @@ class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S
 	@Override
 	public String toString() {
 		return print(new StringBuilder(), 0, "").toString();
+	}
+
+	static <S extends BranchableStream<?, ?>> CachedExpression<S> cacheFor(ExpressionType<? super S> type) {
+		return new CachedExpression<>(type);
 	}
 }

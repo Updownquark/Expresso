@@ -64,6 +64,15 @@ public interface ExpressionField<S extends BranchableStream<?, ?>> extends Expre
 	}
 
 	@Override
+	default Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
+		Expression<S> wrapFork = parser.nextMatchLowPriority(getWrapped());
+		if (wrapFork == null)
+			return null;
+		else
+			return new SimpleExpressionField<>(getType(), wrapFork);
+	}
+
+	@Override
 	default int getMatchQuality() {
 		return getWrapped().getMatchQuality();
 	}

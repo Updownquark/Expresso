@@ -79,6 +79,11 @@ public class ForbidExpressionType<S extends BranchableStream<?, ?>> extends Abst
 		}
 
 		@Override
+		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
+			return null;
+		}
+
+		@Override
 		protected CompositionError getSelfError(ExpressoParser<S> parser) {
 			// theForbidden field is not initialized yet, need to use the children
 			Expression<S> forbidden = getChildren().get(0);

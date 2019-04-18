@@ -35,6 +35,8 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 	 */
 	Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException;
 
+	Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException;
+
 	/** @return The number of errors in this possibility */
 	int getErrorCount();
 
@@ -84,6 +86,10 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 		BetterList<Expression<S>> lastFieldResult = new BetterTreeList<>(false);
 		result.add(this);
 		for (String field : fields) {
+			boolean optional = field.length() > 1 && field.charAt(0) == '?';
+			if (optional)
+				field = field.substring(1);
+
 			// We could clear out lastFieldResult and add all the results to it, then clear the results, but this is more efficient
 			BetterList<Expression<S>> temp = result;
 			result = lastFieldResult;
@@ -91,10 +97,14 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 			result.clear();
 			for (Expression<S> lfr : lastFieldResult) {
 				if (lfr instanceof ExpressionField) {
-					for (Expression<S> child : lfr.getChildren())
-						FieldSearcher.findFields(child, field, result);
-				} else
-					FieldSearcher.findFields(lfr, field, result);
+					for (Expression<S> child : lfr.getChildren()) {
+						if (!FieldSearcher.findFields(child, field, result) && optional)
+							result.add(lfr);
+					}
+				} else {
+					if (!FieldSearcher.findFields(lfr, field, result) && optional)
+						result.add(lfr);
+				}
 			}
 		}
 		return (BetterList<ExpressionField<S>>) (Deque<?>) result;
@@ -210,6 +220,11 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 			}
 
 			@Override
+			public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
+				return null;
+			}
+
+			@Override
 			public int getErrorCount() {
 				return 0;
 			}
@@ -271,15 +286,19 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 
 	/** A worker class that searches an expression's tree structure for fields */
 	public static class FieldSearcher {
-		static <S extends BranchableStream<?, ?>> void findFields(Expression<S> expr, String field,
+		static <S extends BranchableStream<?, ?>> boolean findFields(Expression<S> expr, String field,
 			Deque<Expression<S>> results) {
+			boolean found;
 			if (expr instanceof ExpressionField) {
-				if (((ExpressionField<S>) expr).getType().getFields().contains(field))
+				found = ((ExpressionField<S>) expr).getType().getFields().contains(field);
+				if (found)
 					results.add(expr);
-				return;
+				return found;
 			}
+			found = false;
 			for (Expression<S> child : expr.getChildren())
-				findFields(child, field, results);
+				found |= findFields(child, field, results);
+			return found;
 		}
 	}
 }

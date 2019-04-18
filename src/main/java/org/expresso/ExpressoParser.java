@@ -29,22 +29,7 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> {
 	 */
 	ExpressoParser<S> exclude(int... expressionIds);
 
-	/**
-	 * Allows expression types to insert data into a derived parser that will be available deeper in the stack
-	 * 
-	 * @param type The type to store data for
-	 * @param datum The data to store
-	 * @return The derived parser containing the data
-	 */
-	ExpressoParser<S> withState(ExpressionType<? super S> type, Object datum);
-
-	/**
-	 * Retrieves data stored with {@link #withState(ExpressionType, Object)}
-	 * 
-	 * @param type The type that the data was stored under
-	 * @return The stored data, or null if no data was stored in this parser
-	 */
-	Object getState(ExpressionType<? super S> type);
+	ExpressoParser<S> withInterrupt(ExpressionType<? super S> type, Expression<S> result);
 
 	/**
 	 * @param type The expression type to substitute cache for
@@ -59,7 +44,16 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> {
 	 * @return The most likely possibility for parsing the stream at this parser's position with the given expression type
 	 * @throws IOException If an error occurs reading the stream
 	 */
-	Expression<S> parseWith(ExpressionType<? super S> type) throws IOException;
+	default Expression<S> parseWith(ExpressionType<? super S> type) throws IOException {
+		return parseWith(type, true);
+	}
+
+	/**
+	 * @param type The expression type to parse with
+	 * @return The most likely possibility for parsing the stream at this parser's position with the given expression type
+	 * @throws IOException If an error occurs reading the stream
+	 */
+	Expression<S> parseWith(ExpressionType<? super S> type, boolean useCache) throws IOException;
 
 	/**
 	 * @param expression The expression to branch
@@ -67,4 +61,6 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> {
 	 * @throws IOException If an error occurs reading the stream
 	 */
 	Expression<S> nextMatch(Expression<S> expression) throws IOException;
+
+	Expression<S> nextMatchLowPriority(Expression<S> expression) throws IOException;
 }

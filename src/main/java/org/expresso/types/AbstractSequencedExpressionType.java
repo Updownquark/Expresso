@@ -89,68 +89,62 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 
 	<S2 extends S> Expression<S2> branch(LinkedList<Expression<S2>> repetitions, ExpressoParser<S2> parser, boolean mustChange)
 		throws IOException {
-		// TrackNode branchNode = TRACKER.start("branch");
 		boolean changed = false;
 		int childQuality = 0;
 		for (Expression<S2> rep : repetitions)
 			childQuality += rep.getMatchQuality();
-		try {
-			while (true) {
-				ExpressoParser<S2> branched;
-				if (repetitions.isEmpty())
-					branched = parser;
-				else
-					branched = parser.advance(ExpressoUtils.getLength(parser.getStream().getPosition(), repetitions));
-				SequencePossibility<S2> seq = null;
-				boolean tested = false;
-				while (branched != null && hasChild(repetitions.size())) {
-					if (!mustChange || changed) {
-						tested = true;
-						seq = buildIfSatisfactory(repetitions, parser, childQuality);
-						if (seq != null)
-							return seq;
-					}
-					ExpressionType<? super S> component = theSequenceCache.get(repetitions.size());
-					if (!repetitions.isEmpty() && repetitions.getLast().length() == 0 && repetitions.getLast().getType() == component) {
-						break; // Repeating the same type with zero length is bad
-					} else {
-						// branchNode.end();
-						// branchNode = null;
-						Expression<S2> repetition = branched.parseWith(component);
-						// branchNode = TRACKER.start("branch");
-						if (repetition != null) {
-							int tempCQ = childQuality + repetition.getMatchQuality();
-							if (tempCQ >= parser.getQualityLevel()) {
-								childQuality = tempCQ;
-								tested = false;
-								changed = true;
-								repetitions.add(repetition);
-								branched = branched.advance(repetition.length());
-							}
-						} else
-							break;
-					}
-				}
-				if (!tested && (!mustChange || changed)) {
+		while (true) {
+			ExpressoParser<S2> branched;
+			if (repetitions.isEmpty())
+				branched = parser;
+			else
+				branched = parser.advance(ExpressoUtils.getLength(parser.getStream().getPosition(), repetitions));
+			SequencePossibility<S2> seq = null;
+			boolean tested = false;
+			while (branched != null && hasChild(repetitions.size())) {
+				if (!mustChange || changed) {
+					tested = true;
 					seq = buildIfSatisfactory(repetitions, parser, childQuality);
 					if (seq != null)
 						return seq;
 				}
-				while (true) {
-					if (repetitions.isEmpty())
-						return null; // All possibilities exhausted
-					// Try a different branch of a previous element in the sequence
-					Expression<S2> last = repetitions.removeLast();
-					if (last.isInvariant())
-						return null; // Can't back up any farther
-					int lastPos = ExpressoUtils.getLength(parser.getStream().getPosition(), repetitions);
-					childQuality -= last.getMatchQuality();
-					branched = parser.advance(lastPos);
-					// branchNode.end();
-					// branchNode = null;
-					Expression<S2> repetition = branched.nextMatch(last);
-					// branchNode = TRACKER.start("branch");
+				ExpressionType<? super S> component = theSequenceCache.get(repetitions.size());
+				if (!repetitions.isEmpty() && repetitions.getLast().length() == 0 && repetitions.getLast().getType() == component) {
+					break; // Repeating the same type with zero length is bad
+				} else {
+					Expression<S2> repetition = branched.parseWith(component);
 					if (repetition != null) {
+						int tempCQ = childQuality + repetition.getMatchQuality();
+						if (tempCQ >= parser.getQualityLevel()) {
+							childQuality = tempCQ;
+							tested = false;
+							changed = true;
+							repetitions.add(repetition);
+							branched = branched.advance(repetition.length());
+						}
+					} else
+						break;
+				}
+			}
+			if (!tested && (!mustChange || changed)) {
+				seq = buildIfSatisfactory(repetitions, parser, childQuality);
+				if (seq != null)
+					return seq;
+			}
+			while (true) {
+				if (repetitions.isEmpty())
+					return null; // All possibilities exhausted
+				// Try a different branch of a previous element in the sequence
+				Expression<S2> last = repetitions.removeLast();
+				if (last.isInvariant())
+					return null; // Can't back up any farther
+				int lastPos = ExpressoUtils.getLength(parser.getStream().getPosition(), repetitions);
+				childQuality -= last.getMatchQuality();
+				branched = parser.advance(lastPos);
+				Expression<S2> repetition = branched.nextMatch(last);
+				if (repetition != null) {
+					// If the match doesn't differ in length or quality, we won't have any better luck with it
+					if (repetition.length() != last.length() || repetition.getMatchQuality() >= last.getMatchQuality()) {
 						int tempCQ = childQuality + repetition.getMatchQuality();
 						if (tempCQ >= parser.getQualityLevel()) {
 							childQuality = tempCQ;
@@ -161,9 +155,6 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 					}
 				}
 			}
-		} finally {
-			// if (branchNode != null)
-			// branchNode.end();
 		}
 	}
 
@@ -231,6 +222,11 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 			return getType()//
 				.branch(//
 					new LinkedList<>(getChildren()), parser, true);
+		}
+
+		@Override
+		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
+			return null;
 		}
 
 		@Override

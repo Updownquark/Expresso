@@ -80,5 +80,10 @@ public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends Abst
 				return new LeadUpPossibility<>(getType(), parser, theTerminal, next);
 			return null;
 		}
+
+		@Override
+		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
+			return null;
+		}
 	}
 }

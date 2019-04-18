@@ -17,7 +17,7 @@
 		<class name="type" />
 		<class name="declarable-type" extends="type" />
 		<class name="concrete-type" extends="declarable-type" />
-		<class name="class-content" />
+		<class name="class-content" extends="body-content" />
 		<class name="declaration" extends="class-content" />
 		<class name="file-content" />
 		<class name="import" extends="file-content" />
@@ -328,7 +328,7 @@
 	</expression>
 	
 	<!-- Types -->
-	<expression name="identifier" class="assignable,result-producer">
+	<expression name="identifier">
 		<pattern field="name">[_a-zA-Z][_a-zA-Z0-9]*</pattern>
 	</expression>
 	<expression name="primitive" class="concrete-type">
@@ -344,15 +344,12 @@
 			<literal>double</literal>
 		</one-of>
 	</expression>
-	<expression name="basic-type" priority="998" class="concrete-type">
-		<!-- Just documenting, this is in this order as opposed to having the repeat first because of var-args.  With the repeat first,
-			var arg parameters were parsed with the repeat successful (identifier, then '.'), but the next identifier wasn't there, so the
-			parsing failed.  This ordering fixes this problem. -->
-		<identifier field="name" />
-		<repeat>
+	<expression name="qualified-name" priority="250" class="concrete-type,result-producer,assignable">
+		<option>
+			<qualified-name field="target" />
 			<literal>.</literal>
-			<identifier field="name" />
-		</repeat>
+		</option>
+		<identifier field="name" />
 	</expression>
 	<expression name="array-type" priority="998" class="type">
 		<type field="type"/>
@@ -390,7 +387,7 @@
 		<literal>&gt;</literal>
 	</expression>
 	<expression name="generic-type" priority="998" class="declarable-type">
-		<basic-type field="base" />
+		<qualified-name field="base" />
 		<type-parameters field="parameters" />
 	</expression>
 
@@ -432,7 +429,7 @@
 	<expression name="annotations">
 		<repeat min="1">
 			<literal>@</literal>
-			<basic-type field="type" />
+			<qualified-name field="type" />
 			<option>
 				<literal>(</literal>
 				<one-of>
@@ -469,12 +466,21 @@
 		</one-of>
 	</expression>
 	<expression name="variable-declaration" class="declaration,assignable,statement-content">
-		<option>
-			<annotations field="annotations" />
-		</option>
 		<repeat>
 			<qualifier field="qualifier" />
 		</repeat>
+		<type field="type" />
+		<identifier field="name" />
+		<repeat>
+			<literal>,</literal>
+			<identifier field="name" />
+		</repeat>
+		<literal>;</literal>
+	</expression>
+	<expression name="parameter-declaration">
+		<option>
+			<annotations field="annotations" />
+		</option>
 		<type field="type" />
 		<option>
 			<literal field="var-args">...</literal>
@@ -491,17 +497,15 @@
 		<option>
 			<type-parameters field="type-parameters" />
 		</option>
-		<option>
-			<type field="type" />
-			<whitespace />
-		</option>
+		<type field="type" />
+		<whitespace />
 		<identifier field="name" />
 		<literal>(</literal>
 			<option>
-				<variable-declaration field="parameter" />
+				<parameter-declaration field="parameter" />
 				<repeat>
 					<literal>,</literal>
-					<variable-declaration field="parameter" />
+					<parameter-declaration field="parameter" />
 				</repeat>
 			</option>
 		<literal>)</literal>
@@ -513,9 +517,17 @@
 				<type field="thrown" />
 			</repeat>
 		</option>
-		<option>
-			<block field="body" />
-		</option>
+		<one-of>
+			<sequence>
+				<block field="body" />
+				<option>
+					<literal>;</literal>
+				</option>
+			</sequence>
+			<option>
+				<literal>;</literal>
+			</option>
+		</one-of>
 	</expression>
 	<expression name="class-declaration" class="declaration,body-content,file-content">
 		<option>
@@ -551,7 +563,7 @@
 		</option>
 		<literal>{</literal>
 			<repeat>
-				<statement field="content" />
+				<class-content field="content" />
 			</repeat>
 		<literal>}</literal>
 	</expression>
@@ -592,14 +604,14 @@
 				<literal>;</literal>
 			</option>
 			<repeat>
-				<statement field="content" />
+				<class-content field="content" />
 			</repeat>
 		<literal>}</literal>
 	</expression>
 	<expression name="type-import" class="import">
 		<literal>import</literal>
 		<whitespace />
-		<basic-type field="type" />
+		<qualified-name field="type" />
 		<option>
 			<literal field="wildcard">.*</literal>
 		</option>
@@ -610,7 +622,7 @@
 		<whitespace />
 		<literal>static</literal>
 		<whitespace />
-		<basic-type field="type" />
+		<qualified-name field="type" />
 		<option>
 			<literal field="wildcard">.*</literal>
 		</option>

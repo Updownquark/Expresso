@@ -120,10 +120,16 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 
 		@Override
 		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+			if (theComponent.isInvariant())
+				return null;
 			Expression<S> next = parser.nextMatch(theComponent);
 			if (next != null)
 				return new OneOfPossibility<>(theType, next, theComponentId);
-			
+			return null;
+		}
+
+		@Override
+		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
 			CollectionElement<? extends ExpressionType<? super S>> component = theType.getComponents().getAdjacentElement(theComponentId,
 				true);
 			while (component != null) {
@@ -237,6 +243,11 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 
 		@Override
 		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+			return null;
+		}
+
+		@Override
+		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
 			return null;
 		}
 

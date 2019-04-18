@@ -3,14 +3,18 @@ package org.expresso.impl;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import org.expresso.DualPriorityBranchingExpression;
 import org.expresso.Expression;
 import org.expresso.ExpressionType;
 import org.expresso.ExpressoParser;
 import org.expresso.debug.ExpressoDebugger.DebugExpressionParsing;
 import org.expresso.debug.ExpressoDebugger.DebugResultMethod;
 import org.expresso.stream.BranchableStream;
+import org.qommons.collect.BetterSet;
+import org.qommons.collect.CollectionElement;
 
 /**
  * Default implementation of {@link ExpressoParser}
@@ -55,21 +59,20 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	private final ParseSession<S> theSession;
 	private final S theStream;
 	private final int[] theExcludedTypes;
-	private final PersistentStack<ComponentStateInfo<S>> theStates;
+	private final BetterSet<ComponentRecursiveInterrupt<S>> theStack;
 	private final Map<Integer, CachedExpression<S>> theCache;
 
 	/**
 	 * @param session The parsing session
 	 * @param stream The stream (with position)
 	 * @param excludedTypes IDs of types that this parser will not return expressions for
-	 * @param cacheOverride Cache overrides for this parser
+	 * @param stack The expression stack for this position
 	 */
-	public ExpressoParserImpl(ParseSession<S> session, S stream, int[] excludedTypes,
-		PersistentStack<ComponentStateInfo<S>> cacheOverride) {
+	public ExpressoParserImpl(ParseSession<S> session, S stream, int[] excludedTypes, BetterSet<ComponentRecursiveInterrupt<S>> stack) {
 		theSession = session;
 		theStream = stream;
 		theExcludedTypes = excludedTypes;
-		theStates = cacheOverride;
+		theStack = stack;
 		theCache = new HashMap<>();
 	}
 
@@ -101,41 +104,83 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		int[] union = union(theExcludedTypes, expressionIds);
 		if (union == theExcludedTypes)
 			return this;
-		else if (theStates == null) {
+		else {
 			try {
 				// theSession.debug(() -> "Excluding " + Arrays.toString(expressionIds));
 				return theSession.getParser(theStream, 0, union);
 			} catch (IOException e) {
 				throw new IllegalStateException("Should not happen--not advancing stream", e);
 			}
-		} else
-			return new ExpressoParserImpl<>(theSession, theStream, union, theStates);
+		}
 	}
 
 	@Override
-	public ExpressoParser<S> withState(ExpressionType<? super S> type, Object datum) {
+	public ExpressoParser<S> withInterrupt(ExpressionType<? super S> type, Expression<S> result) {
 		return new ExpressoParserImpl<>(theSession, theStream, theExcludedTypes,
-			new PersistentStack<>(theStates, new ComponentStateInfo<>(type, datum)));
+			new PersistentStack<>(theStates, new ComponentRecursiveInterrupt<>(type, result)));
 	}
 
 	@Override
-	public Object getState(ExpressionType<? super S> type) {
-		ComponentStateInfo<S> override = theStates == null ? null : theStates.search(tuple -> tuple.type == type);
-		if (override != null)
-			return override.value;
-		else
-			return null;
+	public Expression<S> parseWith(ExpressionType<? super S> component, boolean useCache) throws IOException {
+		return parseWith(component, null, true);
 	}
 
-	// @Override
-	// public ExpressoParser<S> useCache(ExpressionType<? super S> component, Expression<S> result, Consumer<ExpressoParser<S>> onHit) {
-	// return new ExpressoParserImpl<>(theSession, theStream, theExcludedTypes,
-	// new PersistentStack<>(theCacheOverride, new CacheOverride<>(component, result, onHit)));
-	// }
+	class StackPushResult {
+		private ComponentRecursiveInterrupt<S> topStackFrame;
+		private Expression<S> previousInterrupt;
+		final CollectionElement<ComponentRecursiveInterrupt<S>> frame;
+		final Expression<S> interrupt;
 
-	@Override
-	public Expression<S> parseWith(ExpressionType<? super S> component) throws IOException {
+		StackPushResult(CollectionElement<ComponentRecursiveInterrupt<S>> frame, //
+			ComponentRecursiveInterrupt<S> topFrame, Expression<S> prevInterrupt) {
+			this.frame = frame;
+			this.topStackFrame = topFrame;
+			this.previousInterrupt = prevInterrupt;
+			this.interrupt = null;
+		}
+
+		StackPushResult(Expression<S> interrupt) {
+			this.interrupt = interrupt;
+			this.frame = null;
+		}
+
+		void pop() {
+			if (frame == null)
+				return;
+			theStack.mutableElement(frame.getElementId()).remove();
+			if (topStackFrame != null)
+				topStackFrame.result = previousInterrupt;
+		}
+	}
+
+	StackPushResult pushOnStack(ExpressionType<? super S> component, Expression<S> recursiveInterrupt, boolean interruptible) {
+		CollectionElement<ComponentRecursiveInterrupt<S>> stackFrame = null;
+		boolean[] added = new boolean[1];
+		stackFrame = theStack.getOrAdd(new ComponentRecursiveInterrupt<>(component, recursiveInterrupt, 0), false, () -> added[0] = true);
+		if (added[0])
+			return new StackPushResult(stackFrame, null, null);
+		else if (!interruptible) {
+			CollectionElement<ComponentRecursiveInterrupt<S>> lowStackFrame = theStack
+				.addElement(new ComponentRecursiveInterrupt<>(component, recursiveInterrupt, ++stackFrame.get().numDownstream), false);
+			Expression<S> oldRI = stackFrame.get().result;
+			stackFrame.get().result = recursiveInterrupt;
+			return new StackPushResult(lowStackFrame, stackFrame.get(), oldRI);
+		} else { // Interrupted
+			Expression<S> ri = stackFrame.get().result;
+			// Interrupts everything downstream of the interrupting frame
+			stackFrame = theStack.getAdjacentElement(stackFrame.getElementId(), true);
+			while (stackFrame != null) {
+				stackFrame.get().wasInterrupted = true;
+				stackFrame = theStack.getAdjacentElement(stackFrame.getElementId(), true);
+			}
+			return new StackPushResult(ri);
+		}
+	}
+
+	Expression<S> parseWith(ExpressionType<? super S> component, Expression<S> recursiveInterrupt, boolean interruptible)
+		throws IOException {
 		DebugExpressionParsing debug = theSession.getDebugger().begin(component, theStream, null);
+		StackPushResult stackFrame = null;
 		try {
 			int cacheId = component.getId();
 			if (cacheId < 0) {
@@ -146,7 +191,18 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				debug.finished(null, DebugResultMethod.Excluded);
 				return null;
 			}
-			if (!component.isCacheable()) {
+			stackFrame = pushOnStack(component, recursiveInterrupt, interruptible);
+			if (stackFrame.frame == null) {
+				debug.finished(stackFrame.interrupt, DebugResultMethod.RecursiveInterrupt);
+				return stackFrame.interrupt;
+			}
+			if (recursiveInterrupt != null) {
+				Expression<S> result = component.parse(this);
+				while (result != null && !find(result, recursiveInterrupt))
+					result = result.nextMatch(this);
+				debug.finished(result, DebugResultMethod.Parsed);
+				return result;
+			} else if (!component.isCacheable()) {
 				Expression<S> result = component.parse(this);
 				debug.finished(result, DebugResultMethod.Parsed);
 				return result;
@@ -154,25 +210,45 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 			boolean[] newCache = new boolean[1];
 			CachedExpression<S> cached = theCache.computeIfAbsent(cacheId, k -> {
 				newCache[0] = true;
-				return new CachedExpression<>(component);
+				return CachedExpression.cacheFor(component);
 			});
 			if (newCache[0]) {
 				Expression<S> match = component.parse(this);
-				cached.setPossibility(match);
 				debug.finished(match, DebugResultMethod.Parsed);
+				boolean cache = !stackFrame.frame.get().wasInterrupted;
+				if (cache) {
+					cached.setPossibility(match);
+					return cached.asPossibility();
+				} else {
+					theCache.remove(cacheId);
+					return match;
+				}
 			} else {
 				debug.finished(cached.asPossibility(), DebugResultMethod.UsedCache);
+				return cached.asPossibility();
 			}
-			return cached.asPossibility();
 		} catch (RuntimeException e) {
 			theSession.getDebugger().suspend();
 			throw e;
+		} finally {
+			if (stackFrame != null)
+				stackFrame.pop();
 		}
 	}
 
 	@Override
 	public Expression<S> nextMatch(Expression<S> expression) throws IOException {
+		return nextMatch(expression, null);
+	}
+
+	@Override
+	public Expression<S> nextMatchLowPriority(Expression<S> expression) throws IOException {
+		return nextMatchLowerPriority(expression, null);
+	}
+
+	private Expression<S> nextMatch(Expression<S> expression, Expression<S> recursiveInterrupt) throws IOException {
 		DebugExpressionParsing debug = theSession.getDebugger().begin(expression.getType(), theStream, expression);
+		StackPushResult stackFrame = null;
 		try {
 			int cacheId = expression.getType().getId();
 			if (cacheId < 0) {
@@ -183,12 +259,78 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				debug.finished(null, DebugResultMethod.Excluded);
 				return null;
 			}
+			stackFrame = pushOnStack(expression.getType(), recursiveInterrupt, false);
+			DebugResultMethod method;
+			if (expression instanceof CachedExpression && ((CachedExpression<?>) expression).hasNextMatch())
+				method = DebugResultMethod.UsedCache;
+			else
+				method = DebugResultMethod.Parsed;
+			if (!(expression instanceof NextMatch) && theSession.isRecursive(expression.getType()))
+				expression = new NextMatch<>(null, expression, null, 0);
 			Expression<S> match = expression.nextMatch(this);
-			debug.finished(match, DebugResultMethod.Parsed);
+			if (expression instanceof CachedExpression)
+				((CachedExpression<S>) expression).cacheNext(match);
+			else if (expression instanceof NextMatch) {
+				if (((NextMatch<S>) expression).theMatch instanceof CachedExpression)
+					((CachedExpression<S>) ((NextMatch<S>) expression).theMatch).cacheNext(match);
+			}
+			debug.finished(match, method);
 			return match;
 		} catch (RuntimeException e) {
 			theSession.getDebugger().suspend();
 			throw e;
+		} finally {
+			if (stackFrame != null)
+				stackFrame.pop();
+		}
+	}
+
+	Expression<S> nextMatchLowerPriority(Expression<S> expression, Expression<S> recursiveInterrupt)
+		throws IOException {
+		DebugExpressionParsing debug = theSession.getDebugger().begin(expression.getType(), theStream, expression);
+		StackPushResult stackFrame = null;
+		try {
+			int cacheId = expression.getType().getId();
+			if (cacheId < 0) {
+				Expression<S> result = expression.nextMatch(this);
+				debug.finished(result, DebugResultMethod.Parsed);
+				return result;
+			} else if (theExcludedTypes != null && Arrays.binarySearch(theExcludedTypes, cacheId) >= 0) {
+				debug.finished(null, DebugResultMethod.Excluded);
+				return null;
+			}
+			stackFrame = pushOnStack(expression.getType(), recursiveInterrupt, false);
+			DebugResultMethod method;
+			if (expression instanceof CachedExpression && ((CachedExpression<?>) expression).hasNextMatch())
+				method = DebugResultMethod.UsedCache;
+			else
+				method = DebugResultMethod.Parsed;
+			Expression<S> match = expression.nextMatchLowPriority(this);
+			while (match != null && recursiveInterrupt != null && !find(match, recursiveInterrupt)) {
+				Expression<S> next;
+				do {
+					next = match.nextMatch(this);
+				} while (next != null && !find(next, recursiveInterrupt));
+				if (next != null) {
+					match = next;
+					break;
+				} else
+					match = match.nextMatchLowPriority(this);
+			}
+			if (expression instanceof CachedExpression)
+				((CachedExpression<S>) expression).cacheNextLowPriority(match);
+			else if (expression instanceof NextMatch) {
+				if (((NextMatch<S>) expression).theMatch instanceof CachedExpression)
+					((CachedExpression<S>) ((NextMatch<S>) expression).theMatch).cacheNextLowPriority(match);
+			}
+			debug.finished(match, method);
+			return match;
+		} catch (RuntimeException e) {
+			theSession.getDebugger().suspend();
+			throw e;
+		} finally {
+			if (stackFrame != null)
+				stackFrame.pop();
 		}
 	}
 
@@ -240,18 +382,191 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		return theStream.toString();
 	}
 
-	static class ComponentStateInfo<S extends BranchableStream<?, ?>> {
-		final ExpressionType<? super S> type;
-		final Object value;
+	static class NextMatch<S extends BranchableStream<?, ?>> implements Expression<S> {
+		private final NextMatch<S> theSource;
+		private final Expression<S> theMatch;
+		private final Expression<S> theInvariantContent;
+		private final int theSourceStage;
 
-		public ComponentStateInfo(ExpressionType<? super S> type, Object value) {
-			this.type = type;
-			this.value = value;
+		public NextMatch(NextMatch<S> source, Expression<S> match, Expression<S> invariantContent, int sourceStage) {
+			theSource = source;
+			theMatch = match;
+			theInvariantContent = invariantContent;
+			theSourceStage = sourceStage;
+		}
+
+		@Override
+		public ExpressionType<? super S> getType() {
+			return theMatch.getType();
+		}
+
+		@Override
+		public S getStream() {
+			return theMatch.getStream();
+		}
+
+		@Override
+		public int length() {
+			return theMatch.length();
+		}
+
+		@Override
+		public List<? extends Expression<S>> getChildren() {
+			return theMatch.getChildren();
+		}
+
+		@Override
+		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+			ExpressoParserImpl<S> p = (ExpressoParserImpl<S>) parser;
+			// First, try to branch the component itself
+			ExpressoParserImpl<S>.StackPushResult stackFrame = p.pushOnStack(theMatch.getType(), null, false);
+			Expression<S> next;
+			next = theMatch.nextMatch(parser);
+			while (next != null && theInvariantContent != null && !find(next, theInvariantContent))
+				next = next.nextMatch(parser);
+			stackFrame.pop();
+			if (next != null)
+				return new NextMatch<>(this, next, theInvariantContent, 2);
+
+			return nextMatch2(p);
+		}
+
+		private Expression<S> nextMatch2(ExpressoParserImpl<S> parser) throws IOException {
+			Expression<S> next;
+			// Next, parse other matches, using this match for the initial content
+			next = parser.parseWith(theMatch.getType(), this, false);
+			if (next != null)
+				return new NextMatch<>(this, next, this, 3);
+
+			return nextMatch3(parser);
+		}
+
+		private Expression<S> nextMatch3(ExpressoParserImpl<S> parser) throws IOException {
+			Expression<S> next;
+			if (theMatch instanceof DualPriorityBranchingExpression) {
+				next = parser.nextMatchLowerPriority(theMatch, this);
+				if (next != null)
+					return new NextMatch<>(this, next, this, 4);
+			}
+
+			return nextMatch4(parser);
+		}
+
+		private Expression<S> nextMatch4(ExpressoParserImpl<S> parser) throws IOException {
+			if (theSource != null) {
+				Expression<S> next;
+				switch (theSourceStage) {
+				case 2:
+					next = theSource.nextMatch2(parser);
+					break;
+				case 3:
+					next = theSource.nextMatch3(parser);
+					break;
+				case 4:
+					next = theSource.nextMatch4(parser);
+					break;
+				default:
+					throw new IllegalStateException("There is no stage " + theSourceStage + "!");
+				}
+				return next; // No need to wrap with a reference back to this as the source, because all the stages are done.
+			} else
+				return null;
+		}
+
+		@Override
+		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
+			return null;
+		}
+
+		@Override
+		public int getErrorCount() {
+			return theMatch.getErrorCount();
+		}
+
+		@Override
+		public Expression<S> getFirstError() {
+			return theMatch.getFirstError();
+		}
+
+		@Override
+		public int getLocalErrorRelativePosition() {
+			return theMatch.getLocalErrorRelativePosition();
+		}
+
+		@Override
+		public String getLocalErrorMessage() {
+			return theMatch.getLocalErrorMessage();
+		}
+
+		@Override
+		public Expression<S> unwrap() {
+			return theMatch.unwrap();
+		}
+
+		@Override
+		public int getMatchQuality() {
+			return theMatch.getMatchQuality();
+		}
+
+		@Override
+		public boolean isInvariant() {
+			return theMatch.isInvariant();
+		}
+
+		@Override
+		public StringBuilder print(StringBuilder str, int indent, String metadata) {
+			return theMatch.print(str, indent, metadata);
 		}
 
 		@Override
 		public String toString() {
-			return type + "->" + value;
+			return theMatch.toString();
+		}
+	}
+
+	static boolean find(Expression<?> ancestor, Expression<?> descendant) {
+		if (ancestor == descendant)
+			return true;
+		for (Expression<?> child : ancestor.getChildren()) {
+			if (find(child, descendant))
+				return true;
+			else if (child.length() > 0)
+				return false;
+		}
+		return false;
+	}
+
+	static class ComponentRecursiveInterrupt<S extends BranchableStream<?, ?>> {
+		final ExpressionType<? super S> type;
+		final int depth;
+		int numDownstream;
+		Expression<S> result;
+		boolean wasInterrupted;
+
+		public ComponentRecursiveInterrupt(ExpressionType<? super S> type, Expression<S> result, int depth) {
+			this.type = type;
+			this.depth = depth;
+			this.result = result;
+		}
+
+		@Override
+		public int hashCode() {
+			int hash = type.getId();
+			if (depth > 0)
+				hash = (hash << 8) | depth;
+			return hash;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (depth > 0)
+				return false;
+			return obj instanceof ComponentRecursiveInterrupt && ((ComponentRecursiveInterrupt<?>) obj).type == type;
+		}
+
+		@Override
+		public String toString() {
+			return type + "->" + result;
 		}
 	}
 }

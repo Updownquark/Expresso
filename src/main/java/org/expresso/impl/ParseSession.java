@@ -8,10 +8,16 @@ import org.expresso.Expression;
 import org.expresso.ExpressionType;
 import org.expresso.ExpressoGrammar;
 import org.expresso.ExpressoParser;
+import org.expresso.GrammarExpressionType;
 import org.expresso.debug.ExpressoDebugUI;
 import org.expresso.debug.ExpressoDebugger;
+import org.expresso.impl.ExpressoParserImpl.ComponentRecursiveInterrupt;
 import org.expresso.stream.BranchableStream;
 import org.qommons.BreakpointHere;
+import org.qommons.collect.BetterHashSet;
+import org.qommons.collect.BetterSet;
+import org.qommons.collect.CollectionElement;
+import org.qommons.collect.ElementId;
 
 /**
  * Does the work of parsing a stream
@@ -23,6 +29,9 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 
 	private final ExpressoGrammar<? super S> theGrammar;
 	private final Map<ExpressoParserImpl.Template, ExpressoParserImpl<S>> theParsers;
+	private final Map<Integer, BetterSet<ComponentRecursiveInterrupt<S>>> theStacks;
+	private final Map<Integer, Boolean> theRecursiveCache;
+	private final BetterSet<Integer> theRecursiveVisited;
 	private ExpressoDebugger theDebugger;
 	private int theQualityLevel;
 
@@ -30,6 +39,9 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 	public ParseSession(ExpressoGrammar<? super S> grammar) {
 		theGrammar = grammar;
 		theParsers = new HashMap<>();
+		theStacks = new HashMap<>();
+		theRecursiveCache = new HashMap<>();
+		theRecursiveVisited = BetterHashSet.build().unsafe().buildSet();
 
 		if (DEBUG_UI && BreakpointHere.isDebugEnabled() != null) {
 			ExpressoDebugUI debugger = new ExpressoDebugUI();
@@ -66,7 +78,10 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 						break roundLoop;
 				}
 			}
-			theParsers.clear(); // Clear the cache between rounds
+			// Clear the cache between rounds
+			theParsers.clear();
+			theRecursiveCache.clear();
+
 			theQualityLevel--;
 			if (theQualityLevel < minQuality)
 				break;
@@ -90,6 +105,39 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 			theDebugger = ExpressoDebugger.IDLE;
 	}
 
+	public boolean isRecursive(ExpressionType<?> type) {
+		if (type.getId() < 0 || !(type instanceof GrammarExpressionType))
+			return false;
+		return theRecursiveCache.computeIfAbsent(type.getId(), //
+			id -> isRecursive(type, type, theQualityLevel));
+	}
+
+	private boolean isRecursive(ExpressionType<?> toSearch, ExpressionType<?> target, int minQuality) {
+		if (toSearch == target || Boolean.TRUE.equals(theRecursiveCache.get(toSearch.getId())))
+			return true;
+		ElementId added = null;
+		if (toSearch.getId() >= 0) {
+			added = CollectionElement.getElementId(theRecursiveVisited.addElement(toSearch.getId(), false));
+			if (added == null)
+				return false; // Found a loop, but not with the expression type we're searching for
+		}
+		try {
+			for (ExpressionType<?> child : toSearch.getComponents()) {
+				if (isRecursive(child, target, minQuality))
+					return true;
+				else {
+					minQuality -= child.getEmptyQuality(minQuality);
+					if (minQuality > 0)
+						break;
+				}
+			}
+			return false;
+		} finally {
+			if (added != null)
+				theRecursiveVisited.mutableElement(added).remove();
+		}
+	}
+
 	private static boolean isSatisfied(Expression<?> best, BranchableStream<?, ?> stream) {
 		return stream.isFullyDiscovered() && best.length() == stream.getDiscoveredLength();
 	}
@@ -101,7 +149,8 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 		ExpressoParserImpl.Template key = new ExpressoParserImpl.Template(streamPosition, excludedTypes);
 		ExpressoParserImpl<S> parser = theParsers.get(key);
 		if (parser == null) {
-			parser = new ExpressoParserImpl<>(this, (S) stream.advance(advance), excludedTypes, null);
+			parser = new ExpressoParserImpl<>(this, (S) stream.advance(advance), excludedTypes, //
+				theStacks.computeIfAbsent(streamPosition, s -> BetterHashSet.build().unsafe().buildSet()));
 			theParsers.put(key, parser);
 		}
 		return parser;

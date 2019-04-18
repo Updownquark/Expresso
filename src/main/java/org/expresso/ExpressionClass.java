@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Predicate;
 
 import org.expresso.stream.BranchableStream;
 import org.expresso.types.OneOfExpressionType;
@@ -40,6 +41,11 @@ public class ExpressionClass<S extends BranchableStream<?, ?>> extends OneOfExpr
 		theParentClasses = parentClasses;
 		theChildClasses = childClasses;
 		thePrioritizer = (x1, x2) -> ((ConfiguredExpressionType<S>) x1).getPriority() - ((ConfiguredExpressionType<S>) x2).getPriority();
+	}
+
+	@Override
+	public boolean isCacheable() {
+		return true;
 	}
 
 	@Override
@@ -80,85 +86,45 @@ public class ExpressionClass<S extends BranchableStream<?, ?>> extends OneOfExpr
 		return false;
 	}
 
-	@Override
-	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
-		RecursionRegulator<S2> regulator = (RecursionRegulator<S2>) parser.getState(this);
-		if (regulator == null && thePrioritizer != null) {
-			regulator = new RecursionRegulator<>();
-			parser = parser.withState(this, regulator);
-		} else if (regulator.isInterrupting)
-			return regulator.theInterrupt;
-		Runnable done = regulator.interrupt(null);
-		try {
-			for (CollectionElement<? extends ExpressionType<? super S>> component : getComponents().elements()) {
-				Expression<S2> possibility = parser.parseWith(//
-					component.get());
-				if (possibility != null)
-					return new ClassExpression<>(this, possibility, component.getElementId(), possibility.isInvariant(), null, false);
-			}
-		} finally {
-			done.run();
-		}
-		return null;
-	}
+	// @Override
+	// public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
+	// ExpressoParser<S2> stopRecurse = parser.withInterrupt(this, null);
+	// for (CollectionElement<? extends ExpressionType<? super S>> component : getComponents().elements()) {
+	// Expression<S2> possibility = stopRecurse.parseWith(//
+	// component.get());
+	// if (possibility != null)
+	// return new ClassExpression<>(this, possibility, component.getElementId(), null, x -> true);
+	// }
+	// return null;
+	// }
 
 	@Override
 	public String toString() {
 		return "Class " + theName;
 	}
 
-	class RecursionRegulator<S2 extends S> {
-		boolean isInterrupting;
-		Expression<S2> theInterrupt;
+	<S2 extends S> Expression<S2> recurse(ClassExpression<S2> expression, ExpressoParser<S2> parser) throws IOException {
+		ExpressoParser<S2> stopRecurse = parser.withInterrupt(this, expression);
+		CollectionElement<? extends ExpressionType<? super S>> component;
+		// TODO This wasn't working for some expressions (e.g. "a+b")
+		// component = getComponents().getElement(componentId);
+		component = getComponents().getTerminalElement(true);
+		// ExpressionType<? super S> lowerBoundComponent = component.get();
+		while (component != null) {
+			// if (!after && thePrioritizer != null) {
+			// after = thePrioritizer.compare(component.get(), lowerBoundComponent) != 0;
+			// }
+			ElementId compId = component.getElementId();
 
-		Runnable interrupt(Expression<S2> interrupt) {
-			this.theInterrupt = interrupt;
-			isInterrupting = true;
-			return () -> {
-				this.theInterrupt = null;
-				isInterrupting = false;
-			};
+			Expression<S2> recursed = stopRecurse.parseWith(component.get(), false);
+			if (recursed != null && expression.theFilter.test(recursed) && find(recursed, expression))
+				return new ClassExpression<>(this, recursed, component.getElementId(), expression.theSource, x -> find(x, expression));
+			component = getComponents().getAdjacentElement(compId, true);
 		}
+		return null;
 	}
 
-	<S2 extends S> Expression<S2> recurse(ClassExpression<S2> expression, ElementId componentId, ExpressoParser<S2> parser)
-		throws IOException {
-		// HACK!! We only want to bother about recursion with classes,
-		// since those are the only one-of operations that can be referred to by other components
-		// Eventually, this code should go into ExpressionClass itself
-		RecursionRegulator<S2> regulator = (RecursionRegulator<S2>) parser.getState(this);
-		Runnable done;
-		if (regulator != null)
-			done = regulator.interrupt(new InvariantExpression<>(expression));
-		else
-			done = () -> {
-			};
-		try {
-			CollectionElement<? extends ExpressionType<? super S>> component = getComponents().getElement(componentId);
-			// ExpressionType<? super S> lowerBoundComponent = component.get();
-			boolean after = false;
-			while (component != null) {
-				// if (!after && thePrioritizer != null) {
-				// after = thePrioritizer.compare(component.get(), lowerBoundComponent) != 0;
-				// }
-				ElementId compId = component.getElementId();
-
-				Expression<S2> recursed = parser.parseWith(component.get());
-				if (recursed != null//
-					&& (after || find(recursed, regulator.theInterrupt))// Not sure about this line
-				)
-					return new ClassExpression<>(this, recursed, component.getElementId(), false, expression.theSource,
-						expression.useSourceNext);
-				after = true;
-				component = getComponents().getAdjacentElement(compId, true);
-			}
-			return null;
-		} finally {
-			done.run();
-		}
-	}
-
-	private static boolean find(Expression<?> ancestor, Expression<?> descendant) {
+	static boolean find(Expression<?> ancestor, Expression<?> descendant) {
 		if (ancestor == descendant)
 			return true;
 		for (Expression<?> child : ancestor.getChildren()) {
@@ -170,22 +136,33 @@ public class ExpressionClass<S extends BranchableStream<?, ?>> extends OneOfExpr
 		return false;
 	}
 
+	<S2 extends S> Expression<S2> lowerPriority(ElementId componentId, ExpressoParser<S2> parser) throws IOException {
+		ExpressoParser<S2> stopRecurse = parser.withInterrupt(this, null);
+		CollectionElement<? extends ExpressionType<? super S>> component = getComponents().getAdjacentElement(componentId, true);
+		while (component != null) {
+			Expression<S2> possibility = stopRecurse.parseWith(//
+				component.get());
+			if (possibility != null)
+				return new ClassExpression<>(this, possibility, component.getElementId(), null, x -> true);
+			component = getComponents().getAdjacentElement(component.getElementId(), true);
+		}
+		return null;
+	}
+
 	private static class ClassExpression<S extends BranchableStream<?, ?>> implements Expression<S> {
 		private final ExpressionClass<? super S> theType;
 		private final Expression<S> theComponent;
 		private final ElementId theComponentId;
-		private final boolean isInvariant;
 		private final ClassExpression<S> theSource;
-		private final boolean useSourceNext;
+		final Predicate<Expression<S>> theFilter;
 
-		ClassExpression(ExpressionClass<? super S> type, Expression<S> component, ElementId componentId, boolean invariant,
-			ClassExpression<S> source, boolean useSourceNext) {
+		ClassExpression(ExpressionClass<? super S> type, Expression<S> component, ElementId componentId, ClassExpression<S> source,
+			Predicate<Expression<S>> filter) {
 			theType = type;
 			theComponent = component;
 			theComponentId = componentId;
-			isInvariant = invariant;
 			theSource = source;
-			this.useSourceNext = useSourceNext;
+			theFilter = filter;
 		}
 
 		@Override
@@ -211,31 +188,24 @@ public class ExpressionClass<S extends BranchableStream<?, ?>> extends OneOfExpr
 		@Override
 		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
 			// Try to branch the component itself
-			Expression<S> next = parser.nextMatch(theComponent);
-			if (next != null)
-				return new ClassExpression<>(theType, next, theComponentId, false, this, true);
+			ExpressoParser<S> stopRecurse = parser.withInterrupt(theType, null);
+			Expression<S> next = stopRecurse.nextMatch(theComponent);
+			if (next != null && theFilter.test(next))
+				return new ClassExpression<>(theType, next, theComponentId, this, theFilter);
 			else
 				return nextMatch2(parser);
 		}
 
 		private Expression<S> nextMatch2(ExpressoParser<S> parser) throws IOException {
-			ExpressionClass<? super S>.RecursionRegulator<S> regulator = (ExpressionClass<? super S>.RecursionRegulator<S>) parser
-				.getState(theType);
-			if (regulator == null) {
-				regulator = theType.new RecursionRegulator<>();
-				parser = parser.withState(theType, regulator);
-			} else if (regulator.isInterrupting)
-				return null; // TODO When does this happen?
-
 			// Parse lower-priority matches, interrupting recursive class parsing with this expression
-			Expression<S> next = theType.recurse(this, theComponentId, parser);
+			Expression<S> next = theType.recurse(this, parser);
 			if (next != null)
 				return next;
 
 			if (theSource != null)
 				return theSource.nextMatch2(parser);
-
-			return null;
+			else
+				return theType.lowerPriority(theComponentId, parser);
 		}
 
 		@Override
@@ -265,7 +235,7 @@ public class ExpressionClass<S extends BranchableStream<?, ?>> extends OneOfExpr
 
 		@Override
 		public boolean isInvariant() {
-			return isInvariant;
+			return false;
 		}
 
 		@Override
@@ -306,97 +276,6 @@ public class ExpressionClass<S extends BranchableStream<?, ?>> extends OneOfExpr
 		@Override
 		public String toString() {
 			return print(new StringBuilder(), 0, "").toString();
-		}
-	}
-
-	static class InvariantExpression<S extends BranchableStream<?, ?>> implements Expression<S> {
-		private final Expression<S> theExpression;
-
-		InvariantExpression(Expression<S> expression) {
-			theExpression = expression;
-		}
-
-		@Override
-		public ExpressionType<? super S> getType() {
-			return theExpression.getType();
-		}
-
-		@Override
-		public S getStream() {
-			return theExpression.getStream();
-		}
-
-		@Override
-		public int length() {
-			return theExpression.length();
-		}
-
-		@Override
-		public List<? extends Expression<S>> getChildren() {
-			return theExpression.getChildren();
-		}
-
-		@Override
-		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
-			return null;
-		}
-
-		@Override
-		public int getErrorCount() {
-			return theExpression.getErrorCount();
-		}
-
-		@Override
-		public Expression<S> getFirstError() {
-			return theExpression.getFirstError();
-		}
-
-		@Override
-		public int getLocalErrorRelativePosition() {
-			return theExpression.getLocalErrorRelativePosition();
-		}
-
-		@Override
-		public String getLocalErrorMessage() {
-			return theExpression.getLocalErrorMessage();
-		}
-
-		@Override
-		public Expression<S> unwrap() {
-			return theExpression.unwrap();
-		}
-
-		@Override
-		public int getMatchQuality() {
-			return theExpression.getMatchQuality();
-		}
-
-		@Override
-		public boolean isInvariant() {
-			return true;
-		}
-
-		@Override
-		public StringBuilder print(StringBuilder str, int indent, String metadata) {
-			return theExpression.print(str, indent, metadata);
-		}
-
-		@Override
-		public int hashCode() {
-			return theExpression.hashCode();
-		}
-
-		@Override
-		public boolean equals(Object obj) {
-			if (obj instanceof InvariantExpression)
-				return theExpression.equals(((InvariantExpression<?>) obj).theExpression);
-			else
-				return theExpression.equals(obj);
-		}
-
-		@Override
-		public String toString() {
-			return theExpression.toString();
 		}
 	}
 }

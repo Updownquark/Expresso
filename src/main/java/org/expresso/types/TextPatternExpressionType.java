@@ -140,6 +140,11 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 		}
 
 		@Override
+		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
+			return null;
+		}
+
+		@Override
 		public int getErrorCount() {
 			return theMatcher.lookingAt() ? 0 : 1;
 		}

@@ -112,6 +112,11 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 		}
 
 		@Override
+		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
+			return null;
+		}
+
+		@Override
 		public int getErrorCount() {
 			return theLength == theType.getLength() ? 0 : 1;
 		}
