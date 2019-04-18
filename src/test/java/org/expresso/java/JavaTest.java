@@ -1,16 +1,28 @@
 package org.expresso.java;
 
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.net.URL;
 import java.util.function.Supplier;
 
-import org.expresso.*;
+import org.expresso.ConfiguredExpressionType;
+import org.expresso.DefaultGrammarParser;
+import org.expresso.Expression;
+import org.expresso.ExpressionField;
+import org.expresso.ExpressionTester;
+import org.expresso.ExpressionType;
+import org.expresso.ExpressoGrammar;
+import org.expresso.ExpressoGrammarParser;
 import org.expresso.stream.CharSequenceStream;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.qommons.ArrayUtils;
 import org.qommons.BreakpointHere;
 import org.qommons.QommonsUtils;
 import org.qommons.collect.BetterList;
+import org.qommons.config.QommonsConfig;
 
 /** Tests the Expresso parser using the embedded Java grammar */
 public class JavaTest {
@@ -30,12 +42,14 @@ public class JavaTest {
 		theParser = grammarParser.parseGrammar(DefaultGrammarParser.class.getResource("/org/expresso/grammars/Java8.xml"));
 	}
 
-	private <T> T getWithin(Supplier<T> task, long time) {
+	@SuppressWarnings("deprecation")
+	private static <T> T getWithin(Supplier<T> task, long time) {
 		if (time == 0)
-			return task.get();
+			time = Long.MAX_VALUE;
+		// return task.get();
 		boolean[] done = new boolean[1];
 		Object[] result = new Object[1];
-		Throwable[] ex = new RuntimeException[1];
+		Throwable[] ex = new Throwable[1];
 		Thread worker = new Thread(() -> {
 			try {
 				result[0] = task.get();
@@ -45,21 +59,26 @@ public class JavaTest {
 				ex[0] = e;
 				done[0] = true;
 			}
-		}, getClass().getSimpleName() + " worker");
+		}, JavaTest.class.getSimpleName() + " worker");
 		worker.start();
 		long start = System.currentTimeMillis();
-		while (System.currentTimeMillis() < start + time && !done[0]) {
+		while (System.currentTimeMillis() - start < time && !done[0]) {
 			try {
 				Thread.sleep(10);
 			} catch (InterruptedException e) {
 			}
 		}
 		if (done[0]) {
-			if (ex[0] instanceof RuntimeException)
-				throw (RuntimeException) ex[0];
-			else if (ex[0] instanceof Error)
-				throw (Error) ex[0];
-			else
+			if (ex[0] != null) {
+				ex[0].setStackTrace(QommonsUtils.patchStackTraces(//
+					ex[0].getStackTrace(), //
+					ArrayUtils.remove(Thread.currentThread().getStackTrace(), 0), //
+					Thread.class.getName(), "run"));
+				if (ex[0] instanceof RuntimeException)
+					throw (RuntimeException) ex[0];
+				else
+					throw (Error) ex[0];
+			} else
 				return (T) result[0];
 		} else {
 			worker.stop();
@@ -68,6 +87,10 @@ public class JavaTest {
 	}
 
 	private Expression<CharSequenceStream> parse(String expression, String type, boolean checkForErrors, long time) {
+		return parse(CharSequenceStream.from(expression), type, checkForErrors, time);
+	}
+
+	private Expression<CharSequenceStream> parse(CharSequenceStream stream, String type, boolean checkForErrors, long time) {
 		return getWithin(() -> {
 			ExpressionType<CharSequenceStream> component = theParser.getExpressionsByName().get(type);
 			if (component == null)
@@ -76,7 +99,7 @@ public class JavaTest {
 				throw new IllegalArgumentException("No such type or class: " + type);
 			Expression<CharSequenceStream> result;
 			try {
-				result = theParser.parse(CharSequenceStream.from(expression), component, checkForErrors ? 0 : -5);
+				result = theParser.parse(stream, component, checkForErrors ? 0 : -5);
 			} catch (IOException e) {
 				throw new IllegalStateException(e);
 			}
@@ -85,7 +108,7 @@ public class JavaTest {
 				if (result.getErrorCount() > 0)
 					Assert.assertEquals(result.getFirstError().getLocalErrorMessage(), 0, result.getErrorCount());
 			}
-			Assert.assertEquals("Incomplete match: " + result.printContent(false), expression.length(), result.length());
+			Assert.assertEquals("Incomplete match: " + result.printContent(false), stream.length(), result.length());
 			return result;
 		}, time);
 	}
@@ -95,7 +118,7 @@ public class JavaTest {
 	public void testVariable() {
 		Expression<CharSequenceStream> result = parse("vbl", "result-producer", true, TIMEOUT);
 		result = result.unwrap();
-		Assert.assertEquals("identifier", ((ConfiguredExpressionType<?>) result.getType()).getName());
+		Assert.assertEquals("qualified-name", ((ConfiguredExpressionType<?>) result.getType()).getName());
 		Assert.assertEquals("vbl", result.getField("name").getFirst().printContent(false));
 	}
 
@@ -103,17 +126,20 @@ public class JavaTest {
 	@Test
 	public void testField() {
 		Expression<CharSequenceStream> result = parse("vbl.field", "result-producer", true, TIMEOUT).unwrap();
-		Assert.assertEquals("field-ref", ((ConfiguredExpressionType<?>) result.getType()).getName());
-		Assert.assertEquals("vbl", result.getField("target").getFirst().printContent(false));
-		Assert.assertEquals("field", result.getField("name").getFirst().printContent(false));
-		Assert.assertEquals(0, result.getField("method").size());
+		new ExpressionTester("fieldTest").withType("qualified-name", "field-ref")//
+			.withField("target", target -> {
+				target.withType("qualified-name").withContent("vbl");
+			}).withField("name", name -> {
+				name.withContent("field");
+			}).withField("method")//
+			.test(result);
 	}
 
 	/** Tests parsing a nested field invocation (vbl.field1.field2) */
 	@Test
 	public void testDoubleField() {
 		Expression<CharSequenceStream> result = parse("vbl.field1.field2", "result-producer", true, TIMEOUT).unwrap();
-		Assert.assertEquals("field-ref", ((ConfiguredExpressionType<?>) result.getType()).getName());
+		Assert.assertEquals("qualified-name", ((ConfiguredExpressionType<?>) result.getType()).getName());
 		Expression<CharSequenceStream> inner = result.getField("target").getFirst().getWrapped().unwrap();
 		// The target could be parsed validly as a field or a type, so checking that here would be more trouble than it's worth
 		Assert.assertEquals("vbl.field1", inner.printContent(false));
@@ -138,7 +164,7 @@ public class JavaTest {
 		BetterList<ExpressionField<CharSequenceStream>> args = result.getField("arguments", "argument");
 		Assert.assertEquals(2, args.size());
 		Assert.assertEquals("number", ((ConfiguredExpressionType<?>) args.getFirst().getWrapped().unwrap().getType()).getName());
-		Assert.assertEquals("identifier", ((ConfiguredExpressionType<?>) args.getLast().getWrapped().unwrap().getType()).getName());
+		Assert.assertEquals("qualified-name", ((ConfiguredExpressionType<?>) args.getLast().getWrapped().unwrap().getType()).getName());
 	}
 
 	/** Test parsing a constructor with generic type arguments (new java.util.ArrayList&lt;Integer>(5)) */
@@ -180,8 +206,7 @@ public class JavaTest {
 	@Test
 	public void testDoubleMethod() {
 		Expression<CharSequenceStream> result = parse("list.addAll(java.util.Arrays.asList(1, 2, 3, 4, 5))", "result-producer", false,
-			TIMEOUT)
-			.unwrap();
+			TIMEOUT).unwrap();
 		checkDoubleMethod(result);
 	}
 
@@ -218,85 +243,136 @@ public class JavaTest {
 	}
 
 	private static void checkBlock(Expression<?> expr) {
-		Assert.assertEquals("block", ((ConfiguredExpressionType<?>) expr.getType()).getName());
-		BetterList<? extends Expression<?>> statements = expr.getField("content", "content");
-		Assert.assertEquals(3, statements.size());
-
-		Expression<?> vblDecl = statements.getFirst().unwrap();
-		Assert.assertEquals("variable-declaration", ((ConfiguredExpressionType<?>) vblDecl.getType()).getName());
-		Assert.assertEquals("java.util.ArrayList", vblDecl.getField("type", "base").getFirst().printContent(false).trim());
-		BetterList<? extends Expression<?>> typeParams = vblDecl.getField("type", "parameters", "parameter");
-		Assert.assertEquals(1, typeParams.size());
-		Assert.assertEquals("Integer", typeParams.getFirst().printContent(false));
-
-		Expression<?> assign = statements.get(1).unwrap();
-		Assert.assertEquals("assign", ((ConfiguredExpressionType<?>) assign.getType()).getName());
-		Expression<?> assignVbl = assign.getField("variable").getFirst().unwrap();
-		Assert.assertEquals("identifier", ((ConfiguredExpressionType<?>) assignVbl.getType()).getName());
-		Assert.assertEquals("list", assignVbl.printContent(false).trim());
-		Expression<?> assignVal = assign.getField("operand").getFirst().unwrap();
-		Assert.assertEquals("constructor", ((ConfiguredExpressionType<?>) assignVal.getType()).getName());
-		Assert.assertEquals("generic-type",
-			((ConfiguredExpressionType<?>) assignVal.getField("type").getFirst().unwrap().getType()).getName());
-		Assert.assertEquals("ArrayList", assignVal.getField("type", "base").getFirst().printContent(false).trim());
-		Assert.assertEquals("5", assignVal.getField("arguments").getFirst().printContent(false));
-
-		checkDoubleMethod(statements.getLast().unwrap());
+		new ExpressionTester("block").withType("block").withField("content.?content", s1 -> {
+			s1.withType("variable-declaration").withField("type", s1Type -> {
+				s1Type.withType("generic-type").withField("base", s1TypeBase -> {
+					s1TypeBase.withContent("java.util.ArrayList");
+				}).withField("parameters.parameter", s1TypeParams -> {
+					s1TypeParams.withContent("Integer");
+				});
+			});
+		}, s2 -> {
+			s2.withType("assign").withField("variable", s2Var -> {
+				s2Var.withType("qualified-name").withContent("list");
+			}).withField("operand", s2Op -> {
+				s2Op.withType("constructor").withField("type", s2OpType -> {
+					s2OpType.withType("generic-type").withField("base", s2OpTypeBase -> {
+						s2OpTypeBase.withContent("ArrayList");
+					}).withField("parameters.parameter"); // No parameters
+				}).withField("arguments.argument", s2OpArgs -> {
+					s2OpArgs.withType("number").withContent("5");
+				});
+			});
+		}, s3 -> {
+			s3.withType("method").withField("target", s3Target -> {
+				s3Target.withType("qualified-name").withContent("list");
+			}).withField("method.name", s3MethodName -> {
+				s3MethodName.withContent("addAll");
+			}).withField("method.arguments.argument", s3Arg -> {
+				s3Arg.withType("method").withField("target", s3ArgTarget -> {
+					s3ArgTarget.withContent("java.util.Arrays");
+				}).withField("method.name", s3ArgMethodName -> {
+					s3ArgMethodName.withContent("asList");
+				}).withField("method.arguments.argument", s3ArgArg1 -> {
+					s3ArgArg1.withType("number").withContent("1");
+				}, s3ArgArg2 -> {
+					s3ArgArg2.withType("number").withContent("2");
+				}, s3ArgArg3 -> {
+					s3ArgArg3.withType("number").withContent("3");
+				}, s3ArgArg4 -> {
+					s3ArgArg4.withType("number").withContent("4");
+				}, s3ArgArg5 -> {
+					s3ArgArg5.withType("number").withContent("5");
+				});
+			});
+		})//
+			.test(expr);
 	}
 
+	/**
+	 * Tests A fairly complex expression
+	 * (<code>org.observe.collect.ObservableCollection.create(org.observe.util.TypeTokens.get().STRING,new org.qommons.tree.SortedTreeList&lt;String&gt;(true, org.qommons.QommonsUtils.DISTINCT_NUMBER_TOLERANT))</code>)
+	 */
 	@Test
 	public void testWow() {
 		String expression = "org.observe.collect.ObservableCollection.create(org.observe.util.TypeTokens.get().STRING,"
-			+ "new org.qommons.tree.SortedTreeList<String>(true, org.qommons.QommonsUtils.DISTINCT_NUMBER_TOLERANT))";
+			+ " new org.qommons.tree.SortedTreeList<String>(true, org.qommons.QommonsUtils.DISTINCT_NUMBER_TOLERANT))";
 		Expression<CharSequenceStream> result = parse(expression, "result-producer", true, TIMEOUT * 5).unwrap();
 		checkWow(result);
 	}
 
-	private void checkWow(Expression<?> expr) {
-		Assert.assertEquals("method", ((ConfiguredExpressionType<?>) expr.getType()).getName());
-
-		Expression<?> target = expr.getField("target").getFirst().getWrapped().unwrap();
-		Assert.assertEquals("org.observe.collect.ObservableCollection", target.printContent(false));
-		Assert.assertEquals("create", expr.getField("method", "name").getFirst().printContent(false));
-
-		BetterList<? extends ExpressionField<?>> args = expr.getField("method", "arguments", "argument");
-		Assert.assertEquals(2, args.size());
-
-		Expression<?> arg1 = args.getFirst().getWrapped().unwrap();
-		Assert.assertEquals("field-ref", ((ConfiguredExpressionType<?>) arg1.getType()).getName());
-		Expression<?> arg1Target = arg1.getField("target").getFirst().getWrapped().unwrap();
-		Assert.assertEquals("method", ((ConfiguredExpressionType<?>) arg1Target.getType()).getName());
-		Expression<?> arg1TargetTarget = arg1Target.getField("target").getFirst().getWrapped().unwrap();
-		Assert.assertEquals("org.observe.util.TypeTokens", arg1TargetTarget.printContent(false));
-		Assert.assertEquals("get", arg1Target.getField("method", "name").getFirst().printContent(false));
-		Assert.assertEquals("STRING", arg1.getField("name").getFirst().printContent(false));
-
-		Expression<?> arg2 = args.getLast().getWrapped().unwrap();
-		Assert.assertEquals("constructor", ((ConfiguredExpressionType<?>) arg2.getType()).getName());
-		Expression<?> arg2Type = arg2.getField("type").getFirst().getWrapped().unwrap();
-		Assert.assertEquals("generic-type", ((ConfiguredExpressionType<?>) arg2Type.getType()).getName());
-		Assert.assertEquals("org.qommons.tree.SortedTreeList", arg2Type.getField("base").getFirst().printContent(false));
-		Assert.assertEquals("String", arg2Type.getField("parameters", "parameter").getFirst().printContent(false));
-
-		BetterList<? extends ExpressionField<?>> args2 = arg2.getField("arguments", "argument");
-		Assert.assertEquals(2, args2.size());
-		Expression<?> arg2Arg1 = args2.getFirst().getWrapped().unwrap();
-		// TODO Right now, the parser is finding an identifier instead of a boolean. This is probably just a problem with the grammar.
-		// Assert.assertEquals("boolean", ((ConfiguredExpressionType<?>) arg2Arg1.getType()).getName());
-		Assert.assertEquals("true", arg2Arg1.printContent(false));
-		Expression<?> arg2Arg2 = args2.getLast();
-		Assert.assertEquals("org.qommons.QommonsUtils.DISTINCT_NUMBER_TOLERANT", arg2Arg2.printContent(false).trim());
+	private static void checkWow(Expression<?> expr) {
+		new ExpressionTester("WOW").withType("method")//
+			.withField("target", target -> {
+				target.withContent("org.observe.collect.ObservableCollection");
+			}).withField("method.name", method -> {
+				method.withContent("create");
+			}).withField("method.arguments.argument", arg1 -> {
+				arg1.withType("qualified-name").withField("target", arg1Target -> {
+					arg1Target.withType("method").withField("target", arg1TargetTarget -> {
+						arg1TargetTarget.withContent("org.observe.util.TypeTokens");
+					}).withField("method.name", arg1TargetMethod -> arg1TargetMethod.withContent("get"));
+				}).withField("name", arg1FieldName -> arg1FieldName.withContent("STRING"));
+			}, arg2 -> {
+				arg2.withType("constructor").withField("type", arg2Type -> {
+					arg2Type.withType("generic-type").withField("base", arg2TypeBase -> {
+						arg2TypeBase.withContent("org.qommons.tree.SortedTreeList");
+					}).withField("parameters.parameter", arg2TypeParams -> {
+						arg2TypeParams.withContent("String");
+					});
+				}).withField("arguments.argument", arg2Arg1 -> {
+					// TODO Right now, the parser is finding an identifier instead of a boolean.
+					// This is probably just a problem with the grammar.
+					// arg2Arg1.withType("boolean");
+					arg2Arg1.withContent("true");
+				}, arg2Arg2 -> {
+					arg2Arg2.withType("qualified-name").withField("target", arg2Arg2Target -> {
+						arg2Arg2Target.withContent("org.qommons.QommonsUtils");
+					}).withField("name", arg2Arg2Name -> {
+						arg2Arg2Name.withContent("DISTINCT_NUMBER_TOLERANT");
+					});
+				});
+			})//
+			.test(expr);
 	}
 
 	@Test
-	public void testPerformance() {
-		@SuppressWarnings("unused")
-		int before = 0;
-		for (int i = 0; i < 10; i++) {
-			testBlock();
-			System.out.println("Success " + (i + 1) + " of 10");
+	public void testSimpleOperations() {
+		new ExpressionTester("add").withType("add").withField("left", left -> {
+			left.withType("qualified-name").withContent("a");
+		}).withField("right", right -> {
+			right.withType("qualified-name").withContent("b");
+		})//
+			.test(parse("a+b", "result-producer", true, TIMEOUT));
+	}
+
+	@Test
+	public void testMethodDeclaration() {
+		new ExpressionTester("addMethod").withType("method")//
+			.withField("qualifier", //
+				qualifier -> qualifier.withContent("public"), //
+				qualifier -> qualifier.withContent("static")//
+			).withField("name", name -> name.withContent("add")//
+			).withField("body.content", body -> {
+				body.withType("return").withField("value", returnValue -> {
+					returnValue.withType("add").withField("left", left -> {
+						left.withType("qualified-name").withContent("a");
+					}).withField("right", right -> {
+						right.withType("qualified-name").withContent("b");
+				});
+				});
+			})//
+			.test(parse(String.join("\tpublic static int add(int a, int b){\n", //
+				"\t\treturn a+b;\n", //
+				"\t}\n"), "class-content", true, TIMEOUT * 2));
+	}
+
+	@Test
+	public void testSimpleJavaFile() throws IOException {
+		URL file = QommonsConfig.toUrl("src/test/java/org/expresso/java/SimpleParseableJavaFile.java");
+		Expression<CharSequenceStream> result;
+		try (Reader reader = new InputStreamReader(file.openStream())) {
+			result = parse(CharSequenceStream.from(reader, 4096), "java-file", true, TIMEOUT * 5);
 		}
-		@SuppressWarnings("unused")
-		int after = 1;
 	}
 }

@@ -27,8 +27,14 @@ import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreePath;
 
-import org.expresso.*;
+import org.expresso.BareContentExpressionType;
+import org.expresso.Expression;
+import org.expresso.ExpressionFieldType;
+import org.expresso.ExpressionType;
+import org.expresso.ExpressoGrammar;
+import org.expresso.GrammarExpressionType;
 import org.expresso.stream.BranchableStream;
+import org.expresso.types.OneOfExpressionType;
 import org.observe.ObservableValue;
 import org.observe.SettableValue;
 import org.observe.SimpleObservable;
@@ -132,9 +138,11 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 			theResult = result;
 			theMethod = methodUsed;
 			theStateChange.onNext(null);
-			for (ParsingState child : theChildren.reverse())
-				if (child.theLastParseTime != null && child.theLastParseTime.compareTo(theLastParseTime) < 0)
-					child.reset(null);
+			if (theExpressionType instanceof OneOfExpressionType) {
+				for (ParsingState child : theChildren.reverse())
+					if (child.theLastParseTime != null && child.theLastParseTime.compareTo(theLastParseTime) < 0)
+						child.reset(null);
+			}
 		}
 
 		void reset(BranchableStream<?, ?> stream) {
