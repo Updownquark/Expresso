@@ -29,12 +29,19 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 	List<? extends Expression<S>> getChildren();
 
 	/**
-	 * @param parser TODO
+	 * @param parser The parser parsing the expression
 	 * @return Another interpretation of the stream by this expresssion's type
 	 * @throws IOException If an error occurs reading the stream
 	 */
 	Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException;
 
+	/**
+	 * Allows another branch of matches
+	 * 
+	 * @param parser The parser parsing the expression
+	 * @return Another interpretation of the stream by this expresssion's type
+	 * @throws IOException If an error occurs reading the stream
+	 */
 	Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException;
 
 	/** @return The number of errors in this possibility */
@@ -286,8 +293,7 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 
 	/** A worker class that searches an expression's tree structure for fields */
 	public static class FieldSearcher {
-		static <S extends BranchableStream<?, ?>> boolean findFields(Expression<S> expr, String field,
-			Deque<Expression<S>> results) {
+		static <S extends BranchableStream<?, ?>> boolean findFields(Expression<S> expr, String field, Deque<Expression<S>> results) {
 			boolean found;
 			if (expr instanceof ExpressionField) {
 				found = ((ExpressionField<S>) expr).getType().getFields().contains(field);

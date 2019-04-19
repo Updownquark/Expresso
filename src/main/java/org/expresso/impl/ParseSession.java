@@ -24,7 +24,7 @@ import org.qommons.collect.ElementId;
  * @param <S> The type of the stream
  */
 public class ParseSession<S extends BranchableStream<?, ?>> {
-	private static final boolean DEBUG_UI = false;
+	private static final boolean DEBUG_UI = true;
 
 	private final ExpressoGrammar<? super S> theGrammar;
 	private final Map<ExpressoParserImpl.Template, ExpressoParserImpl<S>> theParsers;
@@ -123,6 +123,10 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 			theDebugger = ExpressoDebugger.IDLE;
 	}
 
+	/**
+	 * @param type The component to test
+	 * @return If the component could possibly use itself as a component
+	 */
 	public boolean isRecursive(ExpressionType<?> type) {
 		if (type.getId() < 0 || !(type instanceof GrammarExpressionType))
 			return false;

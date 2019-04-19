@@ -1,10 +1,6 @@
 package org.expresso.debug;
 
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Dimension;
-import java.awt.EventQueue;
-import java.awt.Font;
+import java.awt.*;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.time.Instant;
@@ -13,26 +9,14 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.function.Supplier;
 
-import javax.swing.BorderFactory;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTextPane;
-import javax.swing.JTree;
+import javax.swing.*;
 import javax.swing.border.Border;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreePath;
 
-import org.expresso.BareContentExpressionType;
-import org.expresso.Expression;
-import org.expresso.ExpressionFieldType;
-import org.expresso.ExpressionType;
-import org.expresso.ExpressoGrammar;
-import org.expresso.GrammarExpressionType;
+import org.expresso.*;
 import org.expresso.stream.BranchableStream;
 import org.expresso.types.OneOfExpressionType;
 import org.observe.ObservableValue;
@@ -233,7 +217,7 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 		else
 			state = theStack.getLast().getChild(stream.getPosition(), component);
 		if (state == null)
-			return DebugExpressionParsing.IDLE;
+			return DebugExpressionParsing.IDLE_PARSING;
 		else
 			state.into(stream);
 		while (!component.equals(state.theExpressionType) && state.theChildren.size() == 1) {

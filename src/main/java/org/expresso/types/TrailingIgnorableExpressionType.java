@@ -12,20 +12,31 @@ import org.expresso.ExpressionType;
 import org.expresso.ExpressoParser;
 import org.expresso.stream.BranchableStream;
 
+/**
+ * An expression type used when only trailing ignorables remain after parsing a structure
+ * 
+ * @param <S> The type of the stream parsed
+ */
 public class TrailingIgnorableExpressionType<S extends BranchableStream<?, ?>> extends AbstractExpressionType<S> {
 	private final ExpressionClass<? super S> theIgnorableClass;
 	private final ExpressionType<? super S> theTargetType;
 
+	/**
+	 * @param ignorableClass The ignorable expression class
+	 * @param targetType The target expression type parsed
+	 */
 	public TrailingIgnorableExpressionType(ExpressionClass<? super S> ignorableClass, ExpressionType<? super S> targetType) {
 		super(-1);
 		theIgnorableClass = ignorableClass;
 		theTargetType = targetType;
 	}
 
+	/** @return The ignorable expression class */
 	public ExpressionClass<? super S> getIgnorableClass() {
 		return theIgnorableClass;
 	}
 
+	/** @return The target expression type parsed */
 	public ExpressionType<? super S> getTargetType() {
 		return theTargetType;
 	}
@@ -45,10 +56,21 @@ public class TrailingIgnorableExpressionType<S extends BranchableStream<?, ?>> e
 		throw new IllegalStateException("This type does not parse itself");
 	}
 
+	/**
+	 * An expression used when only trailing ignorables are left after parsing an expression
+	 * 
+	 * @param <S> The type of the stream parsed
+	 */
 	public static class TrailingIgnorableExpression<S extends BranchableStream<?, ?>> extends ComposedExpression<S> {
 		private final Expression<S> theTarget;
 		private final List<Expression<S>> theIgnorables;
 
+		/**
+		 * @param ignorableClass The ignorable expression classs
+		 * @param parser The parser that the expression was parsed out of
+		 * @param target The content of the parsed expression
+		 * @param ignorables The trailing ignorables
+		 */
 		public TrailingIgnorableExpression(ExpressionClass<? super S> ignorableClass, ExpressoParser<S> parser, Expression<S> target,
 			List<Expression<S>> ignorables) {
 			super(new TrailingIgnorableExpressionType<>(ignorableClass, target.getType()), parser, buildChildren(target, ignorables));
@@ -64,10 +86,12 @@ public class TrailingIgnorableExpressionType<S extends BranchableStream<?, ?>> e
 			return Collections.unmodifiableList(children);
 		}
 
+		/** @return The content of the parsed expression */
 		public Expression<S> getTarget() {
 			return theTarget;
 		}
 
+		/** @return The trailing ignorables */
 		public List<Expression<S>> getIgnorables() {
 			return theIgnorables;
 		}

@@ -43,5 +43,10 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> {
 	 */
 	Expression<S> nextMatch(Expression<S> expression) throws IOException;
 
+	/**
+	 * @param expression The expression to branch with lower priority
+	 * @return Another interpretation of the stream by the expresssion's type
+	 * @throws IOException If an error occurs reading the stream
+	 */
 	Expression<S> nextMatchLowPriority(Expression<S> expression) throws IOException;
 }

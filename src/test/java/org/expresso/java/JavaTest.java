@@ -213,6 +213,7 @@ public class JavaTest {
 		checkArraysAsList(arg);
 	}
 
+	/** Tests parsing a variable declaration(java.util.ArrayList<Integer> list;) */
 	@Test
 	public void testVarDeclaration() {
 		String expression = "java.util.ArrayList<Integer> list;";
@@ -343,6 +344,7 @@ public class JavaTest {
 			.test(expr);
 	}
 
+	/** Tests parsing a very simple expression (a+b) */
 	@Test
 	public void testSimpleOperations() {
 		new ExpressionTester("add").withType("add").withField("left", left -> {
@@ -353,6 +355,7 @@ public class JavaTest {
 			.test(parse("a+b", "result-producer", true, TIMEOUT));
 	}
 
+	/** Tests parsing a method declaration (with body) */
 	@Test
 	public void testMethodDeclaration() {
 		new ExpressionTester("addMethod").withType("method-declaration")//
@@ -374,6 +377,11 @@ public class JavaTest {
 				"\t}\n"), "class-content", true, TIMEOUT * 2));
 	}
 
+	/**
+	 * Tests parsing of a simple, but complete, java file
+	 * 
+	 * @throws IOException If the file cannot be read
+	 */
 	@Test
 	public void testSimpleJavaFile() throws IOException {
 		URL file = QommonsConfig.toUrl("src/test/java/org/expresso/java/SimpleParseableJavaFile.java");
