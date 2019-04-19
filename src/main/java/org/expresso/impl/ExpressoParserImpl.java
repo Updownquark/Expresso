@@ -115,14 +115,8 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	}
 
 	@Override
-	public ExpressoParser<S> withInterrupt(ExpressionType<? super S> type, Expression<S> result) {
-		return new ExpressoParserImpl<>(theSession, theStream, theExcludedTypes,
-			new PersistentStack<>(theStates, new ComponentRecursiveInterrupt<>(type, result)));
-	}
-
-	@Override
-	public Expression<S> parseWith(ExpressionType<? super S> component, boolean useCache) throws IOException {
-		return parseWith(component, null, true);
+	public Expression<S> parseWith(ExpressionType<? super S> component) throws IOException {
+		return parseWith(component, null);
 	}
 
 	class StackPushResult {
@@ -186,8 +180,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		return new StackPushResult(lowStackFrame, stackFrame.get());
 	}
 
-	Expression<S> parseWith(ExpressionType<? super S> component, Expression<S> recursiveInterrupt, boolean interruptible)
-		throws IOException {
+	Expression<S> parseWith(ExpressionType<? super S> component, Expression<S> recursiveInterrupt) throws IOException {
 		DebugExpressionParsing debug = theSession.getDebugger().begin(component, theStream, null);
 		StackPushResult stackFrame = null;
 		try {
@@ -201,7 +194,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				return null;
 			}
 			if (component.isCacheable() || theSession.isRecursive(component)) {
-				stackFrame = pushOnStack(component, recursiveInterrupt, interruptible);
+				stackFrame = pushOnStack(component, recursiveInterrupt, true);
 				if (stackFrame.frame == null) {
 					debug.finished(stackFrame.interrupt, DebugResultMethod.RecursiveInterrupt);
 					return stackFrame.interrupt;
@@ -318,9 +311,9 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				method = DebugResultMethod.Parsed;
 			Expression<S> match = expression.nextMatchLowPriority(this);
 			while (match != null && recursiveInterrupt != null && !find(match, recursiveInterrupt)) {
-				Expression<S> next;
+				Expression<S> next = match;
 				do {
-					next = match.nextMatch(this);
+					next = next.nextMatch(this);
 				} while (next != null && !find(next, recursiveInterrupt));
 				if (next != null) {
 					match = next;
@@ -447,7 +440,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 			// Next, parse other matches, using this match for the initial content
 			if (parser.theStack.getElement(new ComponentRecursiveInterrupt<>(getType(), true, this, 0), false).get().numDownstream > 0)
 				return null; // Only do the rest at the top level
-			next = parser.parseWith(theMatch.getType(), this, true);
+			next = parser.parseWith(theMatch.getType(), this);
 			if (next != null)
 				return new NextMatch<>(this, next, this, 3);
 

@@ -29,31 +29,12 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> {
 	 */
 	ExpressoParser<S> exclude(int... expressionIds);
 
-	ExpressoParser<S> withInterrupt(ExpressionType<? super S> type, Expression<S> result);
-
-	/**
-	 * @param type The expression type to substitute cache for
-	 * @param result The possibility to return for the type
-	 * @return A parser for the same place in the stream that will always return the given possibility when parsing the given expression
-	 *         type
-	 */
-	// ExpressoParser<S> useCache(ExpressionType<? super S> type, Expression<S> result, Consumer<ExpressoParser<S>> onHit);
-
 	/**
 	 * @param type The expression type to parse with
 	 * @return The most likely possibility for parsing the stream at this parser's position with the given expression type
 	 * @throws IOException If an error occurs reading the stream
 	 */
-	default Expression<S> parseWith(ExpressionType<? super S> type) throws IOException {
-		return parseWith(type, true);
-	}
-
-	/**
-	 * @param type The expression type to parse with
-	 * @return The most likely possibility for parsing the stream at this parser's position with the given expression type
-	 * @throws IOException If an error occurs reading the stream
-	 */
-	Expression<S> parseWith(ExpressionType<? super S> type, boolean useCache) throws IOException;
+	Expression<S> parseWith(ExpressionType<? super S> type) throws IOException;
 
 	/**
 	 * @param expression The expression to branch

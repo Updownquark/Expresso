@@ -213,6 +213,20 @@ public class JavaTest {
 		checkArraysAsList(arg);
 	}
 
+	@Test
+	public void testVarDeclaration() {
+		String expression = "java.util.ArrayList<Integer> list;";
+		Expression<CharSequenceStream> result = parse(expression, "body-content", true, TIMEOUT).unwrap();
+		new ExpressionTester("Var declaration").withType("variable-declaration").withField("type", type -> {
+			type.withType("generic-type").withField("base", base -> {
+				base.withContent("java.util.ArrayList");
+			}).withField("parameters.parameter", param -> {
+				param.withContent("Integer");
+			});
+		}).withField("name", name -> name.withContent("list"))//
+			.test(result);
+	}
+
 	/**
 	 * Tests a more complex block of statements:
 	 * 
