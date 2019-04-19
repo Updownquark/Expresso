@@ -355,7 +355,7 @@ public class JavaTest {
 
 	@Test
 	public void testMethodDeclaration() {
-		new ExpressionTester("addMethod").withType("method")//
+		new ExpressionTester("addMethod").withType("method-declaration")//
 			.withField("qualifier", //
 				qualifier -> qualifier.withContent("public"), //
 				qualifier -> qualifier.withContent("static")//

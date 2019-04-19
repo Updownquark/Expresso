@@ -1,0 +1,90 @@
+package org.expresso.types;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+import org.expresso.Expression;
+import org.expresso.ExpressionClass;
+import org.expresso.ExpressionType;
+import org.expresso.ExpressoParser;
+import org.expresso.stream.BranchableStream;
+
+public class TrailingIgnorableExpressionType<S extends BranchableStream<?, ?>> extends AbstractExpressionType<S> {
+	private final ExpressionClass<? super S> theIgnorableClass;
+	private final ExpressionType<? super S> theTargetType;
+
+	public TrailingIgnorableExpressionType(ExpressionClass<? super S> ignorableClass, ExpressionType<? super S> targetType) {
+		super(-1);
+		theIgnorableClass = ignorableClass;
+		theTargetType = targetType;
+	}
+
+	public ExpressionClass<? super S> getIgnorableClass() {
+		return theIgnorableClass;
+	}
+
+	public ExpressionType<? super S> getTargetType() {
+		return theTargetType;
+	}
+
+	@Override
+	public int getEmptyQuality(int minQuality) {
+		return 0;
+	}
+
+	@Override
+	public List<? extends ExpressionType<? super S>> getComponents() {
+		return Collections.<ExpressionType<? super S>> unmodifiableList(Arrays.asList(theIgnorableClass, theTargetType));
+	}
+
+	@Override
+	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
+		throw new IllegalStateException("This type does not parse itself");
+	}
+
+	public static class TrailingIgnorableExpression<S extends BranchableStream<?, ?>> extends ComposedExpression<S> {
+		private final Expression<S> theTarget;
+		private final List<Expression<S>> theIgnorables;
+
+		public TrailingIgnorableExpression(ExpressionClass<? super S> ignorableClass, ExpressoParser<S> parser, Expression<S> target,
+			List<Expression<S>> ignorables) {
+			super(new TrailingIgnorableExpressionType<>(ignorableClass, target.getType()), parser, buildChildren(target, ignorables));
+			theTarget = target;
+			theIgnorables = ignorables;
+		}
+
+		private static <S extends BranchableStream<?, ?>> List<Expression<S>> buildChildren(Expression<S> target,
+			List<Expression<S>> ignorables) {
+			List<Expression<S>> children = new ArrayList<>(ignorables.size() + 1);
+			children.add(target);
+			children.addAll(ignorables);
+			return Collections.unmodifiableList(children);
+		}
+
+		public Expression<S> getTarget() {
+			return theTarget;
+		}
+
+		public List<Expression<S>> getIgnorables() {
+			return theIgnorables;
+		}
+
+		@Override
+		public Expression<S> unwrap() {
+			return theTarget.unwrap();
+		}
+
+		@Override
+		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+			throw new IllegalStateException("This type does not parse itself");
+		}
+
+		@Override
+		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
+			throw new IllegalStateException("This type does not parse itself");
+		}
+	}
+}
