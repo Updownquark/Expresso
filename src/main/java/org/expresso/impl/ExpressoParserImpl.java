@@ -6,7 +6,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.expresso.DualPriorityBranchingExpression;
 import org.expresso.Expression;
 import org.expresso.ExpressionType;
 import org.expresso.ExpressoParser;
@@ -15,6 +14,7 @@ import org.expresso.debug.ExpressoDebugger.DebugResultMethod;
 import org.expresso.stream.BranchableStream;
 import org.qommons.collect.BetterSet;
 import org.qommons.collect.CollectionElement;
+import org.qommons.collect.ElementId;
 
 /**
  * Default implementation of {@link ExpressoParser}
@@ -126,16 +126,14 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	}
 
 	class StackPushResult {
-		private ComponentRecursiveInterrupt<S> topStackFrame;
-		private Expression<S> previousInterrupt;
+		private ComponentRecursiveInterrupt<S> rootFrame;
 		final CollectionElement<ComponentRecursiveInterrupt<S>> frame;
 		final Expression<S> interrupt;
 
 		StackPushResult(CollectionElement<ComponentRecursiveInterrupt<S>> frame, //
-			ComponentRecursiveInterrupt<S> topFrame, Expression<S> prevInterrupt) {
+			ComponentRecursiveInterrupt<S> rootFrame) {
 			this.frame = frame;
-			this.topStackFrame = topFrame;
-			this.previousInterrupt = prevInterrupt;
+			this.rootFrame = rootFrame;
 			this.interrupt = null;
 		}
 
@@ -148,33 +146,44 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 			if (frame == null)
 				return;
 			theStack.mutableElement(frame.getElementId()).remove();
-			if (topStackFrame != null)
-				topStackFrame.result = previousInterrupt;
+			if (rootFrame != null) {
+				rootFrame.leaf = frame.get().parent;
+				rootFrame.numDownstream--;
+			}
 		}
 	}
 
 	StackPushResult pushOnStack(ExpressionType<? super S> component, Expression<S> recursiveInterrupt, boolean interruptible) {
 		CollectionElement<ComponentRecursiveInterrupt<S>> stackFrame = null;
 		boolean[] added = new boolean[1];
-		stackFrame = theStack.getOrAdd(new ComponentRecursiveInterrupt<>(component, recursiveInterrupt, 0), false, () -> added[0] = true);
-		if (added[0])
-			return new StackPushResult(stackFrame, null, null);
-		else if (!interruptible) {
-			CollectionElement<ComponentRecursiveInterrupt<S>> lowStackFrame = theStack
-				.addElement(new ComponentRecursiveInterrupt<>(component, recursiveInterrupt, ++stackFrame.get().numDownstream), false);
-			Expression<S> oldRI = stackFrame.get().result;
-			stackFrame.get().result = recursiveInterrupt;
-			return new StackPushResult(lowStackFrame, stackFrame.get(), oldRI);
-		} else { // Interrupted
-			Expression<S> ri = stackFrame.get().result;
-			// Interrupts everything downstream of the interrupting frame
-			stackFrame = theStack.getAdjacentElement(stackFrame.getElementId(), true);
-			while (stackFrame != null) {
-				stackFrame.get().wasInterrupted = true;
-				stackFrame = theStack.getAdjacentElement(stackFrame.getElementId(), true);
-			}
-			return new StackPushResult(ri);
+		stackFrame = theStack.getOrAdd(new ComponentRecursiveInterrupt<>(component, interruptible, recursiveInterrupt, 0), false,
+			() -> added[0] = true);
+		if (added[0]) {
+			stackFrame.get().element = stackFrame.getElementId();
+			return new StackPushResult(stackFrame, null);
 		}
+		if (interruptible) {
+			ComponentRecursiveInterrupt<S> interruptingCRI = stackFrame.get().leaf;
+			while (interruptingCRI != null && !interruptingCRI.interruptible)
+				interruptingCRI = interruptingCRI.parent;
+			if (interruptingCRI != null && interruptingCRI.interruptible) { // Interrupted
+				Expression<S> ri = interruptingCRI.result;
+				// Interrupts everything downstream of the interrupting frame
+				stackFrame = theStack.getAdjacentElement(interruptingCRI.element, true);
+				while (stackFrame != null) {
+					stackFrame.get().wasInterrupted = true;
+					stackFrame = theStack.getAdjacentElement(stackFrame.getElementId(), true);
+				}
+				return new StackPushResult(ri);
+			}
+		}
+		ComponentRecursiveInterrupt<S> newCRI = new ComponentRecursiveInterrupt<>(component, interruptible, recursiveInterrupt,
+			++stackFrame.get().numDownstream);
+		newCRI.parent = stackFrame.get().leaf;
+		CollectionElement<ComponentRecursiveInterrupt<S>> lowStackFrame = theStack.addElement(newCRI, false);
+		newCRI.element = lowStackFrame.getElementId();
+		stackFrame.get().leaf = newCRI;
+		return new StackPushResult(lowStackFrame, stackFrame.get());
 	}
 
 	Expression<S> parseWith(ExpressionType<? super S> component, Expression<S> recursiveInterrupt, boolean interruptible)
@@ -191,10 +200,12 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				debug.finished(null, DebugResultMethod.Excluded);
 				return null;
 			}
-			stackFrame = pushOnStack(component, recursiveInterrupt, interruptible);
-			if (stackFrame.frame == null) {
-				debug.finished(stackFrame.interrupt, DebugResultMethod.RecursiveInterrupt);
-				return stackFrame.interrupt;
+			if (component.isCacheable() || theSession.isRecursive(component)) {
+				stackFrame = pushOnStack(component, recursiveInterrupt, interruptible);
+				if (stackFrame.frame == null) {
+					debug.finished(stackFrame.interrupt, DebugResultMethod.RecursiveInterrupt);
+					return stackFrame.interrupt;
+				}
 			}
 			if (recursiveInterrupt != null) {
 				Expression<S> result = component.parse(this);
@@ -299,7 +310,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				debug.finished(null, DebugResultMethod.Excluded);
 				return null;
 			}
-			stackFrame = pushOnStack(expression.getType(), recursiveInterrupt, false);
+			stackFrame = pushOnStack(expression.getType(), recursiveInterrupt, true);
 			DebugResultMethod method;
 			if (expression instanceof CachedExpression && ((CachedExpression<?>) expression).hasNextMatch())
 				method = DebugResultMethod.UsedCache;
@@ -434,7 +445,9 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		private Expression<S> nextMatch2(ExpressoParserImpl<S> parser) throws IOException {
 			Expression<S> next;
 			// Next, parse other matches, using this match for the initial content
-			next = parser.parseWith(theMatch.getType(), this, false);
+			if (parser.theStack.getElement(new ComponentRecursiveInterrupt<>(getType(), true, this, 0), false).get().numDownstream > 0)
+				return null; // Only do the rest at the top level
+			next = parser.parseWith(theMatch.getType(), this, true);
 			if (next != null)
 				return new NextMatch<>(this, next, this, 3);
 
@@ -442,12 +455,9 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		}
 
 		private Expression<S> nextMatch3(ExpressoParserImpl<S> parser) throws IOException {
-			Expression<S> next;
-			if (theMatch instanceof DualPriorityBranchingExpression) {
-				next = parser.nextMatchLowerPriority(theMatch, this);
-				if (next != null)
-					return new NextMatch<>(this, next, this, 4);
-			}
+			Expression<S> next = parser.nextMatchLowerPriority(theMatch, this);
+			if (next != null)
+				return new NextMatch<>(this, next, this, 4);
 
 			return nextMatch4(parser);
 		}
@@ -537,16 +547,22 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	}
 
 	static class ComponentRecursiveInterrupt<S extends BranchableStream<?, ?>> {
+		public ComponentRecursiveInterrupt<S> parent;
 		final ExpressionType<? super S> type;
+		final boolean interruptible;
+		ElementId element;
 		final int depth;
+		ComponentRecursiveInterrupt<S> leaf;
 		int numDownstream;
-		Expression<S> result;
+		final Expression<S> result;
 		boolean wasInterrupted;
 
-		public ComponentRecursiveInterrupt(ExpressionType<? super S> type, Expression<S> result, int depth) {
+		public ComponentRecursiveInterrupt(ExpressionType<? super S> type, boolean interruptible, Expression<S> result, int depth) {
 			this.type = type;
+			this.interruptible = interruptible;
 			this.depth = depth;
 			this.result = result;
+			leaf = this;
 		}
 
 		@Override

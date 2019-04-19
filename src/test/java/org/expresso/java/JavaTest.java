@@ -6,14 +6,7 @@ import java.io.Reader;
 import java.net.URL;
 import java.util.function.Supplier;
 
-import org.expresso.ConfiguredExpressionType;
-import org.expresso.DefaultGrammarParser;
-import org.expresso.Expression;
-import org.expresso.ExpressionField;
-import org.expresso.ExpressionTester;
-import org.expresso.ExpressionType;
-import org.expresso.ExpressoGrammar;
-import org.expresso.ExpressoGrammarParser;
+import org.expresso.*;
 import org.expresso.stream.CharSequenceStream;
 import org.junit.Assert;
 import org.junit.Before;
@@ -308,7 +301,7 @@ public class JavaTest {
 			}).withField("method.name", method -> {
 				method.withContent("create");
 			}).withField("method.arguments.argument", arg1 -> {
-				arg1.withType("qualified-name").withField("target", arg1Target -> {
+				arg1.withType("qualified-name", "field-ref").withField("target", arg1Target -> {
 					arg1Target.withType("method").withField("target", arg1TargetTarget -> {
 						arg1TargetTarget.withContent("org.observe.util.TypeTokens");
 					}).withField("method.name", arg1TargetMethod -> arg1TargetMethod.withContent("get"));
