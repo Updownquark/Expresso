@@ -165,7 +165,6 @@
 			<up-to field="content">
 				<literal>*/</literal>
 			</up-to>
-			<literal>*/</literal>
 		</without>
 	</expression>
 	
