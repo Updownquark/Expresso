@@ -536,7 +536,7 @@
 		<repeat>
 			<qualifier field="qualifier" />
 		</repeat>
-		<one-of>
+		<one-of field="type">
 			<literal>class</literal>
 			<literal>interface</literal>
 		</one-of>

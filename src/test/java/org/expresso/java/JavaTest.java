@@ -381,5 +381,68 @@ public class JavaTest {
 		try (Reader reader = new InputStreamReader(file.openStream())) {
 			result = parse(CharSequenceStream.from(reader, 4096), "java-file", true, TIMEOUT * 5);
 		}
+		result = result.unwrap();
+		new ExpressionTester("SimpleParseableJavaFile").withType("java-file")//
+			.withField("package", pkg -> pkg.withContent("org.expresso.java"))//
+			.withField("content",
+				clazz -> clazz.withType("class-declaration")//
+					.withField("name", name -> name.withContent("SimpleParseableJavaFile"))//
+					.withField("qualifier", qfr -> qfr.withContent("public"))//
+					.withField("type", type -> type.withContent("class"))//
+					.withField("content", addMethod -> {
+						addMethod.withType("method-declaration")//
+							.withField("qualifier", //
+								qfr -> qfr.withContent("public"), qfr -> qfr.withContent("static"))//
+							.withField("type", type -> type.withContent("int"))//
+							.withField("name", name -> name.withContent("add"))//
+							.withField("parameter", //
+								param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
+									name -> name.withContent("a")), //
+								param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
+									name -> name.withContent("b")))
+							.withField("body.content",
+								body -> body.withType("return").withField("value",
+									rv -> rv.withType("add")//
+										.withField("left", left -> left.withContent("a"))//
+										.withField("right", right -> right.withContent("b"))));
+					}, subMethod -> {
+						subMethod.withType("method-declaration")//
+							.withField("qualifier", //
+								qfr -> qfr.withContent("public"), qfr -> qfr.withContent("static"))//
+							.withField("type", type -> type.withContent("int"))//
+							.withField("name", name -> name.withContent("subtract"))//
+							.withField("parameter", //
+								param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
+									name -> name.withContent("a")), //
+								param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
+									name -> name.withContent("b")))
+							.withField("body.content",
+								body -> body.withType("return").withField("value",
+									rv -> rv.withType("subtract")//
+										.withField("left", left -> left.withContent("a"))//
+										.withField("right", right -> right.withContent("b"))));
+					}, op1 -> {
+						op1.withType("method-declaration")//
+							.withField("qualifier", //
+								qfr -> qfr.withContent("public"), qfr -> qfr.withContent("static"))//
+							.withField("type", type -> type.withContent("int"))//
+							.withField("name", name -> name.withContent("op1"))//
+							.withField("parameter", //
+								param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
+									name -> name.withContent("a")), //
+								param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
+									name -> name.withContent("b")), //
+								param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
+									name -> name.withContent("c")))
+							.withField("body.content",
+								body -> body.withType("return").withField("value",
+									rv -> rv.withType("add")//
+										.withField("left", left -> left.withContent("a"))//
+										.withField("right",
+											right -> right.withType("multiply")//
+												.withField("left", multLeft -> multLeft.withContent("b"))//
+												.withField("right", multRight -> multRight.withContent("c")))));
+					}))//
+			.test(result);
 	}
 }
