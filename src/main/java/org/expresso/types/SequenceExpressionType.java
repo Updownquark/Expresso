@@ -17,7 +17,7 @@ public class SequenceExpressionType<S extends BranchableStream<?, ?>> extends Ab
 	 * @param id The cache ID for this expression type
 	 * @param components The components that make up this sequence
 	 */
-	public SequenceExpressionType(int id, List<ExpressionType<S>> components) {
+	public SequenceExpressionType(int id, List<? extends ExpressionType<? super S>> components) {
 		super(id, components);
 	}
 

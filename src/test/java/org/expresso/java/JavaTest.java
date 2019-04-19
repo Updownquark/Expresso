@@ -352,10 +352,10 @@ public class JavaTest {
 						left.withType("qualified-name").withContent("a");
 					}).withField("right", right -> {
 						right.withType("qualified-name").withContent("b");
-				});
+					});
 				});
 			})//
-			.test(parse(String.join("\tpublic static int add(int a, int b){\n", //
+			.test(parse(String.join("", "\tpublic static int add(int a, int b){\n", //
 				"\t\treturn a+b;\n", //
 				"\t}\n"), "class-content", true, TIMEOUT * 2));
 	}

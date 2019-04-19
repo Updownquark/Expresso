@@ -24,7 +24,7 @@ public class RepeatExpressionType<S extends BranchableStream<?, ?>> extends Abst
 	 * @param max The maximum number of times the sequence may be present in the stream
 	 * @param components The components for the sequence
 	 */
-	public RepeatExpressionType(int id, int min, int max, List<ExpressionType<S>> components) {
+	public RepeatExpressionType(int id, int min, int max, List<? extends ExpressionType<? super S>> components) {
 		super(id, new InfiniteSequenceRepeater<>());
 		if (min > max)
 			throw new IllegalArgumentException("min (" + min + ") must be <= max (" + max + ")");

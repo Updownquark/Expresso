@@ -4,11 +4,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.expresso.Expression;
-import org.expresso.ExpressionType;
-import org.expresso.ExpressoGrammar;
-import org.expresso.ExpressoParser;
-import org.expresso.GrammarExpressionType;
+import org.expresso.*;
 import org.expresso.debug.ExpressoDebugUI;
 import org.expresso.debug.ExpressoDebugger;
 import org.expresso.impl.ExpressoParserImpl.ComponentRecursiveInterrupt;
@@ -67,6 +63,13 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 		theDebugger.init(theGrammar, stream, component);
 		theQualityLevel = 0;
 		Expression<S> best = null;
+		// ExpressionClass<? super S> ignorable = theGrammar.getExpressionClasses().get(DefaultGrammarParser.IGNORABLE);
+		// if (ignorable != null) { // Account for ignorables at the end of the content
+		// component = new SequenceExpressionType<>(-1,
+		// Collections.<ExpressionType<? super S>> unmodifiableList(Arrays.<ExpressionType<? super S>> asList(component, //
+		// new OptionalExpressionType<>(-1,
+		// Arrays.asList(new RepeatExpressionType<>(-1, 0, Integer.MAX_VALUE, Arrays.asList(ignorable)))))));
+		// }
 		ExpressoParser<S> parser = getParser(stream, 0, new int[0]);
 		// TrackNode node = ExpressionType.TRACKER.start("parse");
 		roundLoop: for (int round = 1; round < 10; round++) {
