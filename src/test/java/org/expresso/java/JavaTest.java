@@ -106,6 +106,11 @@ public class JavaTest {
 		}, time);
 	}
 
+	private void testExpression(String expression, String expressionType, boolean errorFree, long time, ExpressionTester validation) {
+		Expression<CharSequenceStream> result = parse(expression, expressionType, errorFree, time);
+		validation.test(result);
+	}
+
 	/** Tests parsing a simple variable name (vbl) */
 	@Test
 	public void testVariable() {
@@ -375,6 +380,16 @@ public class JavaTest {
 			.test(parse(String.join("", "\tpublic static int add(int a, int b){\n", //
 				"\t\treturn a+b;\n", //
 				"\t}\n"), "class-content", true, TIMEOUT * 2));
+	}
+
+	@Test
+	public void testString(){
+		testExpression("\"This is a string\"", "result-producer", true, TIMEOUT,//
+			new ExpressionTester("Simple String").withType("string").withField("value", val -> val.withContent("This is a string\"")));
+
+		testExpression("\"This string has an escaped quote (\\\")\"", "result-producer", true, TIMEOUT, //
+			new ExpressionTester("Simple String").withType("string").withField("value", val -> val//
+				.withContent("This string has an escaped quote (\\\")\"")));
 	}
 
 	/**

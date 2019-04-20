@@ -47,7 +47,6 @@
 					<literal>&#10;</literal>
 				</one-of>
 			</up-to>
-			<literal>&quot;</literal>
 		</without>
 	</expression>
 	<expression name="number" class="literal-number">
