@@ -41,12 +41,25 @@
 	<expression name="string" class="literal-value">
 		<literal>&quot;</literal>
 		<without types="ignorable">
-			<up-to field="value">
+			<repeat field="content">
 				<one-of>
-					<literal>&quot;</literal>
-					<literal>&#10;</literal>
+					<literal field="escaped-quote">\"</literal>
+					<sequence field="unicode-character">
+						<literal>\u</literal>
+						<pattern field="char-code">[0-9a-fA-F]{4}</pattern>
+					</sequence>
+					<sequence field="special-character">
+						<literal>\</literal>
+						<pattern field="char-code">[a-z]</pattern>
+					</sequence>
+					<sequence field="escaped-character">
+						<literal>\</literal>
+						<pattern field="character">["\\]</pattern>
+					</sequence>
+					<pattern field="content">[^"\\]+</pattern>
 				</one-of>
-			</up-to>
+			</repeat>
+			<literal>&quot;</literal>
 		</without>
 	</expression>
 	<expression name="number" class="literal-number">
