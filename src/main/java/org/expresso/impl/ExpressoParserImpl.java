@@ -182,6 +182,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 
 	Expression<S> parseWith(ExpressionType<? super S> component, Expression<S> recursiveInterrupt) throws IOException {
 		DebugExpressionParsing debug = theSession.getDebugger().begin(component, theStream, null);
+		boolean recursive = theSession.isRecursive(component);
 		StackPushResult stackFrame = null;
 		try {
 			int cacheId = component.getId();
@@ -193,7 +194,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				debug.finished(null, DebugResultMethod.Excluded);
 				return null;
 			}
-			if (component.isCacheable() || theSession.isRecursive(component)) {
+			if (component.isCacheable() || recursive) {
 				stackFrame = pushOnStack(component, recursiveInterrupt, true);
 				if (stackFrame.frame == null) {
 					debug.finished(stackFrame.interrupt, DebugResultMethod.RecursiveInterrupt);
@@ -205,32 +206,39 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				while (result != null && !find(result, recursiveInterrupt))
 					result = result.nextMatch(this);
 				debug.finished(result, DebugResultMethod.Parsed);
+				// if (result != null && recursive && !(result instanceof NextMatch))
+				// result = new NextMatch<>(null, result, null, 0);
 				return result;
 			} else if (!component.isCacheable()) {
 				Expression<S> result = component.parse(this);
 				debug.finished(result, DebugResultMethod.Parsed);
+				// if (result != null && recursive && !(result instanceof NextMatch))
+				// result = new NextMatch<>(null, result, null, 0);
 				return result;
 			}
 			boolean[] newCache = new boolean[1];
 			CachedExpression<S> cached = theCache.computeIfAbsent(cacheId, k -> {
 				newCache[0] = true;
-				return CachedExpression.cacheFor(component);
+				return new CachedExpression<>(component);
 			});
+			Expression<S> result;
 			if (newCache[0]) {
 				Expression<S> match = component.parse(this);
-				debug.finished(match, DebugResultMethod.Parsed);
+				// if (match != null && recursive)
+				// match = new NextMatch<>(null, match, null, 0);
 				boolean cache = !stackFrame.frame.get().wasInterrupted;
 				if (cache) {
 					cached.setPossibility(match);
-					return cached.asPossibility();
+					result = cached.asPossibility();
 				} else {
 					theCache.remove(cacheId);
-					return match;
+					result = match;
 				}
 			} else {
-				debug.finished(cached.asPossibility(), DebugResultMethod.UsedCache);
-				return cached.asPossibility();
+				result = cached.asPossibility();
 			}
+			debug.finished(result, DebugResultMethod.UsedCache);
+			return result;
 		} catch (RuntimeException e) {
 			theSession.getDebugger().suspend();
 			throw e;
@@ -242,15 +250,6 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 
 	@Override
 	public Expression<S> nextMatch(Expression<S> expression) throws IOException {
-		return nextMatch(expression, null);
-	}
-
-	@Override
-	public Expression<S> nextMatchLowPriority(Expression<S> expression) throws IOException {
-		return nextMatchLowerPriority(expression, null);
-	}
-
-	private Expression<S> nextMatch(Expression<S> expression, Expression<S> recursiveInterrupt) throws IOException {
 		DebugExpressionParsing debug = theSession.getDebugger().begin(expression.getType(), theStream, expression);
 		StackPushResult stackFrame = null;
 		try {
@@ -263,7 +262,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				debug.finished(null, DebugResultMethod.Excluded);
 				return null;
 			}
-			stackFrame = pushOnStack(expression.getType(), recursiveInterrupt, false);
+			stackFrame = pushOnStack(expression.getType(), null, false);
 			DebugResultMethod method;
 			if (expression instanceof CachedExpression && ((CachedExpression<?>) expression).hasNextMatch())
 				method = DebugResultMethod.UsedCache;
@@ -278,6 +277,10 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				if (((NextMatch<S>) expression).theMatch instanceof CachedExpression)
 					((CachedExpression<S>) ((NextMatch<S>) expression).theMatch).cacheNext(match);
 			}
+			// if (!stackFrame.frame.get().wasInterrupted) {
+			// if (expression instanceof CachedExpression)
+			// match = ((CachedExpression<S>) expression).cacheNext(match);
+			// }
 			debug.finished(match, method);
 			return match;
 		} catch (RuntimeException e) {
@@ -287,6 +290,11 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 			if (stackFrame != null)
 				stackFrame.pop();
 		}
+	}
+
+	@Override
+	public Expression<S> nextMatchLowPriority(Expression<S> expression) throws IOException {
+		return nextMatchLowerPriority(expression, null);
 	}
 
 	Expression<S> nextMatchLowerPriority(Expression<S> expression, Expression<S> recursiveInterrupt)
@@ -327,6 +335,10 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				if (((NextMatch<S>) expression).theMatch instanceof CachedExpression)
 					((CachedExpression<S>) ((NextMatch<S>) expression).theMatch).cacheNextLowPriority(match);
 			}
+			// if (!stackFrame.frame.get().wasInterrupted) {
+			// if (expression instanceof CachedExpression)
+			// match = ((CachedExpression<S>) expression).cacheNextLowPriority(match);
+			// }
 			debug.finished(match, method);
 			return match;
 		} catch (RuntimeException e) {
