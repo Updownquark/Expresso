@@ -118,6 +118,21 @@ public class JavaTest {
 		validation.test(result);
 	}
 
+	private void testExpressionOnFile(String fileName, long time, ExpressionTester validation) throws IOException {
+		URL self = QommonsConfig.toUrl("src/test/java/org/expresso/java/" + getClass().getSimpleName() + ".java");
+		URL file = QommonsConfig.toUrl(QommonsConfig.resolve(fileName, self.toString()));
+		Expression<CharSequenceStream> result;
+		// These lines are for potentially inspecting the file extension and using different grammar based on that,
+		// but I'm not set up to do anything like that in this tester yet.
+		// int lastDot=fileName.lastIndexOf('.');
+		// String extension=lastDot<0 ? null : fileName.substring(lastDot+1);
+		try (Reader reader = new InputStreamReader(file.openStream())) {
+			result = parse(CharSequenceStream.from(reader, 4096), "java-file", true, time);
+		}
+		result = result.unwrap();
+		validation.test(result);
+	}
+
 	/** Tests parsing a simple variable name (vbl) */
 	@Test
 	public void testVariable() {
@@ -407,79 +422,81 @@ public class JavaTest {
 	 */
 	@Test
 	public void testSimpleJavaFile() throws IOException {
-		URL file = QommonsConfig.toUrl("src/test/java/org/expresso/java/SimpleParseableJavaFile.java");
-		Expression<CharSequenceStream> result;
-		try (Reader reader = new InputStreamReader(file.openStream())) {
-			result = parse(CharSequenceStream.from(reader, 4096), "java-file", true, TIMEOUT * 5);
-		}
-		result = result.unwrap();
-		new ExpressionTester("SimpleParseableJavaFile").withType("java-file")//
-			.withField("package", pkg -> pkg.withContent("org.expresso.java"))//
-			.withField("content",
-				clazz -> clazz.withType("class-declaration")//
-					.withField("javadoc",
-						jd -> jd.withContent("/**\n"//
-							+ " * This file is only here to be parsed by a unit test\n"//
-							+ " * \n"//
-							+ " * @author Andrew Butler\n"//
-							+ " */"))
-					.withField("name", name -> name.withContent("SimpleParseableJavaFile"))//
-					.withField("qualifier", qfr -> qfr.withContent("public"))//
-					.withField("type", type -> type.withContent("class"))//
-					.withField("content", addMethod -> {
-						addMethod.withType("method-declaration")//
-							.withField("qualifier", //
-								qfr -> qfr.withContent("public"), qfr -> qfr.withContent("static"))//
-							.withField("type", type -> type.withContent("int"))//
-							.withField("name", name -> name.withContent("add"))//
-							.withField("parameter", //
-								param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
-									name -> name.withContent("a")), //
-								param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
-									name -> name.withContent("b")))
-							.withField("body.content",
-								body -> body.withType("return").withField("value",
-									rv -> rv.withType("add")//
-										.withField("left", left -> left.withContent("a"))//
-										.withField("right", right -> right.withContent("b"))));
-					}, subMethod -> {
-						subMethod.withType("method-declaration")//
-							.withField("qualifier", //
-								qfr -> qfr.withContent("public"), qfr -> qfr.withContent("static"))//
-							.withField("type", type -> type.withContent("int"))//
-							.withField("name", name -> name.withContent("subtract"))//
-							.withField("parameter", //
-								param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
-									name -> name.withContent("a")), //
-								param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
-									name -> name.withContent("b")))
-							.withField("body.content",
-								body -> body.withType("return").withField("value",
-									rv -> rv.withType("subtract")//
-										.withField("left", left -> left.withContent("a"))//
-										.withField("right", right -> right.withContent("b"))));
-					}, op1 -> {
-						op1.withType("method-declaration")//
-							.withField("qualifier", //
-								qfr -> qfr.withContent("public"), qfr -> qfr.withContent("static"))//
-							.withField("type", type -> type.withContent("int"))//
-							.withField("name", name -> name.withContent("op1"))//
-							.withField("parameter", //
-								param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
-									name -> name.withContent("a")), //
-								param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
-									name -> name.withContent("b")), //
-								param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
-									name -> name.withContent("c")))
-							.withField("body.content",
-								body -> body.withType("return").withField("value",
-									rv -> rv.withType("add")//
-										.withField("left", left -> left.withContent("a"))//
-										.withField("right",
-											right -> right.withType("multiply")//
-												.withField("left", multLeft -> multLeft.withContent("b"))//
-												.withField("right", multRight -> multRight.withContent("c")))));
-					}))//
-			.test(result);
+		testExpressionOnFile("SimpleParseableJavaFile.java", TIMEOUT * 5,
+			new ExpressionTester("SimpleParseableJavaFile").withType("java-file")//
+				.withField("package", pkg -> pkg.withContent("org.expresso.java"))//
+				.withField("content",
+					clazz -> clazz.withType("class-declaration")//
+						.withField("javadoc",
+							jd -> jd.withContent("/**\n"//
+								+ " * This file is only here to be parsed by a unit test\n"//
+								+ " * \n"//
+								+ " * @author Andrew Butler\n"//
+								+ " */"))
+						.withField("name", name -> name.withContent("SimpleParseableJavaFile"))//
+						.withField("qualifier", qfr -> qfr.withContent("public"))//
+						.withField("type", type -> type.withContent("class"))//
+						.withField("content", addMethod -> {
+							addMethod.withType("method-declaration")//
+								.withField("qualifier", //
+									qfr -> qfr.withContent("public"), qfr -> qfr.withContent("static"))//
+								.withField("type", type -> type.withContent("int"))//
+								.withField("name", name -> name.withContent("add"))//
+								.withField("parameter", //
+									param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
+										name -> name.withContent("a")), //
+									param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
+										name -> name.withContent("b")))
+								.withField("body.content",
+									body -> body.withType("return").withField("value",
+										rv -> rv.withType("add")//
+											.withField("left", left -> left.withContent("a"))//
+											.withField("right", right -> right.withContent("b"))));
+						}, subMethod -> {
+							subMethod.withType("method-declaration")//
+								.withField("qualifier", //
+									qfr -> qfr.withContent("public"), qfr -> qfr.withContent("static"))//
+								.withField("type", type -> type.withContent("int"))//
+								.withField("name", name -> name.withContent("subtract"))//
+								.withField("parameter", //
+									param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
+										name -> name.withContent("a")), //
+									param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
+										name -> name.withContent("b")))
+								.withField("body.content",
+									body -> body.withType("return").withField("value",
+										rv -> rv.withType("subtract")//
+											.withField("left", left -> left.withContent("a"))//
+											.withField("right", right -> right.withContent("b"))));
+						}, op1 -> {
+							op1.withType("method-declaration")//
+								.withField("qualifier", //
+									qfr -> qfr.withContent("public"), qfr -> qfr.withContent("static"))//
+								.withField("type", type -> type.withContent("int"))//
+								.withField("name", name -> name.withContent("op1"))//
+								.withField("parameter", //
+									param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
+										name -> name.withContent("a")), //
+									param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
+										name -> name.withContent("b")), //
+									param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
+										name -> name.withContent("c")))
+								.withField("body.content",
+									body -> body.withType("return").withField("value",
+										rv -> rv.withType("add")//
+											.withField("left", left -> left.withContent("a"))//
+											.withField("right",
+												right -> right.withType("multiply")//
+													.withField("left", multLeft -> multLeft.withContent("b"))//
+													.withField("right", multRight -> multRight.withContent("c")))));
+						})));
+	}
+
+	@Test
+	public void testParseSelf() throws IOException {
+		testExpressionOnFile(getClass().getSimpleName() + ".java", TIMEOUT * 10, //
+			new ExpressionTester(getClass().getSimpleName())//
+				.withField("content", clazz -> clazz.withType("class-declaration")//
+					.withField("name", name -> name.withContent(getClass().getSimpleName()))));
 	}
 }
