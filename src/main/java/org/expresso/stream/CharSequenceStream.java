@@ -4,8 +4,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
 
-import org.qommons.BreakpointHere;
-
 /** A branchable stream of character data */
 public abstract class CharSequenceStream extends BranchableStream<Character, char []> implements CharSequence {
 	private int theLineNumber = 1;
@@ -119,8 +117,6 @@ public abstract class CharSequenceStream extends BranchableStream<Character, cha
 
 	@Override
 	protected StringBuilder printChunk(char[] chunk, int start, int end, StringBuilder printTo) {
-		if (start < 0 || start > end || end > chunk.length)
-			BreakpointHere.breakpoint();
 		return printTo.append(chunk, start, end - start);
 	}
 
