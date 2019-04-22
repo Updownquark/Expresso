@@ -15,7 +15,7 @@ class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S
 	private CachedExpression<S> theNextLowPriorityMatch;
 	private int cachedHash = -1;
 
-	private CachedExpression(ExpressionType<? super S> type) {
+	CachedExpression(ExpressionType<? super S> type) {
 		theType = type;
 	}
 
@@ -55,9 +55,10 @@ class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S
 			return thePossibility.nextMatch(parser);
 	}
 
-	void cacheNext(Expression<S> next) {
+	Expression<S> cacheNext(Expression<S> next) {
 		if (theNextMatch == null)
-			theNextMatch = CachedExpression.<S> cacheFor(theType).setPossibility(next);
+			theNextMatch = new CachedExpression<S>(theType).setPossibility(next);
+		return theNextMatch.asPossibility();
 	}
 
 	@Override
@@ -68,9 +69,10 @@ class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S
 			return thePossibility.nextMatchLowPriority(parser);
 	}
 
-	void cacheNextLowPriority(Expression<S> next) {
+	Expression<S> cacheNextLowPriority(Expression<S> next) {
 		if (theNextLowPriorityMatch == null)
-			theNextLowPriorityMatch = CachedExpression.<S> cacheFor(getType()).setPossibility(next);
+			theNextLowPriorityMatch = new CachedExpression<S>(getType()).setPossibility(next);
+		return theNextLowPriorityMatch.asPossibility();
 	}
 
 	@Override
@@ -151,9 +153,5 @@ class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S
 	@Override
 	public String toString() {
 		return print(new StringBuilder(), 0, "").toString();
-	}
-
-	static <S extends BranchableStream<?, ?>> CachedExpression<S> cacheFor(ExpressionType<? super S> type) {
-		return new CachedExpression<>(type);
 	}
 }
