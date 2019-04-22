@@ -17,6 +17,7 @@ import org.expresso.debug.ExpressoDebugUI;
 import org.expresso.debug.ExpressoDebugger;
 import org.expresso.impl.ExpressoParserImpl.ComponentRecursiveInterrupt;
 import org.expresso.stream.BranchableStream;
+import org.expresso.types.SequenceExpressionType;
 import org.expresso.types.TrailingIgnorableExpressionType;
 import org.qommons.BreakpointHere;
 import org.qommons.collect.BetterHashSet;
@@ -77,8 +78,6 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 		roundLoop: for (int round = 1; round < 10; round++) {
 			Expression<S> match = parser.parseWith(component);
 			for (; match != null; match = parser.nextMatch(match)) {
-				if (match.length() < stream.getDiscoveredLength()) {
-				}
 				if (best == null || match.compareTo(best) < 0) {
 					best = match;
 
@@ -145,14 +144,14 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 	 * @return If the component could possibly use itself as a component
 	 */
 	public boolean isRecursive(ExpressionType<?> type) {
-		if (type.getId() < 0 || !(type instanceof GrammarExpressionType))
+		if (!cacheRecursive(type))
 			return false;
 		return theRecursiveCache.computeIfAbsent(type.getId(), //
-			id -> isRecursive(type, type, theQualityLevel));
+			id -> isRecursive(type, type, theQualityLevel, true));
 	}
 
-	private boolean isRecursive(ExpressionType<?> toSearch, ExpressionType<?> target, int minQuality) {
-		if (toSearch == target || Boolean.TRUE.equals(theRecursiveCache.get(toSearch.getId())))
+	private boolean isRecursive(ExpressionType<?> toSearch, ExpressionType<?> target, int minQuality, boolean topLevel) {
+		if (!topLevel && (toSearch == target || Boolean.TRUE.equals(theRecursiveCache.get(toSearch.getId()))))
 			return true;
 		ElementId added = null;
 		if (toSearch.getId() >= 0) {
@@ -161,13 +160,19 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 				return false; // Found a loop, but not with the expression type we're searching for
 		}
 		try {
+			ExpressionType<?> prevChild = null;
 			for (ExpressionType<?> child : toSearch.getComponents()) {
-				if (isRecursive(child, target, minQuality))
+				if (prevChild == child)
+					return false;
+				prevChild = child;
+				if (isRecursive(child, target, minQuality, false)) {
 					return true;
-				else {
-					minQuality -= child.getEmptyQuality(minQuality);
-					if (minQuality > 0)
-						break;
+				} else {
+					if (toSearch instanceof SequenceExpressionType) {
+						minQuality -= child.getEmptyQuality(minQuality);
+						if (minQuality > 0)
+							break;
+					}
 				}
 			}
 			return false;
@@ -175,6 +180,10 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 			if (added != null)
 				theRecursiveVisited.mutableElement(added).remove();
 		}
+	}
+
+	private static boolean cacheRecursive(ExpressionType<?> type) {
+		return type.getId() >= 0 || type instanceof GrammarExpressionType;
 	}
 
 	private static boolean isSatisfied(Expression<?> best, BranchableStream<?, ?> stream) {

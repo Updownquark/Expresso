@@ -493,9 +493,17 @@
 		</repeat>
 		<type field="type" />
 		<identifier field="name" />
+		<option>
+			<literal>=</literal>
+			<result-producer field="init" />
+		</option>
 		<repeat>
 			<literal>,</literal>
 			<identifier field="name" />
+			<option>
+				<literal>=</literal>
+				<result-producer field="init" />
+			</option>
 		</repeat>
 		<literal>;</literal>
 	</expression>
@@ -574,7 +582,7 @@
 			<literal>class</literal>
 			<literal>interface</literal>
 		</one-of>
-		<whitespace />
+		<ignorable />
 		<identifier field="name" />
 		<option>
 			<type-parameters field="type-parameters" />
@@ -609,7 +617,7 @@
 			<qualifier field="qualifier" />
 		</repeat>
 		<literal>enum</literal>
-		<whitespace />
+		<ignorable />
 		<identifier field="name" />
 		<option>
 			<type-parameters field="type-parameters" />

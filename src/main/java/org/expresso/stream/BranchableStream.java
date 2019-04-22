@@ -376,7 +376,8 @@ public abstract class BranchableStream<D, C> implements Cloneable {
 		Chunk chunk = theChunk;
 		while (chunk != null && chunkStart < chunkEnd) {
 			printChunk(chunk.getData(), chunkStart, Math.min(chunkEnd, chunk.length()), printTo);
-			chunkStart += chunk.length();
+			chunkStart = 0;
+			chunkEnd -= chunk.length();
 			chunk = chunk.getNext();
 		}
 		return printTo;

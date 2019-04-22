@@ -1,6 +1,10 @@
 package org.expresso.debug;
 
-import java.awt.*;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.EventQueue;
+import java.awt.Font;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.time.Instant;
@@ -9,14 +13,26 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.function.Supplier;
 
-import javax.swing.*;
+import javax.swing.BorderFactory;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextPane;
+import javax.swing.JTree;
 import javax.swing.border.Border;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreePath;
 
-import org.expresso.*;
+import org.expresso.BareContentExpressionType;
+import org.expresso.Expression;
+import org.expresso.ExpressionFieldType;
+import org.expresso.ExpressionType;
+import org.expresso.ExpressoGrammar;
+import org.expresso.GrammarExpressionType;
 import org.expresso.stream.BranchableStream;
 import org.expresso.types.OneOfExpressionType;
 import org.observe.ObservableValue;
@@ -170,6 +186,7 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 		Over, Into, Out;
 	}
 
+	private BranchableStream<?, ?> theStream;
 	private final SettableValue<ParsingState> theRoot;
 	private final SettableValue<ParsingState> theSelection;
 	private final LinkedList<ParsingState> theStack;
@@ -197,6 +214,7 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 
 	@Override
 	public void init(ExpressoGrammar<?> grammar, BranchableStream<?, ?> stream, ExpressionType<?> root) {
+		theStream = stream;
 		if (EventQueue.isDispatchThread())
 			throw new IllegalStateException("Cannot debug parsing on the EDT");
 		if (theRoot.get() != null && theRoot.get().theExpressionType == root)
@@ -224,8 +242,13 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 			state = state.theChildren.get(0);
 		}
 		if (!component.equals(state.theExpressionType)) {
-			System.err.println("Bad State!!");
-			suspend();
+			if (theStack.isEmpty()) {
+				// Just parsing terminal ignorables
+				return DebugExpressionParsing.IDLE_PARSING;
+			} else {
+				System.err.println("Bad State!!");
+				suspend();
+			}
 		}
 		theStack.add(state);
 		{
@@ -292,7 +315,6 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 	@Override
 	public void suspend() {
 		isReallySuspended = true;
-		isSuspended.set(true, null);
 		if (!theStack.isEmpty()) {
 			if (theSelection.get() == theStack.getLast()) {
 				// Refresh the selection, since it may have changed
@@ -304,10 +326,11 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 				theStateTree.scrollPathToVisible(path);
 			});
 		}
-		while (isSuspended.get()) {
+		do {
 			// This loop is to capture the case where the user clicks "Debug" and then "Suspend" again right after
 			// The debugger will catch in the same place without progressing in the parsing
 			isReallySuspended = true;
+			isSuspended.set(true, null);
 			while (isSuspended.get()) {
 				try {
 					Thread.sleep(100);
@@ -319,7 +342,7 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 				isDebugging.set(false, null);
 				BreakpointHere.breakpoint();
 			}
-		}
+		} while (isSuspended.get());
 	}
 
 	private void resume() {
@@ -466,7 +489,7 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 					text.append(state.theStream.toString());
 					escapeHtml(text, len, text.length(), false);
 				} else {
-					theRoot.get().theStream.printContent(0, result.getStream().getPosition(), text);
+					theStream.printContent(0, result.getStream().getPosition(), text);
 					escapeHtml(text, len, text.length(), false);
 					text.append("<b><font color=\"red\">");
 					len = text.length();
@@ -477,7 +500,9 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 					result.getStream().printContent(result.length(), state.theStream.getDiscoveredLength(), text);
 					escapeHtml(text, len, text.length(), false);
 				}
+				int prevScroll = textScroll.getVerticalScrollBar().getValue();
 				textArea.setText(text.toString());
+				EventQueue.invokeLater(() -> textScroll.getVerticalScrollBar().setValue(prevScroll));
 			} else
 				textArea.setText("");
 		});
