@@ -6,7 +6,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import org.expresso.*;
+import org.expresso.DefaultGrammarParser;
+import org.expresso.Expression;
+import org.expresso.ExpressionClass;
+import org.expresso.ExpressionType;
+import org.expresso.ExpressoGrammar;
+import org.expresso.ExpressoParser;
+import org.expresso.GrammarExpressionType;
 import org.expresso.debug.ExpressoDebugUI;
 import org.expresso.debug.ExpressoDebugger;
 import org.expresso.impl.ExpressoParserImpl.ComponentRecursiveInterrupt;
@@ -66,19 +72,31 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 		theDebugger.init(theGrammar, stream, component);
 		theQualityLevel = 0;
 		Expression<S> best = null;
-		// ExpressionClass<? super S> ignorable = theGrammar.getExpressionClasses().get(DefaultGrammarParser.IGNORABLE);
-		// if (ignorable != null) { // Account for ignorables at the end of the content
-		// component = new SequenceExpressionType<>(-1,
-		// Collections.<ExpressionType<? super S>> unmodifiableList(Arrays.<ExpressionType<? super S>> asList(component, //
-		// new OptionalExpressionType<>(-1,
-		// Arrays.asList(new RepeatExpressionType<>(-1, 0, Integer.MAX_VALUE, Arrays.asList(ignorable)))))));
-		// }
 		ExpressoParser<S> parser = getParser(stream, 0, new int[0]);
+		ExpressionClass<? super S> ignorable = theGrammar.getExpressionClasses().get(DefaultGrammarParser.IGNORABLE);
 		roundLoop: for (int round = 1; round < 10; round++) {
 			Expression<S> match = parser.parseWith(component);
 			for (; match != null; match = parser.nextMatch(match)) {
+				if (match.length() < stream.getDiscoveredLength()) {
+				}
 				if (best == null || match.compareTo(best) < 0) {
 					best = match;
+
+					if (!stream.isFullyDiscovered() || best.length() < stream.getDiscoveredLength()) {
+						// Account for trailing ignorables
+						ExpressoParser<S> ignoreParser = parser.advance(best.length());
+						Expression<S> ignoreExp = ignoreParser.parseWith(ignorable);
+						if (ignoreExp != null) {
+							List<Expression<S>> ignorables = new LinkedList<>();
+							do {
+								ignorables.add(ignoreExp);
+								ignoreParser = ignoreParser.advance(ignoreExp.length());
+								ignoreExp = ignoreParser.parseWith(ignorable);
+							} while (ignoreExp != null);
+							best = new TrailingIgnorableExpressionType.TrailingIgnorableExpression<>(ignorable, parser, best, ignorables);
+						}
+					}
+
 					if (isSatisfied(best, stream))
 						break roundLoop;
 				}
@@ -94,7 +112,6 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 		}
 		if (best != null && (!stream.isFullyDiscovered() || best.length() < stream.getDiscoveredLength())) {
 			// Account for trailing ignorables
-			ExpressionClass<? super S> ignorable = theGrammar.getExpressionClasses().get(DefaultGrammarParser.IGNORABLE);
 			ExpressoParser<S> ignoreParser = parser.advance(best.length());
 			Expression<S> ignoreExp = ignoreParser.parseWith(ignorable);
 			if (ignoreExp != null) {

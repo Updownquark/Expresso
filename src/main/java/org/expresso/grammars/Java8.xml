@@ -463,7 +463,18 @@
 			<literal>synchronized</literal>
 		</one-of>
 	</expression>
+	<expression name="javadoc">
+		<literal>/**</literal>
+		<without types="ignorable">
+			<up-to>
+				<literal>*/</literal>
+			</up-to>
+		</without>
+	</expression>
 	<expression name="variable-declaration" class="declaration,assignable,statement-content">
+		<option>
+			<javadoc field="javadoc" />
+		</option>
 		<repeat>
 			<qualifier field="qualifier" />
 		</repeat>
@@ -487,7 +498,13 @@
 	</expression>
 	<expression name="method-declaration" class="declaration">
 		<option>
+			<javadoc field="javadoc" />
+		</option>
+		<option>
 			<annotations field="annotations" />
+		</option>
+		<option>
+			<javadoc field="javadoc" />
 		</option>
 		<repeat>
 			<qualifier field="qualifier" />
@@ -529,7 +546,13 @@
 	</expression>
 	<expression name="class-declaration" class="declaration,body-content,file-content">
 		<option>
+			<javadoc field="javadoc" />
+		</option>
+		<option>
 			<annotations field="annotations" />
+		</option>
+		<option>
+			<javadoc field="javadoc" />
 		</option>
 		<repeat>
 			<qualifier field="qualifier" />

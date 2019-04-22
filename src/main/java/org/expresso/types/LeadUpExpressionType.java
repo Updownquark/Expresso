@@ -37,7 +37,7 @@ public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends Abst
 	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
 		ExpressoParser<S2> branched = parser;
 		while (branched != null) {
-			Expression<S2> terminal = parser.parseWith(theTerminal);
+			Expression<S2> terminal = branched.parseWith(theTerminal);
 			if (terminal != null)
 				return new LeadUpPossibility<>(this, parser, theTerminal, terminal);
 			branched = branched.advance(1);

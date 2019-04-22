@@ -67,7 +67,7 @@ public class ExpressionTester {
 	 * @return This tester
 	 */
 	public ExpressionTester withContent(String content) {
-		return withContent(c -> test(content.equals(c), () -> theName + ": content should be " + content + ", not " + c));
+		return withContent(c -> test(content.equals(trimDos(c)), () -> theName + ": content should be " + content + ", not " + c));
 	}
 
 	/**
@@ -121,6 +121,14 @@ public class ExpressionTester {
 					mockIter.next().test(exIter.next().unwrap());
 			}
 		}
+	}
+
+	private static String trimDos(String s) {
+		int idx = s.indexOf('\r');
+		if (idx >= 0)
+			return s.replaceAll("\\r", "");
+		else
+			return s;
 	}
 
 	static class ExpressionFieldsTester {

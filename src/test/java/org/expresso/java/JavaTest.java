@@ -6,7 +6,14 @@ import java.io.Reader;
 import java.net.URL;
 import java.util.function.Supplier;
 
-import org.expresso.*;
+import org.expresso.ConfiguredExpressionType;
+import org.expresso.DefaultGrammarParser;
+import org.expresso.Expression;
+import org.expresso.ExpressionField;
+import org.expresso.ExpressionTester;
+import org.expresso.ExpressionType;
+import org.expresso.ExpressoGrammar;
+import org.expresso.ExpressoGrammarParser;
 import org.expresso.stream.CharSequenceStream;
 import org.junit.Assert;
 import org.junit.Before;
@@ -382,9 +389,10 @@ public class JavaTest {
 				"\t}\n"), "class-content", true, TIMEOUT * 2));
 	}
 
+	/** Tests parsing strings, including escaped quotes and other content */
 	@Test
-	public void testString(){
-		testExpression("\"This is a string\"", "result-producer", true, TIMEOUT,//
+	public void testString() {
+		testExpression("\"This is a string\"", "result-producer", true, TIMEOUT, //
 			new ExpressionTester("Simple String").withType("string").withField("value", val -> val.withContent("This is a string\"")));
 
 		testExpression("\"This string has an escaped quote (\\\")\"", "result-producer", true, TIMEOUT, //
@@ -409,6 +417,12 @@ public class JavaTest {
 			.withField("package", pkg -> pkg.withContent("org.expresso.java"))//
 			.withField("content",
 				clazz -> clazz.withType("class-declaration")//
+					.withField("javadoc",
+						jd -> jd.withContent("/**\n"//
+							+ " * This file is only here to be parsed by a unit test\n"//
+							+ " * \n"//
+							+ " * @author Andrew Butler\n"//
+							+ " */"))
 					.withField("name", name -> name.withContent("SimpleParseableJavaFile"))//
 					.withField("qualifier", qfr -> qfr.withContent("public"))//
 					.withField("type", type -> type.withContent("class"))//
