@@ -6,14 +6,7 @@ import java.io.Reader;
 import java.net.URL;
 import java.util.function.Supplier;
 
-import org.expresso.ConfiguredExpressionType;
-import org.expresso.DefaultGrammarParser;
-import org.expresso.Expression;
-import org.expresso.ExpressionField;
-import org.expresso.ExpressionTester;
-import org.expresso.ExpressionType;
-import org.expresso.ExpressoGrammar;
-import org.expresso.ExpressoGrammarParser;
+import org.expresso.*;
 import org.expresso.stream.CharSequenceStream;
 import org.junit.Assert;
 import org.junit.Before;
@@ -492,6 +485,11 @@ public class JavaTest {
 						})));
 	}
 
+	/**
+	 * Parses this file
+	 * 
+	 * @throws IOException If the file cannot be read
+	 */
 	@Test
 	public void testParseSelf() throws IOException {
 		testExpressionOnFile(getClass().getSimpleName() + ".java", TIMEOUT * 10, //
