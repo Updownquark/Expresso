@@ -6,7 +6,14 @@ import java.io.Reader;
 import java.net.URL;
 import java.util.function.Supplier;
 
-import org.expresso.*;
+import org.expresso.ConfiguredExpressionType;
+import org.expresso.DefaultGrammarParser;
+import org.expresso.Expression;
+import org.expresso.ExpressionField;
+import org.expresso.ExpressionTester;
+import org.expresso.ExpressionType;
+import org.expresso.ExpressoGrammar;
+import org.expresso.ExpressoGrammarParser;
 import org.expresso.stream.CharSequenceStream;
 import org.junit.Assert;
 import org.junit.Before;
@@ -488,7 +495,7 @@ public class JavaTest {
 	@Test
 	public void testAssign() {
 		testExpression(
-			"theParser = grammarParser.parseGrammar(5);", "statement", true, TIMEOUT, new ExpressionTester("assignment"));
+			"theParser = grammarParser.parseGrammar();", "statement", true, TIMEOUT, new ExpressionTester("assignment"));
 		testExpression(
 			"theParser = grammarParser.parseGrammar(DefaultGrammarParser.class.getResource(\"/org/expresso/grammars/Java8.xml\"));",
 			"statement", true, TIMEOUT, new ExpressionTester("assignment")); // TODO

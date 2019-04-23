@@ -313,7 +313,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				return null;
 			}
 			stackFrame = pushOnStack(expression.getType(), recursiveInterrupt, true);
-			DebugResultMethod method;
+			DebugResultMethod method; // TODO This obviously isn't right
 			if (expression instanceof CachedExpression && ((CachedExpression<?>) expression).hasNextMatch())
 				method = DebugResultMethod.UsedCache;
 			else
