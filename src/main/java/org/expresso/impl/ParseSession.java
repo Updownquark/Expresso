@@ -6,13 +6,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import org.expresso.DefaultGrammarParser;
-import org.expresso.Expression;
-import org.expresso.ExpressionClass;
-import org.expresso.ExpressionType;
-import org.expresso.ExpressoGrammar;
-import org.expresso.ExpressoParser;
-import org.expresso.GrammarExpressionType;
+import org.expresso.*;
 import org.expresso.debug.ExpressoDebugUI;
 import org.expresso.debug.ExpressoDebugger;
 import org.expresso.impl.ExpressoParserImpl.ComponentRecursiveInterrupt;
@@ -143,7 +137,8 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 	 * @param type The component to test
 	 * @return If the component could possibly use itself as a component
 	 */
-	public boolean isRecursive(ExpressionType<?> type) {
+	@SuppressWarnings("unused")
+	private boolean isRecursive(ExpressionType<?> type) {
 		if (!cacheRecursive(type))
 			return false;
 		return theRecursiveCache.computeIfAbsent(type.getId(), //

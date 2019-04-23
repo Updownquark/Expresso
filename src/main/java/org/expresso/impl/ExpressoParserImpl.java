@@ -9,6 +9,7 @@ import java.util.Map;
 import org.expresso.Expression;
 import org.expresso.ExpressionType;
 import org.expresso.ExpressoParser;
+import org.expresso.GrammarExpressionType;
 import org.expresso.debug.ExpressoDebugger.DebugExpressionParsing;
 import org.expresso.debug.ExpressoDebugger.DebugResultMethod;
 import org.expresso.stream.BranchableStream;
@@ -182,7 +183,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 
 	Expression<S> parseWith(ExpressionType<? super S> component, Expression<S> recursiveInterrupt) throws IOException {
 		DebugExpressionParsing debug = theSession.getDebugger().begin(component, theStream, null);
-		boolean recursive = theSession.isRecursive(component);
+		boolean recursive = component instanceof GrammarExpressionType;
 		StackPushResult stackFrame = null;
 		try {
 			int cacheId = component.getId();
@@ -268,7 +269,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				method = DebugResultMethod.UsedCache;
 			else
 				method = DebugResultMethod.Parsed;
-			if (!(expression instanceof NextMatch) && theSession.isRecursive(expression.getType()))
+			if (!(expression instanceof NextMatch) && expression.getType() instanceof GrammarExpressionType)
 				expression = new NextMatch<>(null, expression, null, 0);
 			Expression<S> match = expression.nextMatch(this);
 			if (expression instanceof CachedExpression)
