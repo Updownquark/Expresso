@@ -485,6 +485,15 @@ public class JavaTest {
 						})));
 	}
 
+	@Test
+	public void testAssign() {
+		testExpression(
+			"theParser = grammarParser.parseGrammar(5);", "statement", true, TIMEOUT, new ExpressionTester("assignment"));
+		testExpression(
+			"theParser = grammarParser.parseGrammar(DefaultGrammarParser.class.getResource(\"/org/expresso/grammars/Java8.xml\"));",
+			"statement", true, TIMEOUT, new ExpressionTester("assignment")); // TODO
+	}
+
 	/**
 	 * Parses this file
 	 * 
