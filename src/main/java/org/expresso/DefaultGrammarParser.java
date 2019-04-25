@@ -2,14 +2,33 @@ package org.expresso;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.NavigableSet;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.expresso.stream.BinarySequenceStream;
 import org.expresso.stream.BranchableStream;
 import org.expresso.stream.CharSequenceStream;
-import org.expresso.types.*;
+import org.expresso.types.ExcludeExpressionType;
+import org.expresso.types.ForbidExpressionType;
+import org.expresso.types.LeadUpExpressionType;
+import org.expresso.types.OneOfExpressionType;
+import org.expresso.types.OptionalExpressionType;
+import org.expresso.types.RepeatExpressionType;
+import org.expresso.types.SequenceExpressionType;
+import org.expresso.types.TextLiteralExpressionType;
+import org.expresso.types.TextPatternExpressionType;
 import org.qommons.IntList;
 import org.qommons.QommonsUtils;
 import org.qommons.collect.BetterCollections;
@@ -342,8 +361,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 			throw new IllegalArgumentException("Unrecognized component type: " + componentType + " in " + config);
 		else
 			return null;
-		ExpressionType<S> exType = fields == null ? found
-			: new FieldMarkedExpressionType<>(found, Collections.unmodifiableNavigableSet(fields));
+		ExpressionType<S> exType = fields == null ? found : new ExpressionFieldType<>(found, Collections.unmodifiableNavigableSet(fields));
 		if (ignorable != null && found instanceof BareContentExpressionType)
 			exType = new SequenceExpressionType<>(id[0]++, Arrays.asList(ignorable, exType));
 		return exType;
@@ -631,61 +649,6 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		@Override
 		public String toString() {
 			return theWrapped.toString();
-		}
-	}
-
-	/**
-	 * Implementation of {@link ExpressionFieldType}
-	 * 
-	 * @param <S> The super-type of stream parseable by this type
-	 */
-	public static class FieldMarkedExpressionType<S extends BranchableStream<?, ?>> implements ExpressionFieldType<S> {
-		private final ExpressionType<S> theWrapped;
-		private final NavigableSet<String> theFields;
-
-		FieldMarkedExpressionType(ExpressionType<S> wrapped, NavigableSet<String> fields) {
-			theWrapped = wrapped;
-			theFields = fields;
-		}
-
-		@Override
-		public ExpressionType<S> getWrapped() {
-			return theWrapped;
-		}
-
-		@Override
-		public int getId() {
-			return -1;
-		}
-
-		@Override
-		public boolean isCacheable() {
-			return theWrapped.isCacheable();
-		}
-
-		@Override
-		public int getEmptyQuality(int minQuality) {
-			return theWrapped.getEmptyQuality(minQuality);
-		}
-
-		@Override
-		public NavigableSet<String> getFields() {
-			return theFields;
-		}
-
-		@Override
-		public <S2 extends S> ExpressionField<S2> parse(ExpressoParser<S2> parser) throws IOException {
-			return ExpressionFieldType.wrap(this, parser.parseWith(theWrapped));
-		}
-
-		@Override
-		public Iterable<? extends ExpressionType<? super S>> getComponents() {
-			return Collections.unmodifiableList(Arrays.asList(theWrapped));
-		}
-
-		@Override
-		public String toString() {
-			return theWrapped.toString() + " field=" + theFields;
 		}
 	}
 }

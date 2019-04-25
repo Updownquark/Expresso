@@ -1,5 +1,8 @@
 package org.expresso;
 
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.NavigableSet;
 
 import org.expresso.stream.BranchableStream;
@@ -9,16 +12,57 @@ import org.expresso.stream.BranchableStream;
  *
  * @param <S> The stream super-type of the expression type
  */
-public interface ExpressionFieldType<S extends BranchableStream<?, ?>> extends ExpressionType<S> {
-	/** @return The actual content expression type */
-	ExpressionType<S> getWrapped();
+public class ExpressionFieldType<S extends BranchableStream<?, ?>> implements ExpressionType<S> {
+	private final ExpressionType<S> theWrapped;
+	private final NavigableSet<String> theFields;
 
-	/** @return The fields that are declared on this expression type */
-	NavigableSet<String> getFields();
+	/**
+	 * @param wrapped The expression type marked as a field by a composing expression
+	 * @param fields The set of fields this type is marked with
+	 */
+	public ExpressionFieldType(ExpressionType<S> wrapped, NavigableSet<String> fields) {
+		theWrapped = wrapped;
+		theFields = fields;
+	}
+
+	/** @return The actual content expression type */
+	public ExpressionType<S> getWrapped() {
+		return theWrapped;
+	}
 
 	@Override
-	default int getId() {
+	public int getId() {
 		return -1;
+	}
+
+	@Override
+	public boolean isCacheable() {
+		return theWrapped.isCacheable();
+	}
+
+	@Override
+	public int getEmptyQuality(int minQuality) {
+		return theWrapped.getEmptyQuality(minQuality);
+	}
+
+	/** @return The fields that are declared on this expression type */
+	public NavigableSet<String> getFields() {
+		return theFields;
+	}
+
+	@Override
+	public <S2 extends S> ExpressionField<S2> parse(ExpressoParser<S2> parser) throws IOException {
+		return ExpressionFieldType.wrap(this, parser.parseWith(theWrapped));
+	}
+
+	@Override
+	public Iterable<? extends ExpressionType<? super S>> getComponents() {
+		return Collections.unmodifiableList(Arrays.asList(theWrapped));
+	}
+
+	@Override
+	public String toString() {
+		return theWrapped.toString() + " field=" + theFields;
 	}
 
 	/**
