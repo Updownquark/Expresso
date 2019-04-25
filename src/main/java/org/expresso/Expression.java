@@ -29,53 +29,6 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 	List<? extends Expression<S>> getChildren();
 
 	/**
-	 * @param parser The parser parsing the expression
-	 * @return Another interpretation of the stream by this expresssion's type
-	 * @throws IOException If an error occurs reading the stream
-	 */
-	Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException;
-
-	/**
-	 * Allows another branch of matches
-	 * 
-	 * @param parser The parser parsing the expression
-	 * @return Another interpretation of the stream by this expresssion's type
-	 * @throws IOException If an error occurs reading the stream
-	 */
-	Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException;
-
-	/** @return The number of errors in this possibility */
-	int getErrorCount();
-
-	/** @return The expression in this structure containing the first error in this possibility (or null if there is no error) */
-	Expression<S> getFirstError();
-
-	/** @return The position in this expression where an error is recognized (or -1 if this expression itself does not have an error) */
-	int getLocalErrorRelativePosition();
-
-	/** @return The error message in this expression */
-	String getLocalErrorMessage();
-
-	/** @return An expression equivalent to this with possibly condensed structure */
-	Expression<S> unwrap();
-
-	/**
-	 * @return A measure of how certain this expression's {@link #getType() type} is that this expression accurately represents the intent
-	 *         of the stream content
-	 */
-	int getMatchQuality();
-
-	/**
-	 * Prints a multi-line text representation of this possibility to a string builder
-	 * 
-	 * @param str The string builder to print to
-	 * @param indent The number of tabs to insert after each newline in the text representation
-	 * @param metadata Metadata that will be appended to the first line
-	 * @return The same string builder
-	 */
-	StringBuilder print(StringBuilder str, int indent, String metadata);
-
-	/**
 	 * @param fields The nested fields to get
 	 * @return A list with all expressions matching the given field path
 	 */
@@ -104,6 +57,21 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 				} else {
 					if (!FieldSearcher.findFields(lfr, field, result) && optional)
 						result.add(lfr);
+				}
+			}
+			if (result.isEmpty()) {
+				for (Expression<S> lfr : lastFieldResult) {
+					boolean found = false;
+					if (lfr instanceof ExpressionField) {
+						for (Expression<S> child : lfr.getChildren()) {
+							found |= FieldSearcher.findFields(child.getType(), field);
+							if (found)
+								break;
+						}
+					} else
+						found = FieldSearcher.findFields(lfr.getType(), field);
+					if (!found)
+						throw new IllegalArgumentException(lfr.getType() + " does not declare a field \"" + field + "\"");
 				}
 			}
 		}
@@ -135,6 +103,53 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 		}
 		return str.toString();
 	}
+
+	/** @return The number of errors in this possibility */
+	int getErrorCount();
+
+	/** @return The expression in this structure containing the first error in this possibility (or null if there is no error) */
+	Expression<S> getFirstError();
+
+	/** @return The position in this expression where an error is recognized (or -1 if this expression itself does not have an error) */
+	int getLocalErrorRelativePosition();
+
+	/** @return The error message in this expression */
+	String getLocalErrorMessage();
+
+	/** @return An expression equivalent to this with possibly condensed structure */
+	Expression<S> unwrap();
+
+	/**
+	 * @param parser The parser parsing the expression
+	 * @return Another interpretation of the stream by this expresssion's type
+	 * @throws IOException If an error occurs reading the stream
+	 */
+	Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException;
+
+	/**
+	 * Allows another branch of matches
+	 * 
+	 * @param parser The parser parsing the expression
+	 * @return Another interpretation of the stream by this expresssion's type
+	 * @throws IOException If an error occurs reading the stream
+	 */
+	Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException;
+
+	/**
+	 * @return A measure of how certain this expression's {@link #getType() type} is that this expression accurately represents the intent
+	 *         of the stream content
+	 */
+	int getMatchQuality();
+
+	/**
+	 * Prints a multi-line text representation of this possibility to a string builder
+	 * 
+	 * @param str The string builder to print to
+	 * @param indent The number of tabs to insert after each newline in the text representation
+	 * @param metadata Metadata that will be appended to the first line
+	 * @return The same string builder
+	 */
+	StringBuilder print(StringBuilder str, int indent, String metadata);
 
 	/**
 	 * Compares this expression to another for likelihood that each expression matches the true intent of the stream content.
@@ -286,6 +301,24 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 			found = false;
 			for (Expression<S> child : expr.getChildren())
 				found |= findFields(child, field, results);
+			return found;
+		}
+
+		static boolean findFields(ExpressionType<?> expr, String field) {
+			boolean found;
+			if (expr instanceof ExpressionFieldType)
+				return ((ExpressionFieldType<?>) expr).getFields().contains(field);
+			found = false;
+			ExpressionType<?> lastChild = null;
+			for (ExpressionType<?> child : expr.getComponents()) {
+				if (lastChild == null)
+					lastChild = child;
+				else if (child == lastChild)
+					break;
+				found |= findFields(child, field);
+				if (found)
+					break;
+			}
 			return found;
 		}
 	}

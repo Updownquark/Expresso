@@ -151,7 +151,7 @@ public class JavaTest {
 				target.withType("qualified-name").withContent("vbl");
 			}).withField("name", name -> {
 				name.withContent("field");
-			}).withField("method")//
+			})//
 			.test(result);
 	}
 
@@ -164,7 +164,6 @@ public class JavaTest {
 		// The target could be parsed validly as a field or a type, so checking that here would be more trouble than it's worth
 		Assert.assertEquals("vbl.field1", inner.printContent(false));
 		Assert.assertEquals("field2", result.getField("name").getFirst().printContent(false));
-		Assert.assertEquals(0, result.getField("method").size());
 	}
 
 	/**
