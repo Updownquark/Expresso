@@ -492,13 +492,36 @@ public class JavaTest {
 						})));
 	}
 
+	/** Tests a simple assignment statement (theParser = grammarParser.parseGrammar();) */
 	@Test
-	public void testAssign() {
-		testExpression(
-			"theParser = grammarParser.parseGrammar();", "statement", true, TIMEOUT, new ExpressionTester("assignment"));
+	public void testAssign1() {
+		testExpression("theParser = grammarParser.parseGrammar();", "statement", true, TIMEOUT, //
+			new ExpressionTester("assignment").withType("statement")//
+				.withField("content",
+					content -> content.withType("assign")//
+						.withField("variable", vbl -> vbl.withContent("theParser"))//
+						.withField("operand",
+							val -> val.withType("method")//
+								.withField("target", tgt -> tgt.withContent("grammarParser"))//
+								.withField("method.name", name -> name.withContent("parseGrammar")))));
+	}
+
+	@Test
+	public void testAssign2() {
 		testExpression(
 			"theParser = grammarParser.parseGrammar(DefaultGrammarParser.class.getResource(\"/org/expresso/grammars/Java8.xml\"));",
-			"statement", true, TIMEOUT, new ExpressionTester("assignment")); // TODO
+			"statement", true, TIMEOUT, //
+			new ExpressionTester("assignment").withType("statement")//
+				.withField("content",
+					content -> content.withType("assign")//
+						.withField("variable", vbl -> vbl.withContent("theParser"))//
+						.withField("operand",
+							val -> val.withType("method")//
+								.withField("target", tgt -> tgt.withContent("grammarParser"))//
+								.withField("method.name", name -> name.withContent("parseGrammar"))//
+								.withField("method.arguments.argument", arg -> {
+									// TODO DefaultGrammarParser.class.getResource(\"/org/expresso/grammars/Java8.xml\")
+								}))));
 	}
 
 	/**
@@ -508,7 +531,7 @@ public class JavaTest {
 	 */
 	@Test
 	public void testParseSelf() throws IOException {
-		testExpressionOnFile(getClass().getSimpleName() + ".java", TIMEOUT * 10, //
+		testExpressionOnFile(getClass().getSimpleName() + ".java", TIMEOUT * 4, //
 			new ExpressionTester(getClass().getSimpleName())//
 				.withField("content", clazz -> clazz.withType("class-declaration")//
 					.withField("name", name -> name.withContent(getClass().getSimpleName()))));

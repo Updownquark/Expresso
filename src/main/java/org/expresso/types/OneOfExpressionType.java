@@ -133,9 +133,9 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 			while (component != null) {
 				ElementId compId = component.getElementId();
 
-				Expression<S> recursed = parser.parseWith(component.get());
-				if (recursed != null)
-					return new OneOfPossibility<>(theType, recursed, component.getElementId());
+				Expression<S> result = parser.parseWith(component.get());
+				if (result != null)
+					return new OneOfPossibility<>(theType, result, component.getElementId());
 				component = theType.getComponents().getAdjacentElement(compId, true);
 			}
 			return null;

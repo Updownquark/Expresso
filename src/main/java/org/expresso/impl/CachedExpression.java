@@ -24,7 +24,7 @@ class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S
 		return this;
 	}
 
-	Expression<S> asPossibility() {
+	CachedExpression<S> asPossibility() {
 		return thePossibility == null ? null : this;
 	}
 
