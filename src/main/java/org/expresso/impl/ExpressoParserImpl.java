@@ -163,6 +163,9 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				interruptingCRI = interruptingCRI.parent;
 			if (interruptingCRI != null && interruptingCRI.interruptible) { // Interrupted
 				Expression<S> ri = interruptingCRI.result;
+				// Interrupts the frame only if it has an expression
+				if (ri != null)
+					interruptingCRI.wasInterrupted = true;
 				// Interrupts everything downstream of the interrupting frame
 				stackFrame = theStack.getAdjacentElement(interruptingCRI.element, true);
 				while (stackFrame != null) {
@@ -269,16 +272,16 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 			if (!(expression instanceof NextMatch) && expression.getType() instanceof GrammarExpressionType)
 				expression = new NextMatch<>(null, expression, null, 0);
 			Expression<S> match = expression.nextMatch(this);
-			if (expression instanceof CachedExpression)
-				((CachedExpression<S>) expression).cacheNext(match);
-			else if (expression instanceof NextMatch) {
-				if (((NextMatch<S>) expression).theMatch instanceof CachedExpression)
-					((CachedExpression<S>) ((NextMatch<S>) expression).theMatch).cacheNext(match);
+			if (!stackFrame.frame.get().wasInterrupted) {
+				if (expression instanceof CachedExpression)
+					((CachedExpression<S>) expression).cacheNext(match);
+				else if (expression instanceof NextMatch) {
+					if (((NextMatch<S>) expression).theMatch instanceof CachedExpression)
+						((CachedExpression<S>) ((NextMatch<S>) expression).theMatch).cacheNext(match);
+				}
+				// if (expression instanceof CachedExpression)
+				// match = ((CachedExpression<S>) expression).cacheNext(match);
 			}
-			// if (!stackFrame.frame.get().wasInterrupted) {
-			// if (expression instanceof CachedExpression)
-			// match = ((CachedExpression<S>) expression).cacheNext(match);
-			// }
 			debug.finished(match, method);
 			return match;
 		} catch (RuntimeException e) {
@@ -310,8 +313,8 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				return null;
 			}
 			stackFrame = pushOnStack(expression.getType(), recursiveInterrupt, true);
-			DebugResultMethod method; // TODO This obviously isn't right
-			if (expression instanceof CachedExpression && ((CachedExpression<?>) expression).hasNextMatch())
+			DebugResultMethod method;
+			if (expression instanceof CachedExpression && ((CachedExpression<?>) expression).hasNextLowPriMatch())
 				method = DebugResultMethod.UsedCache;
 			else
 				method = DebugResultMethod.Parsed;
@@ -327,16 +330,16 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				} else
 					match = match.nextMatchLowPriority(this);
 			}
-			if (expression instanceof CachedExpression)
-				((CachedExpression<S>) expression).cacheNextLowPriority(match);
-			else if (expression instanceof NextMatch) {
-				if (((NextMatch<S>) expression).theMatch instanceof CachedExpression)
-					((CachedExpression<S>) ((NextMatch<S>) expression).theMatch).cacheNextLowPriority(match);
+			if (!stackFrame.frame.get().wasInterrupted) {
+				if (expression instanceof CachedExpression)
+					((CachedExpression<S>) expression).cacheNextLowPriority(match);
+				else if (expression instanceof NextMatch) {
+					if (((NextMatch<S>) expression).theMatch instanceof CachedExpression)
+						((CachedExpression<S>) ((NextMatch<S>) expression).theMatch).cacheNextLowPriority(match);
+				}
+				// if (expression instanceof CachedExpression)
+				// match = ((CachedExpression<S>) expression).cacheNextLowPriority(match);
 			}
-			// if (!stackFrame.frame.get().wasInterrupted) {
-			// if (expression instanceof CachedExpression)
-			// match = ((CachedExpression<S>) expression).cacheNextLowPriority(match);
-			// }
 			debug.finished(match, method);
 			return match;
 		} catch (RuntimeException e) {
@@ -519,11 +522,6 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		@Override
 		public int getMatchQuality() {
 			return theMatch.getMatchQuality();
-		}
-
-		@Override
-		public boolean isInvariant() {
-			return theMatch.isInvariant();
 		}
 
 		@Override

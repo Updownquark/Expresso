@@ -120,8 +120,6 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 
 		@Override
 		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
-			if (theComponent.isInvariant())
-				return null;
 			Expression<S> next = parser.nextMatch(theComponent);
 			if (next != null)
 				return new OneOfPossibility<>(theType, next, theComponentId);
@@ -169,11 +167,6 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 		}
 
 		@Override
-		public boolean isInvariant() {
-			return theComponent.isInvariant();
-		}
-
-		@Override
 		public Expression<S> unwrap() {
 			return theComponent.unwrap();
 		}
@@ -211,102 +204,6 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 		@Override
 		public String toString() {
 			return print(new StringBuilder(), 0, "").toString();
-		}
-	}
-
-	static class InvariantExpression<S extends BranchableStream<?, ?>> implements Expression<S> {
-		private final Expression<S> theExpression;
-
-		InvariantExpression(Expression<S> expression) {
-			theExpression = expression;
-		}
-
-		@Override
-		public ExpressionType<? super S> getType() {
-			return theExpression.getType();
-		}
-
-		@Override
-		public S getStream() {
-			return theExpression.getStream();
-		}
-
-		@Override
-		public int length() {
-			return theExpression.length();
-		}
-
-		@Override
-		public List<? extends Expression<S>> getChildren() {
-			return theExpression.getChildren();
-		}
-
-		@Override
-		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
-			return null;
-		}
-
-		@Override
-		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
-			return null;
-		}
-
-		@Override
-		public int getErrorCount() {
-			return theExpression.getErrorCount();
-		}
-
-		@Override
-		public Expression<S> getFirstError() {
-			return theExpression.getFirstError();
-		}
-
-		@Override
-		public int getLocalErrorRelativePosition() {
-			return theExpression.getLocalErrorRelativePosition();
-		}
-
-		@Override
-		public String getLocalErrorMessage() {
-			return theExpression.getLocalErrorMessage();
-		}
-
-		@Override
-		public Expression<S> unwrap() {
-			return theExpression.unwrap();
-		}
-
-		@Override
-		public int getMatchQuality() {
-			return theExpression.getMatchQuality();
-		}
-
-		@Override
-		public boolean isInvariant() {
-			return true;
-		}
-
-		@Override
-		public StringBuilder print(StringBuilder str, int indent, String metadata) {
-			return theExpression.print(str, indent, metadata);
-		}
-
-		@Override
-		public int hashCode() {
-			return theExpression.hashCode();
-		}
-
-		@Override
-		public boolean equals(Object obj) {
-			if (obj instanceof InvariantExpression)
-				return theExpression.equals(((InvariantExpression<?>) obj).theExpression);
-			else
-				return theExpression.equals(obj);
-		}
-
-		@Override
-		public String toString() {
-			return theExpression.toString();
 		}
 	}
 }

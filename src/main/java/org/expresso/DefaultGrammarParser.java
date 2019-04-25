@@ -2,33 +2,14 @@ package org.expresso;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.NavigableSet;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.expresso.stream.BinarySequenceStream;
 import org.expresso.stream.BranchableStream;
 import org.expresso.stream.CharSequenceStream;
-import org.expresso.types.ExcludeExpressionType;
-import org.expresso.types.ForbidExpressionType;
-import org.expresso.types.LeadUpExpressionType;
-import org.expresso.types.OneOfExpressionType;
-import org.expresso.types.OptionalExpressionType;
-import org.expresso.types.RepeatExpressionType;
-import org.expresso.types.SequenceExpressionType;
-import org.expresso.types.TextLiteralExpressionType;
-import org.expresso.types.TextPatternExpressionType;
+import org.expresso.types.*;
 import org.qommons.IntList;
 import org.qommons.QommonsUtils;
 import org.qommons.collect.BetterCollections;
@@ -626,11 +607,6 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		@Override
 		public int getMatchQuality() {
 			return theWrapped.getMatchQuality();
-		}
-
-		@Override
-		public boolean isInvariant() {
-			return theWrapped.isInvariant();
 		}
 
 		@Override

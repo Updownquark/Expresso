@@ -61,6 +61,10 @@ class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S
 		return theNextMatch.asPossibility();
 	}
 
+	boolean hasNextLowPriMatch() {
+		return theNextLowPriorityMatch != null;
+	}
+
 	@Override
 	public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
 		if (theNextLowPriorityMatch != null) {
@@ -108,11 +112,6 @@ class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S
 	@Override
 	public int getMatchQuality() {
 		return thePossibility.getMatchQuality();
-	}
-
-	@Override
-	public boolean isInvariant() {
-		return thePossibility.isInvariant();
 	}
 
 	@Override
