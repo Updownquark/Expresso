@@ -535,4 +535,39 @@ public class JavaTest {
 				.withField("content", clazz -> clazz.withType("class-declaration")//
 					.withField("name", name -> name.withContent(getClass().getSimpleName()))));
 	}
+
+	/** Tests several math operation expressions for correct order-of-operations */
+	@Test
+	public void testOperationOrder() {
+		testExpression("-a*b", "result-producer", true, TIMEOUT, //
+			new ExpressionTester("-a*b")//
+				.withField("name", name -> name.withContent("-"))//
+				.withField("operand",
+					op -> op//
+						.withField("name", name -> name.withContent("*"))//
+						.withField("left", left -> left.withContent("a"))//
+						.withField("right", right -> right.withContent("b"))));
+
+		testExpression("a*-b", "result-producer", true, TIMEOUT, //
+			new ExpressionTester("a*-b")//
+				.withField("name", name -> name.withContent("*"))//
+				.withField("left", left -> left.withContent("a"))//
+				.withField("right",
+					right -> right//
+						.withField("name", name -> name.withContent("-"))//
+						.withField("operand", operand -> operand.withContent("b"))));
+
+		testExpression("-a*b+5", "result-producer", true, TIMEOUT, //
+			new ExpressionTester("-a*b+5")//
+				.withField("name", name -> name.withContent("+"))//
+				.withField("left",
+					left -> left//
+						.withField("name", name -> name.withContent("-"))//
+						.withField("operand",
+							op -> op//
+								.withField("name", name -> name.withContent("*"))//
+								.withField("left", leftLeft -> leftLeft.withContent("a"))//
+								.withField("right", leftRight -> leftRight.withContent("b"))))
+				.withField("right", right -> right.withContent("5")));
+	}
 }
