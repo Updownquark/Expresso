@@ -73,6 +73,6 @@ public class ExpressionFieldType<S extends BranchableStream<?, ?>> implements Ex
 	 */
 	static <S extends BranchableStream<?, ?>> ExpressionField<S> wrap(ExpressionFieldType<? super S> type,
 		Expression<S> possibility) {
-		return possibility == null ? null : new ExpressionField.SimpleExpressionField<>(type, possibility);
+		return possibility == null ? null : new ExpressionField<>(type, possibility);
 	}
 }

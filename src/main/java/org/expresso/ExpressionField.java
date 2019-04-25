@@ -12,78 +12,94 @@ import org.expresso.stream.BranchableStream;
  *
  * @param <S> The type of this expression's stream
  */
-public interface ExpressionField<S extends BranchableStream<?, ?>> extends Expression<S> {
+public class ExpressionField<S extends BranchableStream<?, ?>> implements Expression<S> {
+	private final ExpressionFieldType<? super S> theType;
+	private final Expression<S> theWrapped;
+
+	/**
+	 * @param type The field type
+	 * @param wrapped The wrapped expression
+	 */
+	public ExpressionField(ExpressionFieldType<? super S> type, Expression<S> wrapped) {
+		theType = type;
+		theWrapped = wrapped;
+	}
+
 	@Override
-	ExpressionFieldType<? super S> getType();
+	public ExpressionFieldType<? super S> getType() {
+		return theType;
+	}
 
 	/** @return The actual content of the expression */
-	public Expression<S> getWrapped();
+	public Expression<S> getWrapped() {
+		return theWrapped;
+	}
 
 	@Override
-	default S getStream() {
+	public S getStream() {
 		return getWrapped().getStream();
 	}
 
 	@Override
-	default List<? extends Expression<S>> getChildren() {
+	public List<? extends Expression<S>> getChildren() {
 		return Arrays.asList(getWrapped());
 	}
 
 	@Override
-	default Expression<S> getFirstError() {
+	public Expression<S> getFirstError() {
 		return getWrapped().getFirstError();
 	}
 
 	@Override
-	default int getLocalErrorRelativePosition() {
+	public int getLocalErrorRelativePosition() {
 		return getWrapped().getLocalErrorRelativePosition();
 	}
 
 	@Override
-	default int getErrorCount() {
+	public int getErrorCount() {
 		return getWrapped().getErrorCount();
 	}
 
 	@Override
-	default String getLocalErrorMessage() {
+	public String getLocalErrorMessage() {
 		return getWrapped().getLocalErrorMessage();
 	}
 
 	@Override
-	default int length() {
+	public int length() {
 		return getWrapped().length();
 	}
 
 	@Override
-	default Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+	public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
 		Expression<S> wrapFork = parser.nextMatch(getWrapped());
 		if (wrapFork == null)
 			return null;
 		else
-			return new SimpleExpressionField<>(getType(), wrapFork);
+			return new ExpressionField<>(getType(), wrapFork);
 	}
 
 	@Override
-	default Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
+	public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
 		Expression<S> wrapFork = parser.nextMatchLowPriority(getWrapped());
 		if (wrapFork == null)
 			return null;
 		else
-			return new SimpleExpressionField<>(getType(), wrapFork);
+			return new ExpressionField<>(getType(), wrapFork);
 	}
 
 	@Override
-	default int getMatchQuality() {
+	public int getMatchQuality() {
 		return getWrapped().getMatchQuality();
 	}
 
 	@Override
-	default StringBuilder print(StringBuilder str, int indent, String metadata) {
+	public StringBuilder print(StringBuilder str, int indent, String metadata) {
 		return getWrapped().print(str, indent, metadata + getType().getFields());
 	}
 
 	@Override
-	default Expression<S> unwrap() {
+	public Expression<S> unwrap() {
 		// Expression<S> wrappedUnwrapped = getWrapped().unwrap();
 		// if (wrappedUnwrapped != null && wrappedUnwrapped != getWrapped())
 		// return new SimpleExpressionField<>(getType(), wrappedUnwrapped);
@@ -91,52 +107,23 @@ public interface ExpressionField<S extends BranchableStream<?, ?>> extends Expre
 		return getWrapped().unwrap();
 	}
 
-	/**
-	 * A simple expression field
-	 *
-	 * @param <S> The stream type of the expression
-	 */
-	public static class SimpleExpressionField<S extends BranchableStream<?, ?>> implements ExpressionField<S> {
-		private final ExpressionFieldType<? super S> theType;
-		private final Expression<S> theWrapped;
+	@Override
+	public boolean equals(Object o) {
+		if (o == this)
+			return true;
+		else if (!(o instanceof ExpressionField))
+			return false;
+		ExpressionField<S> other = (ExpressionField<S>) o;
+		return theType.equals(other.getType()) && theWrapped.equals(other.getWrapped());
+	}
 
-		/**
-		 * @param type The field type
-		 * @param wrapped The wrapped expression
-		 */
-		public SimpleExpressionField(ExpressionFieldType<? super S> type, Expression<S> wrapped) {
-			theType = type;
-			theWrapped = wrapped;
-		}
+	@Override
+	public int hashCode() {
+		return Objects.hash(theType, theWrapped);
+	}
 
-		@Override
-		public ExpressionFieldType<? super S> getType() {
-			return theType;
-		}
-
-		@Override
-		public Expression<S> getWrapped() {
-			return theWrapped;
-		}
-
-		@Override
-		public boolean equals(Object o) {
-			if (o == this)
-				return true;
-			else if (!(o instanceof ExpressionField))
-				return false;
-			ExpressionField<S> other = (ExpressionField<S>) o;
-			return theType.equals(other.getType()) && theWrapped.equals(other.getWrapped());
-		}
-
-		@Override
-		public int hashCode() {
-			return Objects.hash(theType, theWrapped);
-		}
-
-		@Override
-		public String toString() {
-			return print(new StringBuilder(), 0, "").toString();
-		}
+	@Override
+	public String toString() {
+		return print(new StringBuilder(), 0, "").toString();
 	}
 }
