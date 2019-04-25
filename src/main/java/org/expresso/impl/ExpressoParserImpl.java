@@ -185,61 +185,54 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		DebugExpressionParsing debug = theSession.getDebugger().begin(component, theStream, null);
 		boolean recursive = component instanceof GrammarExpressionType;
 		StackPushResult stackFrame = null;
+		Expression<S> result;
+		DebugResultMethod method;
 		try {
 			int cacheId = component.getId();
 			if (cacheId < 0) {
-				Expression<S> result = component.parse(this);
-				debug.finished(result, DebugResultMethod.Parsed);
-				return result;
+				result = component.parse(this);
+				method = DebugResultMethod.Parsed;
 			} else if (theExcludedTypes != null && Arrays.binarySearch(theExcludedTypes, cacheId) >= 0) {
-				debug.finished(null, DebugResultMethod.Excluded);
-				return null;
-			}
-			if (component.isCacheable() || recursive) {
-				stackFrame = pushOnStack(component, recursiveInterrupt, true);
-				if (stackFrame.frame == null) {
-					debug.finished(stackFrame.interrupt, DebugResultMethod.RecursiveInterrupt);
-					return stackFrame.interrupt;
-				}
-			}
-			if (recursiveInterrupt != null) {
-				Expression<S> result = component.parse(this);
-				while (result != null && !find(result, recursiveInterrupt))
-					result = result.nextMatch(this);
-				debug.finished(result, DebugResultMethod.Parsed);
-				// if (result != null && recursive && !(result instanceof NextMatch))
-				// result = new NextMatch<>(null, result, null, 0);
-				return result;
-			} else if (!component.isCacheable()) {
-				Expression<S> result = component.parse(this);
-				debug.finished(result, DebugResultMethod.Parsed);
-				// if (result != null && recursive && !(result instanceof NextMatch))
-				// result = new NextMatch<>(null, result, null, 0);
-				return result;
-			}
-			boolean[] newCache = new boolean[1];
-			CachedExpression<S> cached = theCache.computeIfAbsent(cacheId, k -> {
-				newCache[0] = true;
-				return new CachedExpression<>(component);
-			});
-			Expression<S> result;
-			if (newCache[0]) {
-				Expression<S> match = component.parse(this);
-				// if (match != null && recursive)
-				// match = new NextMatch<>(null, match, null, 0);
-				boolean cache = !stackFrame.frame.get().wasInterrupted;
-				if (cache) {
-					cached.setPossibility(match);
-					result = cached.asPossibility();
-				} else {
-					theCache.remove(cacheId);
-					result = match;
-				}
+				result = null;
+				method = DebugResultMethod.Excluded;
 			} else {
-				result = cached.asPossibility();
+				if (component.isCacheable() || recursive)
+					stackFrame = pushOnStack(component, recursiveInterrupt, true);
+
+				if (stackFrame != null && stackFrame.frame == null) {
+					result = stackFrame.interrupt;
+					method = DebugResultMethod.RecursiveInterrupt;
+				} else if (recursiveInterrupt != null) {
+					result = component.parse(this);
+					while (result != null && !find(result, recursiveInterrupt))
+						result = result.nextMatch(this);
+					method = DebugResultMethod.Parsed;
+				} else if (!component.isCacheable()) {
+					result = component.parse(this);
+					method = DebugResultMethod.Parsed;
+				} else {
+					boolean[] newCache = new boolean[1];
+					CachedExpression<S> cached = theCache.computeIfAbsent(cacheId, k -> {
+						newCache[0] = true;
+						return new CachedExpression<>(component);
+					});
+					if (newCache[0]) {
+						Expression<S> match = component.parse(this);
+						method = DebugResultMethod.Parsed;
+						boolean cache = !stackFrame.frame.get().wasInterrupted;
+						if (cache) {
+							cached.setPossibility(match);
+							result = cached.asPossibility();
+						} else {
+							theCache.remove(cacheId);
+							result = match;
+						}
+					} else {
+						result = cached.asPossibility();
+						method = DebugResultMethod.UsedCache;
+					}
+				}
 			}
-			debug.finished(result, DebugResultMethod.UsedCache);
-			return result;
 		} catch (RuntimeException e) {
 			theSession.getDebugger().suspend();
 			throw e;
@@ -247,6 +240,10 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 			if (stackFrame != null)
 				stackFrame.pop();
 		}
+		// if(result!=null && recursive && method==DebugResultMethod.Parsed)
+		// result = new NextMatch<>(null, result, null, 0);
+		debug.finished(result, method);
+		return result;
 	}
 
 	@Override
