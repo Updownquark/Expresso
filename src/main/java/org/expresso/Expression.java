@@ -154,12 +154,6 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 		if (mq1 != mq2)
 			return mq2 - mq1;
 
-		// If one is more consistent (has fewer errors than the other), then obviously it is better
-		int ec1 = getErrorCount();
-		int ec2 = p2.getErrorCount();
-		if (ec1 != ec2)
-			return ec1 - ec2;
-
 		Expression<?> firstErr1 = getFirstError();
 		Expression<?> firstErr2 = p2.getFirstError();
 		int len1 = length();
