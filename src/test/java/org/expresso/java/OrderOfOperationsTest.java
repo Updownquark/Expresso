@@ -19,12 +19,12 @@ public class OrderOfOperationsTest extends JavaTest {
 	public void testOperationOrder1() {
 		testExpression("-a*b", "result-producer", true, org.expresso.java.JavaTest.TIMEOUT, //
 			new ExpressionTester("-a*b")//
-				.withField("name", "-")//
+				.withFieldContent("name", "-")//
 				.withField("operand",
 					op -> op//
-						.withField("name", "*")//
-						.withField("left", "a")//
-						.withField("right", "b")));
+						.withFieldContent("name", "*")//
+						.withFieldContent("left", "a")//
+						.withFieldContent("right", "b")));
 	}
 
 	/** Tests a*-b */
@@ -32,12 +32,12 @@ public class OrderOfOperationsTest extends JavaTest {
 	public void testOperationOrder2() {
 		testExpression("a*-b", "result-producer", true, TIMEOUT, //
 			new ExpressionTester("a*-b")//
-				.withField("name", "*")//
-				.withField("left", "a")//
+				.withFieldContent("name", "*")//
+				.withFieldContent("left", "a")//
 				.withField("right",
 					right -> right//
-						.withField("name", "-")//
-						.withField("operand", "b")));
+						.withFieldContent("name", "-")//
+						.withFieldContent("operand", "b")));
 	}
 
 	/** Tests 5+(a-b) */
@@ -45,15 +45,15 @@ public class OrderOfOperationsTest extends JavaTest {
 	public void testOperationOrder3() {
 		testExpression("5+(a-b)", "result-producer", true, TIMEOUT, //
 			new ExpressionTester("5+(a-b)")//
-				.withField("name", "+")//
-				.withField("left", "5")//
+				.withFieldContent("name", "+")//
+				.withFieldContent("left", "5")//
 				.withField("right",
 					right -> right.withType("parenthetic")//
 						.withField("content",
 							content -> content//
-								.withField("name", "-")//
-								.withField("left", "a")//
-								.withField("right", "b"))));
+								.withFieldContent("name", "-")//
+								.withFieldContent("left", "a")//
+								.withFieldContent("right", "b"))));
 	}
 
 	/** Tests -a*b+5 */
@@ -61,15 +61,15 @@ public class OrderOfOperationsTest extends JavaTest {
 	public void testOperationOrder4() {
 		testExpression("-a*b+5", "result-producer", true, TIMEOUT, //
 			new ExpressionTester("-a*b+5")//
-				.withField("name", "+")//
+				.withFieldContent("name", "+")//
 				.withField("left",
 					left -> left//
-						.withField("name", "-")//
+						.withFieldContent("name", "-")//
 						.withField("operand",
 							op -> op//
-								.withField("name", "*")//
-								.withField("left", "a")//
-								.withField("right", "b")))
+								.withFieldContent("name", "*")//
+								.withFieldContent("left", "a")//
+								.withFieldContent("right", "b")))
 				.withField("right", right -> right.withContent("5")));
 	}
 
@@ -78,13 +78,13 @@ public class OrderOfOperationsTest extends JavaTest {
 	public void testOperationOrder5() {
 		testExpression("a/b/c", "result-producer", true, TIMEOUT, //
 			new ExpressionTester("a/b/c")//
-				.withField("name", "/")//
+				.withFieldContent("name", "/")//
 				.withField("left",
 					left -> left//
-						.withField("name", "/")//
-						.withField("left", "a")//
-						.withField("right", "b"))//
-				.withField("right", "c"));
+						.withFieldContent("name", "/")//
+						.withFieldContent("left", "a")//
+						.withFieldContent("right", "b"))//
+				.withFieldContent("right", "c"));
 	}
 
 	/** Tests a*b+c/d-e+f/g */
@@ -92,32 +92,32 @@ public class OrderOfOperationsTest extends JavaTest {
 	public void testOperationOrder6() {
 		testExpression("a*b+c/d*e-f+g/h", "result-producer", true, TIMEOUT, //
 			new ExpressionTester("a*b+c/d-e+f/g")//
-				.withField("name", "+")//
+				.withFieldContent("name", "+")//
 				.withField("left",
 					left -> left//
-						.withField("name", "-")//
+						.withFieldContent("name", "-")//
 						.withField("left",
 							ll -> ll//
-								.withField("name", "+")//
+								.withFieldContent("name", "+")//
 								.withField("left",
 									lll -> lll//
-										.withField("name", "*")//
-										.withField("left", "a")//
-										.withField("right", "b"))//
+										.withFieldContent("name", "*")//
+										.withFieldContent("left", "a")//
+										.withFieldContent("right", "b"))//
 								.withField("right",
 									llr -> llr//
-										.withField("name", "*")//
+										.withFieldContent("name", "*")//
 										.withField("left",
 											llrl -> llrl//
-												.withField("name", "/")//
-												.withField("left", "c")//
-												.withField("right", "d"))//
-										.withField("right", "e")))//
-						.withField("right", "e"))//
+												.withFieldContent("name", "/")//
+												.withFieldContent("left", "c")//
+												.withFieldContent("right", "d"))//
+										.withFieldContent("right", "e")))//
+						.withFieldContent("right", "e"))//
 				.withField("right",
 					right -> right//
-						.withField("name", "/")//
-						.withField("left", "f")//
-						.withField("right", "g")));
+						.withFieldContent("name", "/")//
+						.withFieldContent("left", "f")//
+						.withFieldContent("right", "g")));
 	}
 }

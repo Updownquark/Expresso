@@ -98,11 +98,35 @@ public class ExpressionTester {
 
 	/**
 	 * @param field The '.'-delimited field name(s)
+	 * @param type The type for the expected single field value
 	 * @param content The content for the expected single field value
 	 * @return This tester
 	 */
-	public ExpressionTester withField(String field, String content) {
+	public ExpressionTester withField(String field, String type, String content) {
+		return withField(field, fieldExp -> fieldExp.withType(type).withContent(content));
+	}
+
+	/**
+	 * @param field The '.'-delimited field name(s)
+	 * @param content The content for the expected single field value
+	 * @return This tester
+	 */
+	public ExpressionTester withFieldContent(String field, String content) {
 		return withField(field, fieldExp -> fieldExp.withContent(content));
+	}
+
+	/**
+	 * @param field The '.'-delimited field name(s)
+	 * @param content The content for each field value
+	 * @return This tester
+	 */
+	public ExpressionTester withFieldContents(String field, String... content) {
+		Consumer<ExpressionTester>[] fieldTesters = new Consumer[content.length];
+		for (int i = 0; i < content.length; i++) {
+			int index = i;
+			fieldTesters[i] = fieldExp -> fieldExp.withContent(content[index]);
+		}
+		return withField(field, fieldTesters);
 	}
 
 	/**

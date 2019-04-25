@@ -40,9 +40,9 @@ public class FunctionalJavaTest extends JavaTest {
 			new ExpressionTester("doubleField").withType("qualified-name")//
 				.withField("target",
 					inner -> inner//
-						.withField("target", "vbl")//
-						.withField("name", "field1"))//
-				.withField("name", "field2"));
+						.withFieldContent("target", "vbl")//
+						.withFieldContent("name", "field1"))//
+				.withFieldContent("name", "field2"));
 	}
 
 	/**
@@ -57,10 +57,8 @@ public class FunctionalJavaTest extends JavaTest {
 	public void testConstructor() {
 		testExpression("new Integer(5, b)", "result-producer", true, TIMEOUT, //
 			new ExpressionTester("constructor").withType("constructor")//
-				.withField("type", "Integer")//
-				.withField("arguments.argument", //
-					arg1 -> arg1.withContent("5"), //
-					arg2 -> arg2.withContent("b")));
+				.withFieldContent("type", "Integer")//
+				.withFieldContents("arguments.argument", "5", "b"));
 	}
 
 	/** Test parsing a constructor with generic type arguments (new java.util.ArrayList&lt;Integer>(5)) */
@@ -70,8 +68,8 @@ public class FunctionalJavaTest extends JavaTest {
 			new ExpressionTester("generic-constructor").withType("constructor")//
 				.withField("type",
 					type -> type.withType("generic-type")//
-						.withField("base", "java.util.ArrayList")//
-						.withField("parameters.parameter", "java.lang.Integer"))//
+						.withFieldContent("base", "java.util.ArrayList")//
+						.withFieldContent("parameters.parameter", "java.lang.Integer"))//
 				.withField("arguments.argument", arg -> arg.withType("number").withContent("5")));
 	}
 
@@ -84,24 +82,23 @@ public class FunctionalJavaTest extends JavaTest {
 
 	private static ExpressionTester checkArraysAsList(ExpressionTester tester) {
 		return tester.withType("method")//
-			.withField("target", target -> target.withType("qualified-name").withContent("java.util.Arrays"))//
-			.withField("method.name", "asList")//
-			.withField("method.arguments.argument", //
-				arg1 -> arg1.withContent("1"), //
-				arg2 -> arg2.withContent("2"), //
-				arg3 -> arg3.withContent("3"), //
-				arg4 -> arg4.withContent("4"), //
-				arg5 -> arg5.withContent("5"));
+			.withField("target", "qualified-name", "java.util.Arrays")//
+			.withFieldContent("method.name", "asList")//
+			.withFieldContents("method.arguments.argument", "1", "2", "3", "4", "5");
 	}
 
 	/** Tests a nested method invocation (list.addAll(java.util.Arrays.asList(1, 2, 3, 4, 5))) */
 	@Test
 	public void testDoubleMethod() {
 		testExpression("list.addAll(java.util.Arrays.asList(1, 2, 3, 4, 5))", "result-producer", false, TIMEOUT, //
-			new ExpressionTester("doubleMethod").withType("method")//
-				.withField("target", "list")//
-				.withField("method.name", "addAll")//
-				.withField("method.arguments.argument", arg -> checkArraysAsList(arg)));
+			checkDoubleMethod(new ExpressionTester("doubleMethod")));
+	}
+
+	private static ExpressionTester checkDoubleMethod(ExpressionTester tester) {
+		return tester.withType("method")//
+			.withFieldContent("target", "list")//
+			.withFieldContent("method.name", "addAll")//
+			.withField("method.arguments.argument", arg -> checkArraysAsList(arg));
 	}
 
 	/** Tests parsing a variable declaration(java.util.ArrayList<Integer> list;) */
@@ -109,13 +106,12 @@ public class FunctionalJavaTest extends JavaTest {
 	public void testVarDeclaration() {
 		String expression = "java.util.ArrayList<Integer> list;";
 		testExpression(expression, "body-content", true, TIMEOUT, //
-			new ExpressionTester("Var declaration").withType("variable-declaration").withField("type", type -> {
-				type.withType("generic-type").withField("base", base -> {
-					base.withContent("java.util.ArrayList");
-				}).withField("parameters.parameter", param -> {
-					param.withContent("Integer");
-				});
-			}).withField("name", name -> name.withContent("list")));
+			new ExpressionTester("Var declaration").withType("variable-declaration")//
+				.withField("type",
+					type -> type.withType("generic-type")//
+						.withFieldContent("base", "java.util.ArrayList")//
+						.withFieldContent("parameters.parameter", "Integer"))
+				.withFieldContent("name", "list"));
 	}
 
 	/**
@@ -138,49 +134,23 @@ public class FunctionalJavaTest extends JavaTest {
 		expression += "}";
 		testExpression(expression, "body-content", true, TIMEOUT, //
 			new ExpressionTester("block").withType("block")//
-				.withField("content.?content", s1 -> {
-					s1.withType("variable-declaration").withField("type", s1Type -> {
-						s1Type.withType("generic-type").withField("base", s1TypeBase -> {
-							s1TypeBase.withContent("java.util.ArrayList");
-						}).withField("parameters.parameter", s1TypeParams -> {
-							s1TypeParams.withContent("Integer");
-						});
-					});
-				}, s2 -> {
-					s2.withType("assign").withField("variable", s2Var -> {
-						s2Var.withType("qualified-name").withContent("list");
-					}).withField("operand", s2Op -> {
-						s2Op.withType("constructor").withField("type", s2OpType -> {
-							s2OpType.withType("generic-type").withField("base", s2OpTypeBase -> {
-								s2OpTypeBase.withContent("ArrayList");
-							}).withField("parameters.parameter"); // No parameters
-						}).withField("arguments.argument", s2OpArgs -> {
-							s2OpArgs.withType("number").withContent("5");
-						});
-					});
-				}, s3 -> {
-					s3.withType("method").withField("target", s3Target -> {
-						s3Target.withType("qualified-name").withContent("list");
-					}).withField("method.name", s3MethodName -> {
-						s3MethodName.withContent("addAll");
-					}).withField("method.arguments.argument", s3Arg -> {
-						s3Arg.withType("method").withField("target", s3ArgTarget -> {
-							s3ArgTarget.withContent("java.util.Arrays");
-						}).withField("method.name", s3ArgMethodName -> {
-							s3ArgMethodName.withContent("asList");
-						}).withField("method.arguments.argument", s3ArgArg1 -> {
-							s3ArgArg1.withType("number").withContent("1");
-						}, s3ArgArg2 -> {
-							s3ArgArg2.withType("number").withContent("2");
-						}, s3ArgArg3 -> {
-							s3ArgArg3.withType("number").withContent("3");
-						}, s3ArgArg4 -> {
-							s3ArgArg4.withType("number").withContent("4");
-						}, s3ArgArg5 -> {
-							s3ArgArg5.withType("number").withContent("5");
-						});
-					});
-				}));
+				.withField("content.?content",
+					s1 -> s1.withType("variable-declaration")//
+						.withField("type",
+							s1Type -> s1Type.withType("generic-type")//
+								.withFieldContent("base", "java.util.ArrayList")//
+								.withFieldContent("parameters.parameter", "Integer")), //
+					s2 -> s2.withType("assign")//
+						.withField("variable", "qualified-name", "list")//
+						.withField("operand",
+							s2Op -> s2Op.withType("constructor")//
+								.withField("type",
+									s2OpType -> s2OpType.withType("generic-type")//
+										.withFieldContent("base", "ArrayList")//
+										.withField("parameters.parameter") // No parameters
+								)//
+								.withField("arguments.argument", "number", "5")), //
+					s3 -> checkDoubleMethod(s3)));
 	}
 
 	/**
@@ -193,36 +163,32 @@ public class FunctionalJavaTest extends JavaTest {
 			+ " new org.qommons.tree.SortedTreeList<String>(true, org.qommons.QommonsUtils.DISTINCT_NUMBER_TOLERANT))";
 		testExpression(expression, "result-producer", true, TIMEOUT * 5, //
 			new ExpressionTester("WOW").withType("method")//
-				.withField("target", target -> {
-					target.withContent("org.observe.collect.ObservableCollection");
-				}).withField("method.name", method -> {
-					method.withContent("create");
-				}).withField("method.arguments.argument", arg1 -> {
-					arg1.withType("qualified-name", "field-ref").withField("target", arg1Target -> {
-						arg1Target.withType("method").withField("target", arg1TargetTarget -> {
-							arg1TargetTarget.withContent("org.observe.util.TypeTokens");
-						}).withField("method.name", arg1TargetMethod -> arg1TargetMethod.withContent("get"));
-					}).withField("name", arg1FieldName -> arg1FieldName.withContent("STRING"));
-				}, arg2 -> {
-					arg2.withType("constructor").withField("type", arg2Type -> {
-						arg2Type.withType("generic-type").withField("base", arg2TypeBase -> {
-							arg2TypeBase.withContent("org.qommons.tree.SortedTreeList");
-						}).withField("parameters.parameter", arg2TypeParams -> {
-							arg2TypeParams.withContent("String");
-						});
-					}).withField("arguments.argument", arg2Arg1 -> {
-						// TODO Right now, the parser is finding an identifier instead of a boolean.
-						// This is probably just a problem with the grammar.
-						// arg2Arg1.withType("boolean");
-						arg2Arg1.withContent("true");
-					}, arg2Arg2 -> {
-						arg2Arg2.withType("qualified-name").withField("target", arg2Arg2Target -> {
-							arg2Arg2Target.withContent("org.qommons.QommonsUtils");
-						}).withField("name", arg2Arg2Name -> {
-							arg2Arg2Name.withContent("DISTINCT_NUMBER_TOLERANT");
-						});
-					});
-				}));
+				.withFieldContent("target", "org.observe.collect.ObservableCollection")//
+				.withFieldContent("method.name", "create")//
+				.withField("method.arguments.argument",
+					arg1 -> arg1.withType("qualified-name", "field-ref")//
+						.withField("target",
+							arg1Target -> arg1Target.withType("method")//
+								.withFieldContent("target", "org.observe.util.TypeTokens")//
+								.withFieldContent("method.name", "get"))//
+						.withFieldContent("name", "STRING"),
+					arg2 -> arg2.withType("constructor")//
+						.withField("type",
+							arg2Type -> arg2Type.withType("generic-type")//
+								.withFieldContent("base", "org.qommons.tree.SortedTreeList")//
+								.withFieldContent("parameters.parameter", "String"))
+						.withField("arguments.argument",
+							arg2Arg1 -> arg2Arg1
+								// TODO Right now, the parser is finding an identifier instead of a boolean.
+								// This is probably just a problem with the grammar.
+								// .withType("boolean")
+								// arg2Arg1.withType("boolean");
+								.withContent("true"),
+							arg2Arg2 -> {
+								arg2Arg2.withType("qualified-name")//
+									.withFieldContent("target", "org.qommons.QommonsUtils")//
+									.withFieldContent("name", "DISTINCT_NUMBER_TOLERANT");
+							})));
 	}
 
 	/** Tests parsing a very simple expression (a+b) */
@@ -245,30 +211,26 @@ public class FunctionalJavaTest extends JavaTest {
 				"\t}\n"),
 			"class-content", true, TIMEOUT * 2, //
 			new ExpressionTester("addMethod").withType("method-declaration")//
-				.withField("qualifier", //
-					qualifier -> qualifier.withContent("public"), //
-					qualifier -> qualifier.withContent("static")//
-				).withField("name", name -> name.withContent("add")//
-				).withField("body.content", body -> {
-					body.withType("return").withField("value", returnValue -> {
-						returnValue.withType("add").withField("left", left -> {
-							left.withType("qualified-name").withContent("a");
-						}).withField("right", right -> {
-							right.withType("qualified-name").withContent("b");
-						});
-					});
-				}));
+				.withFieldContents("qualifier", "public", "static")//
+				.withField("name", name -> name.withContent("add"))//
+				.withField("body.content",
+					body -> body.withType("return")//
+						.withField("value",
+							returnValue -> returnValue.withType("add")//
+								.withField("left", "qualified-name", "a")//
+								.withField("right", "qualified-name", "b"))));
 	}
 
 	/** Tests parsing strings, including escaped quotes and other content */
 	@Test
 	public void testString() {
 		testExpression("\"This is a string\"", "result-producer", true, TIMEOUT, //
-			new ExpressionTester("Simple String").withType("string").withField("content", val -> val.withContent("This is a string")));
+			new ExpressionTester("Simple String").withType("string")//
+				.withFieldContent("content", "This is a string"));
 
 		testExpression("\"This string has an escaped quote (\\\")\"", "result-producer", true, TIMEOUT, //
-			new ExpressionTester("Simple String").withType("string").withField("content", val -> val//
-				.withContent("This string has an escaped quote (\\\")")));
+			new ExpressionTester("Simple String").withType("string")//
+				.withFieldContent("content", "This string has an escaped quote (\\\")"));
 	}
 
 	/**
@@ -283,68 +245,64 @@ public class FunctionalJavaTest extends JavaTest {
 				.withField("package", pkg -> pkg.withContent("org.expresso.java"))//
 				.withField("content",
 					clazz -> clazz.withType("class-declaration")//
-						.withField("javadoc",
-							jd -> jd.withContent("/**\n"//
+						.withFieldContent("javadoc",
+							"/**\n"//
 								+ " * This file is only here to be parsed by a unit test\n"//
 								+ " * \n"//
 								+ " * @author Andrew Butler\n"//
-								+ " */"))
-						.withField("name", name -> name.withContent("SimpleParseableJavaFile"))//
-						.withField("qualifier", qfr -> qfr.withContent("public"))//
-						.withField("type", type -> type.withContent("class"))//
+								+ " */")
+						.withFieldContent("name", "SimpleParseableJavaFile")//
+						.withFieldContent("qualifier", "public")//
+						.withFieldContent("type", "class")//
 						.withField("content", addMethod -> {
 							addMethod.withType("method-declaration")//
-								.withField("qualifier", //
-									qfr -> qfr.withContent("public"), qfr -> qfr.withContent("static"))//
-								.withField("type", type -> type.withContent("int"))//
-								.withField("name", name -> name.withContent("add"))//
+								.withFieldContents("qualifier", "public", "static")//
+								.withFieldContent("type", "int")//
+								.withFieldContent("name", "add")//
 								.withField("parameter", //
-									param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
-										name -> name.withContent("a")), //
-									param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
-										name -> name.withContent("b")))
+									param -> param.withFieldContent("type", "int").withFieldContent("name", "a"), //
+									param -> param.withFieldContent("type", "int").withFieldContent("name", "b"))
 								.withField("body.content",
-									body -> body.withType("return").withField("value",
-										rv -> rv.withType("add")//
-											.withField("left", left -> left.withContent("a"))//
-											.withField("right", right -> right.withContent("b"))));
+									body -> body.withType("return")//
+										.withField("value",
+											rv -> rv//
+												.withFieldContent("name", "+")//
+												.withFieldContent("left", "a")//
+												.withFieldContent("right", "b")));
 						}, subMethod -> {
 							subMethod.withType("method-declaration")//
-								.withField("qualifier", //
-									qfr -> qfr.withContent("public"), qfr -> qfr.withContent("static"))//
-								.withField("type", type -> type.withContent("int"))//
-								.withField("name", name -> name.withContent("subtract"))//
+								.withFieldContents("qualifier", "public", "static")//
+								.withFieldContent("type", "int")//
+								.withFieldContent("name", "subtract")//
 								.withField("parameter", //
-									param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
-										name -> name.withContent("a")), //
-									param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
-										name -> name.withContent("b")))
+									param -> param.withFieldContent("type", "int").withFieldContent("name", "a"), //
+									param -> param.withFieldContent("type", "int").withFieldContent("name", "b"))
 								.withField("body.content",
-									body -> body.withType("return").withField("value",
-										rv -> rv.withType("subtract")//
-											.withField("left", left -> left.withContent("a"))//
-											.withField("right", right -> right.withContent("b"))));
+									body -> body.withType("return")//
+										.withField("value",
+											rv -> rv//
+												.withFieldContent("name", "-")//
+												.withFieldContent("left", "a")//
+												.withFieldContent("right", "b")));
 						}, op1 -> {
 							op1.withType("method-declaration")//
-								.withField("qualifier", //
-									qfr -> qfr.withContent("public"), qfr -> qfr.withContent("static"))//
-								.withField("type", type -> type.withContent("int"))//
-								.withField("name", name -> name.withContent("op1"))//
+								.withFieldContents("qualifier", "public", "static")//
+								.withFieldContent("type", "int")//
+								.withFieldContent("name", "op1")//
 								.withField("parameter", //
-									param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
-										name -> name.withContent("a")), //
-									param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
-										name -> name.withContent("b")), //
-									param -> param.withField("type", pt -> pt.withContent("int")).withField("name",
-										name -> name.withContent("c")))
+									param -> param.withFieldContent("type", "int").withFieldContent("name", "a"), //
+									param -> param.withFieldContent("type", "int").withFieldContent("name", "b"), //
+									param -> param.withFieldContent("type", "int").withFieldContent("name", "c"))
 								.withField("body.content",
-									body -> body.withType("return").withField("value",
-										rv -> rv.withType("add")//
-											.withField("left", left -> left.withContent("a"))//
-											.withField("right",
-												right -> right.withType("multiply")//
-													.withField("left", multLeft -> multLeft.withContent("b"))//
-													.withField("right", multRight -> multRight.withContent("c")))));
+									body -> body.withType("return")//
+										.withField("value",
+											rv -> rv.withType("add")//
+												.withFieldContent("left", "a")//
+												.withField("right",
+													right -> right//
+														.withFieldContent("name", "*")//
+														.withFieldContent("left", "b")//
+														.withFieldContent("right", "c"))));
 						})));
 	}
 
@@ -352,14 +310,25 @@ public class FunctionalJavaTest extends JavaTest {
 	@Test
 	public void testAssign1() {
 		testExpression("theParser = grammarParser.parseGrammar();", "statement", true, TIMEOUT, //
-			new ExpressionTester("assignment").withType("statement")//
+			new ExpressionTester("assign1").withType("statement")//
 				.withField("content",
 					content -> content.withType("assign")//
-						.withField("variable", "theParser")//
+						.withFieldContent("variable", "theParser")//
 						.withField("operand",
 							val -> val.withType("method")//
-								.withField("target", "grammarParser")//
-								.withField("method.name", "parseGrammar"))));
+								.withFieldContent("target", "grammarParser")//
+								.withFieldContent("method.name", "parseGrammar"))));
+	}
+
+	/** Another assignment test (theParser = DefaultGrammarParser.class.getResource;) */
+	@Test
+	public void testAssign2() {
+		testExpression("theParser = DefaultGrammarParser.class.getResource;", "statement", true, TIMEOUT, //
+			new ExpressionTester("assign2").withType("statement")//
+				.withField("content",
+					content -> content.withType("assign")//
+						.withFieldContent("variable", "theParser")//
+						.withFieldContent("operand", "DefaultGrammarParser.class.getResource")));
 	}
 
 	/**
@@ -367,24 +336,24 @@ public class FunctionalJavaTest extends JavaTest {
 	 * <code>theParser = grammarParser.parseGrammar(DefaultGrammarParser.class.getResource("/org/expresso/grammars/Java8.xml")</code>
 	 */
 	@Test
-	public void testAssign2() {
+	public void testAssign3() {
 		testExpression(
 			"theParser = grammarParser.parseGrammar(DefaultGrammarParser.class.getResource(\"/org/expresso/grammars/Java8.xml\"));",
 			"statement", true, TIMEOUT, //
-			new ExpressionTester("assignment").withType("statement")//
+			new ExpressionTester("assign3").withType("statement")//
 				.withField("content",
 					content -> content.withType("assign")//
-						.withField("variable", "theParser")//
+						.withFieldContent("variable", "theParser")//
 						.withField("operand",
 							val -> val.withType("method")//
-								.withField("target", "grammarParser")//
-								.withField("method.name", "parseGrammar")//
+								.withFieldContent("target", "grammarParser")//
+								.withFieldContent("method.name", "parseGrammar")//
 								.withField("method.arguments.argument",
 									arg -> arg.withType("method")//
-										.withField("target", "DefaultGrammarParser.class")//
-										.withField("method.name", "getResource")//
+										.withFieldContent("target", "DefaultGrammarParser.class")//
+										.withFieldContent("method.name", "getResource")//
 										.withField("method.arguments.argument", argArg -> argArg.withType("string")//
-											.withField("content", "/org/expresso/grammars/Java8.xml"))))));
+											.withFieldContent("content", "/org/expresso/grammars/Java8.xml"))))));
 	}
 
 	/**
