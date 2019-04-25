@@ -136,8 +136,6 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 					return null; // All possibilities exhausted
 				// Try a different branch of a previous element in the sequence
 				Expression<S2> last = repetitions.removeLast();
-				if (last.isInvariant())
-					return null; // Can't back up any farther
 				int lastPos = ExpressoUtils.getLength(parser.getStream().getPosition(), repetitions);
 				childQuality -= last.getMatchQuality();
 				branched = parser.advance(lastPos);

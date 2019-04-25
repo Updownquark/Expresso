@@ -73,8 +73,6 @@ public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends Abst
 
 		@Override
 		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
-			if (theTerminalPossibility.isInvariant())
-				return null;
 			Expression<S> next = parser.nextMatch(theTerminalPossibility);
 			if (next != null)
 				return new LeadUpPossibility<>(getType(), parser, theTerminal, next);

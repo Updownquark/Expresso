@@ -144,11 +144,6 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 		}
 
 		@Override
-		public boolean isInvariant() {
-			return false;
-		}
-
-		@Override
 		public List<? extends Expression<S>> getChildren() {
 			return Collections.emptyList();
 		}

@@ -57,8 +57,6 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 
 		@Override
 		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
-			if (theOption.isInvariant())
-				return null;
 			Expression<S> optionNext = parser.nextMatch(theOption);
 			if (optionNext != null)
 				return new OptionalPossibility<>(getType(), parser, optionNext);

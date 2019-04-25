@@ -115,11 +115,6 @@ class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S
 	}
 
 	@Override
-	public boolean isInvariant() {
-		return thePossibility.isInvariant();
-	}
-
-	@Override
 	public boolean equals(Object o) {
 		if (this == o)
 			return true;

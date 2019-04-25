@@ -528,11 +528,6 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		}
 
 		@Override
-		public boolean isInvariant() {
-			return theMatch.isInvariant();
-		}
-
-		@Override
 		public StringBuilder print(StringBuilder str, int indent, String metadata) {
 			return theMatch.print(str, indent, metadata);
 		}

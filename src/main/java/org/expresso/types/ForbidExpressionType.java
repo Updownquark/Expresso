@@ -67,8 +67,6 @@ public class ForbidExpressionType<S extends BranchableStream<?, ?>> extends Abst
 
 		@Override
 		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
-			if (theForbidden.isInvariant())
-				return null;
 			Expression<S> fMatch = parser.nextMatch(theForbidden);
 			if (fMatch == null)
 				return null;

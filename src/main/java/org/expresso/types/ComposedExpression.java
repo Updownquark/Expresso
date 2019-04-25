@@ -26,7 +26,6 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 	private int theErrorCount;
 	private CompositionError theSelfError;
 	private int theQuality;
-	private boolean isInvariant;
 
 	/**
 	 * @param type The type of the expression
@@ -124,12 +123,6 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 		return theQuality;
 	}
 
-	@Override
-	public boolean isInvariant() {
-		computeQuality();
-		return isInvariant;
-	}
-
 	private void computeQuality() {
 		if (isQualityComputed)
 			return;
@@ -137,16 +130,12 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 		Expression<S> firstError = null;
 		int errorCount = 0;
 		int quality = 0;
-		boolean invariant = false;
 		for (Expression<S> child : theChildren) {
 			errorCount += child.getErrorCount();
 			quality += child.getMatchQuality();
 			if (errorCount > 0 && firstError == null)
 				firstError = child.getFirstError();
-			if (child.isInvariant())
-				invariant = true;
 		}
-		isInvariant = invariant;
 		if (theSelfError != null) {
 			errorCount++;
 			quality -= theSelfError.errorWeight;

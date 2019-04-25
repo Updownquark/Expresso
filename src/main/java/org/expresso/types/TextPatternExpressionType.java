@@ -170,11 +170,6 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 		}
 
 		@Override
-		public boolean isInvariant() {
-			return false;
-		}
-
-		@Override
 		public Expression<S> unwrap() {
 			return this;
 		}

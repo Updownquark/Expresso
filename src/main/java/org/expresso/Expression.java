@@ -66,13 +66,6 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 	int getMatchQuality();
 
 	/**
-	 * @return If true, this expression is a key component of the expression which is composed of it. It is illegal for the
-	 *         {@link #nextMatch(ExpressoParser) nextMatch} method of a composite expression containing this component to return an
-	 *         expression without this component.
-	 */
-	boolean isInvariant();
-
-	/**
 	 * Prints a multi-line text representation of this possibility to a string builder
 	 * 
 	 * @param str The string builder to print to
@@ -259,11 +252,6 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 			@Override
 			public int getMatchQuality() {
 				return 0;
-			}
-
-			@Override
-			public boolean isInvariant() {
-				return false;
 			}
 
 			@Override
