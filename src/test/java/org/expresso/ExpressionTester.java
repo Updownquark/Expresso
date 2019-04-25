@@ -97,6 +97,15 @@ public class ExpressionTester {
 	}
 
 	/**
+	 * @param field The '.'-delimited field name(s)
+	 * @param content The content for the expected single field value
+	 * @return This tester
+	 */
+	public ExpressionTester withField(String field, String content) {
+		return withField(field, fieldExp -> fieldExp.withContent(content));
+	}
+
+	/**
 	 * @param expression The expression to test
 	 * @throws AssertionFailedError If the expression does not match this tester's configuration
 	 */
