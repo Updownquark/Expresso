@@ -11,7 +11,7 @@ import org.qommons.collect.BetterList;
  *
  * @param <S> The stream super-type of the expression types
  */
-public class ExpressionClass<S extends BranchableStream<?, ?>> extends OneOfExpressionType<S> implements GrammarExpressionType<S> {
+public abstract class ExpressionClass<S extends BranchableStream<?, ?>> extends OneOfExpressionType<S> implements GrammarExpressionType<S> {
 	private final ExpressoGrammar<S> theGrammar;
 	private final String theName;
 	private final List<ExpressionClass<S>> theParentClasses;
@@ -26,7 +26,7 @@ public class ExpressionClass<S extends BranchableStream<?, ?>> extends OneOfExpr
 	 * @param members The class's members, sorted by priority, then by order of occurrence
 	 */
 	public ExpressionClass(ExpressoGrammar<S> grammar, int id, String name, List<ExpressionClass<S>> parentClasses,
-		List<ExpressionClass<S>> childClasses, BetterList<? extends ConfiguredExpressionType<S>> members) {
+		List<ExpressionClass<S>> childClasses, BetterList<? extends GrammarExpressionType<S>> members) {
 		super(id, members);
 		theGrammar = grammar;
 		theName = name;
@@ -50,8 +50,8 @@ public class ExpressionClass<S extends BranchableStream<?, ?>> extends OneOfExpr
 	}
 
 	@Override
-	public BetterList<? extends ConfiguredExpressionType<S>> getComponents() {
-		return (BetterList<? extends ConfiguredExpressionType<S>>) super.getComponents();
+	public BetterList<? extends GrammarExpressionType<S>> getComponents() {
+		return (BetterList<? extends GrammarExpressionType<S>>) super.getComponents();
 	}
 
 	/** @return The classes that this class extends */

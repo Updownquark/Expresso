@@ -15,7 +15,6 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import org.expresso.stream.BinarySequenceStream;
 import org.expresso.stream.BranchableStream;
@@ -99,22 +98,49 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 
 	class PreParsedClass {
 		final ExpressionClass<S> clazz;
-		final PreParsedClass[] parents;
+		final List<PreParsedClass> parents;
 		final List<String> memberNames;
-		private final BetterList<ConfiguredExpressionType<S>> types;
-		private final SortedTreeList<ExpressionClass<S>> childClasses;
+		private final List<ExpressionClass<S>> parentClasses;
+		private final BetterList<GrammarExpressionType<S>> types;
+		private final BetterList<ExpressionClass<S>> childClasses;
 
-		PreParsedClass(ExpressoGrammar<S> grammar, int id, String className, PreParsedClass[] parents) {
-			types = new SortedTreeList<>(false, (t1, t2) -> -Integer.compare(t1.getPriority(), t2.getPriority()));
+		PreParsedClass(ExpressoGrammar<S> grammar, int id, String className, boolean superClass) {
+			if (superClass)
+				types = new BetterTreeList<>(false);
+			else // TODO Get rid of priority
+				types = new SortedTreeList<>(false,
+					(t1, t2) -> ((ConfiguredExpressionType<?>) t2).getPriority() - ((ConfiguredExpressionType<?>) t1).getPriority());
 			memberNames = new LinkedList<>();
-			childClasses = new SortedTreeList<>(false, ExpressionClass::compareTo);
-			clazz = new ExpressionClass<>(grammar, id, className, //
-				Collections.unmodifiableList(Arrays.asList(parents).stream().map(ppc -> ppc.clazz)
-					.collect(Collectors.toCollection(() -> new ArrayList<>(parents.length)))), //
-				BetterCollections.unmodifiableList(childClasses), BetterCollections.unmodifiableList(types));
-			this.parents = parents;
+			parents = new ArrayList<>();
+			parentClasses = new ArrayList<>();
+			childClasses = new BetterTreeList<>(false);
+			if (superClass)
+				clazz = new ExpressionSuperClass<>(grammar, id, className, //
+					Collections.unmodifiableList(parentClasses), BetterCollections.unmodifiableList(childClasses));
+			else
+				clazz = new ConcreteExpressionClass<>(grammar, id, className, //
+					Collections.unmodifiableList(parentClasses), BetterCollections.unmodifiableList(childClasses), //
+					BetterCollections.unmodifiableList(types));
 			for (PreParsedClass parent : parents)
 				parent.childClasses.add(clazz);
+		}
+
+		void addSuperClass(PreParsedClass superClass, boolean fromConfig) {
+			if (fromConfig && superClass.clazz instanceof ExpressionSuperClass)
+				throw new IllegalArgumentException("Sub-classes of a super class must be declared only by the super class: "
+					+ clazz.getName() + " and " + superClass.clazz.getName());
+			parents.add(superClass);
+			parentClasses.add(superClass.clazz);
+			if (fromConfig)
+				superClass.addSubClass(this, false);
+		}
+
+		void addSubClass(PreParsedClass subClass, boolean fromConfig) {
+			childClasses.add(subClass.clazz);
+			if(clazz instanceof ExpressionSuperClass)
+				types.add(subClass.clazz);
+			if (fromConfig)
+				subClass.addSuperClass(this, false);
 		}
 
 		ExpressionClass<S> addTypeName(String typeName) {
@@ -123,6 +149,8 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		}
 
 		ExpressionClass<S> addType(ConfiguredExpressionType<S> type) {
+			if (clazz instanceof ExpressionSuperClass)
+				return clazz;
 			if (!types.contains(type))
 				types.add(type);
 			for (PreParsedClass parent : parents)
@@ -145,14 +173,16 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 			throw new IllegalArgumentException("expresso expected as root, not " + config.getName());
 		int[] id = new int[1];
 		Map<String, PreParsedClass> declaredClasses = new LinkedHashMap<>();
-		declaredClasses.put(IGNORABLE, new PreParsedClass(grammar, id[0]++, IGNORABLE, new DefaultGrammarParser.PreParsedClass[0]));
+		declaredClasses.put(IGNORABLE, new PreParsedClass(grammar, id[0]++, IGNORABLE, false));
 		QommonsConfig[] classesConfig = config.subConfigs("classes");
 		if (classesConfig.length > 1)
 			throw new IllegalArgumentException("Only a single classes element is allowed");
 		if (classesConfig.length == 1) {
 			for (QommonsConfig classConfig : classesConfig[0].subConfigs()) {
-				if (!"class".equals(classConfig.getName()))
-					throw new IllegalArgumentException("Only class elements (and no attributes) may exist under the classes element");
+				boolean superClass = "super-class".equals(classConfig.getName());
+				if (!superClass && !"class".equals(classConfig.getName()))
+					throw new IllegalArgumentException(
+						"Only class and super-class elements (and no attributes) may exist under the classes element");
 				String className = classConfig.get("name");
 				if (className == null)
 					throw new IllegalArgumentException("class element has no name: " + classConfig);
@@ -162,23 +192,45 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 					throw new IllegalArgumentException(className + " is a reserved component type name: " + classConfig);
 				else if (declaredClasses.containsKey(className))
 					throw new IllegalArgumentException("Class " + className + " is already declared: " + classConfig);
+				declaredClasses.put(className, new PreParsedClass(grammar, id[0]++, className, superClass));
+			}
+			for (QommonsConfig classConfig : classesConfig[0].subConfigs()) {
+				String className = classConfig.get("name");
+				PreParsedClass clazz = declaredClasses.get(className);
 
 				String extendsStr = classConfig.get("extends");
-				PreParsedClass[] parents;
-				if (extendsStr == null)
-					parents = new DefaultGrammarParser.PreParsedClass[0];
-				else {
+				if (extendsStr != null) {
 					String[] extendsSplit = extendsStr.split(",");
-					parents = new DefaultGrammarParser.PreParsedClass[extendsSplit.length];
-					for (int i = 0; i < extendsSplit.length; i++) {
-						extendsSplit[i] = extendsSplit[i].trim();
-						parents[i] = declaredClasses.get(extendsSplit[i]);
-						if (parents[i] == null)
+					for (String parentClassName : extendsSplit) {
+						parentClassName = parentClassName.trim();
+						PreParsedClass parentClass = declaredClasses.get(parentClassName);
+						if (parentClass == null)
 							throw new IllegalArgumentException(
-								"Parent class " + extendsSplit[i] + " of class " + className + " has not been declared");
+								"Parent class " + parentClassName + " of class " + className + " has not been declared");
+						clazz.addSuperClass(parentClass, true);
 					}
 				}
-				declaredClasses.put(className, new PreParsedClass(grammar, id[0]++, className, parents));
+
+				for (QommonsConfig subClassConfig : classConfig.subConfigs()) {
+					if ("name".equals(subClassConfig.getName()) || "extends".equals(subClassConfig.getName()))
+						continue;
+					else if ("sub-class".equals(subClassConfig.getName())) {
+						if (!(clazz.clazz instanceof ExpressionSuperClass))
+							throw new IllegalArgumentException("Sub-classes may only be defined in super-class elements");
+
+						String subClassName = subClassConfig.get("name");
+						if (subClassName == null)
+							throw new IllegalArgumentException(
+								"Sub-class element of super-class " + className + " has no name: " + classConfig);
+						PreParsedClass subClass = declaredClasses.get(subClassName);
+						if (subClass == null)
+							throw new IllegalArgumentException(
+								"Parent class " + subClassConfig.getName() + " of class " + className + " has not been declared");
+						clazz.addSubClass(subClass, true);
+					} else
+						throw new IllegalArgumentException(
+							"Unrecognized configuration element " + subClassConfig.getName() + " in class declaration " + className);
+				}
 			}
 		}
 
@@ -210,6 +262,9 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 					PreParsedClass clazz = declaredClasses.get(classesSplit[i]);
 					if (clazz == null)
 						throw new IllegalArgumentException("Class " + classesSplit[i] + " does not exist: " + type);
+					else if (clazz.clazz instanceof ExpressionSuperClass)
+						throw new IllegalArgumentException("A configured type (" + type.getName()
+							+ ") cannot be a direct member of a super-class: " + clazz.clazz.getName());
 					typeClasses.add(clazz.addTypeName(typeName));
 				}
 				typeClasses = BetterCollections.unmodifiableSortedSet(typeClasses);
