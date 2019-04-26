@@ -82,12 +82,16 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 	protected abstract CompositionError getErrorForComponents(List<? extends Expression<? extends S>> components, int minQuality);
 
 	@Override
-	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
+	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound, Expression<S2> highBound)
+		throws IOException {
 		return branch(//
-			new LinkedList<>(), parser, false);
+			lowBound == null ? new LinkedList<>() : new LinkedList<>(lowBound.getChildren()), //
+			parser, lowBound != null, //
+			highBound == null ? null : highBound.getChildren());
 	}
 
-	<S2 extends S> Expression<S2> branch(LinkedList<Expression<S2>> repetitions, ExpressoParser<S2> parser, boolean mustChange)
+	<S2 extends S> Expression<S2> branch(LinkedList<Expression<S2>> repetitions, ExpressoParser<S2> parser, boolean mustChange, //
+		List<? extends Expression<S2>> highBound)
 		throws IOException {
 		boolean changed = false;
 		int childQuality = 0;
@@ -112,7 +116,8 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 				if (!repetitions.isEmpty() && repetitions.getLast().length() == 0 && repetitions.getLast().getType() == component) {
 					break; // Repeating the same type with zero length is bad
 				} else {
-					Expression<S2> repetition = branched.parseWith(component);
+					Expression<S2> repetition = branched.parseWith(component, null, //
+						(highBound == null || highBound.size() <= repetitions.size()) ? null : highBound.get(repetitions.size()));
 					if (repetition != null) {
 						int tempCQ = childQuality + repetition.getMatchQuality();
 						if (tempCQ >= parser.getQualityLevel()) {
@@ -139,7 +144,9 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 				int lastPos = ExpressoUtils.getLength(parser.getStream().getPosition(), repetitions);
 				childQuality -= last.getMatchQuality();
 				branched = parser.advance(lastPos);
-				Expression<S2> repetition = branched.nextMatch(last);
+				Expression<S2> repetition = branched.parseWith(//
+					last.getType(), last,
+					(highBound == null || highBound.size() <= repetitions.size()) ? null : highBound.get(repetitions.size()));
 				if (repetition != null) {
 					// If the match doesn't differ in length or quality, we won't have any better luck with it
 					if (repetition.length() != last.length() || repetition.getMatchQuality() >= last.getMatchQuality()) {
@@ -223,7 +230,12 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		}
 
 		@Override
-		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
+		public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+			return getType().parse(parser);
+		}
+
+		@Override
+		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
 			return null;
 		}
 

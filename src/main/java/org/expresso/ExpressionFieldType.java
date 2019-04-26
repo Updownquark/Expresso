@@ -51,8 +51,13 @@ public class ExpressionFieldType<S extends BranchableStream<?, ?>> implements Ex
 	}
 
 	@Override
-	public <S2 extends S> ExpressionField<S2> parse(ExpressoParser<S2> parser) throws IOException {
-		return ExpressionFieldType.wrap(this, parser.parseWith(theWrapped));
+	public <S2 extends S> ExpressionField<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound, Expression<S2> highBound)
+		throws IOException {
+		return ExpressionFieldType.wrap(this, parser.parseWith(theWrapped, unwrap(lowBound), unwrap(highBound)));
+	}
+
+	private <S2 extends S> Expression<S2> unwrap(Expression<S2> ex) {
+		return ex == null ? null : ((ExpressionField<S2>) ex).getWrapped();
 	}
 
 	@Override

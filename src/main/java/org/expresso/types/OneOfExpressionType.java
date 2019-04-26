@@ -59,12 +59,33 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 	}
 
 	@Override
-	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
-		for (CollectionElement<? extends ExpressionType<? super S>> component : theComponents.elements()) {
-			Expression<S2> possibility = parser.parseWith(//
-				component.get());
-			if (possibility != null)
-				return new OneOfPossibility<>(this, possibility, component.getElementId());
+	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound, Expression<S2> highBound)
+		throws IOException {
+		OneOfPossibility<S2> low = (OneOfPossibility<S2>) lowBound;
+		OneOfPossibility<S2> high = (OneOfPossibility<S2>) highBound;
+		CollectionElement<? extends ExpressionType<? super S>> component;
+		if (low != null) {
+			Expression<S2> lowNext = parser.parseWith(//
+				low.theComponent.getType(), low.theComponent, high == null ? null : high.theComponent);
+			if (lowNext != null)
+				return new OneOfPossibility<>(this, lowNext, low.theComponentId);
+			component = theComponents.getAdjacentElement(low.theComponentId, true);
+		} else
+			component = theComponents.getTerminalElement(true);
+		boolean isLowBound = low != null;
+		while (component != null) {
+			boolean isHighBound = high == null ? false : component.getElementId().equals(high.theComponentId);
+			Expression<S2> result = parser.parseWith(//
+				component.get(), //
+				isLowBound ? low.theComponent : null, //
+				isHighBound ? high.theComponent : null);
+			isLowBound = false;
+			if (result != null)
+				return new OneOfPossibility<>(this, result, component.getElementId());
+			if (isHighBound)
+				break;
+			else
+				component = theComponents.getAdjacentElement(component.getElementId(), true);
 		}
 		return null;
 	}
@@ -72,19 +93,6 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 	@Override
 	public String toString() {
 		return "OneOf" + theComponents;
-	}
-
-	<S2 extends S> Expression<S2> recurse(Expression<S2> expression, ElementId componentId, ExpressoParser<S2> parser) throws IOException {
-		CollectionElement<? extends ExpressionType<? super S>> component = theComponents.getAdjacentElement(componentId, true);
-		while (component != null) {
-			ElementId compId = component.getElementId();
-
-			Expression<S2> recursed = parser.parseWith(component.get());
-			if (recursed != null)
-				return new OneOfPossibility<>(this, recursed, component.getElementId());
-			component = theComponents.getAdjacentElement(compId, true);
-		}
-		return null;
 	}
 
 	private static class OneOfPossibility<S extends BranchableStream<?, ?>> implements Expression<S> {
@@ -127,16 +135,32 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 		}
 
 		@Override
-		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
-			CollectionElement<? extends ExpressionType<? super S>> component = theType.getComponents().getAdjacentElement(theComponentId,
-				true);
-			while (component != null) {
-				ElementId compId = component.getElementId();
-
+		public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+			CollectionElement<? extends ExpressionType<? super S>> component = theType.getComponents().getTerminalElement(true);
+			while (true) {
 				Expression<S> result = parser.parseWith(component.get());
 				if (result != null)
 					return new OneOfPossibility<>(theType, result, component.getElementId());
-				component = theType.getComponents().getAdjacentElement(compId, true);
+				if (component.getElementId().equals(theComponentId))
+					break;
+				else
+					component = theType.getComponents().getAdjacentElement(component.getElementId(), true);
+			}
+			return null;
+		}
+
+		@Override
+		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
+			CollectionElement<? extends ExpressionType<? super S>> component = theType.getComponents().getAdjacentElement(theComponentId,
+				true);
+			while (component != null) {
+				Expression<S> result = parser.parseWith(component.get());
+				if (result != null)
+					return new OneOfPossibility<>(theType, result, component.getElementId());
+				if (limit != null && component.getElementId().equals(((OneOfPossibility<S>) limit).theComponentId))
+					break;
+				else
+					component = theType.getComponents().getAdjacentElement(component.getElementId(), true);
 			}
 			return null;
 		}

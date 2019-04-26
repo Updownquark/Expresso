@@ -27,7 +27,8 @@ public class ExcludeExpressionType<S extends BranchableStream<?, ?>> extends Seq
 	}
 
 	@Override
-	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> session) throws IOException {
-		return super.parse(session.exclude(theExcludedIds));
+	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> session, Expression<S2> lowBound, Expression<S2> highBound)
+		throws IOException {
+		return super.parse(session.exclude(theExcludedIds), lowBound, highBound);
 	}
 }

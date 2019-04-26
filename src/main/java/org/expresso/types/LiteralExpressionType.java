@@ -56,9 +56,18 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 	public abstract boolean equals(Object o);
 
 	@Override
-	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
-		LiteralPossibility<C, S2> possibility = new LiteralPossibility<>(this, parser);
-		if (possibility.getMatchQuality() >= parser.getQualityLevel())
+	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound, Expression<S2> highBound)
+		throws IOException {
+		LiteralPossibility<C, S2> possibility;
+		if (lowBound != null) {
+			if (lowBound.length() == 0)
+				return null;
+			possibility = new LiteralPossibility<>(this, parser, lowBound.length() - 1);
+		} else
+			possibility = new LiteralPossibility<>(this, parser);
+		if (possibility.length() <= (highBound == null ? 0 : highBound.length()))
+			return null;
+		else if (possibility.getMatchQuality() >= parser.getQualityLevel())
 			return possibility;
 		return null;
 	}
@@ -80,7 +89,7 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 			theLength = type.getMatchUntil(parser.getStream());
 		}
 
-		private LiteralPossibility(LiteralExpressionType<C, ? super S> type, ExpressoParser<S> parser, int length) throws IOException {
+		LiteralPossibility(LiteralExpressionType<C, ? super S> type, ExpressoParser<S> parser, int length) throws IOException {
 			theType = type;
 			theParser = parser;
 			theLength = length;
@@ -112,7 +121,12 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 		}
 
 		@Override
-		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
+		public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+			return null;
+		}
+
+		@Override
+		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
 			return null;
 		}
 

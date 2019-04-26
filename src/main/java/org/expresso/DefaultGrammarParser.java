@@ -590,9 +590,15 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		}
 
 		@Override
-		public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
-			Expression<S2> ex = parser.parseWith(type);
+		public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound, Expression<S2> highBound)
+			throws IOException {
+			Expression<S2> ex = parser.parseWith(type, //
+				unwrap(lowBound), unwrap(highBound));
 			return ex == null ? null : new WrappedExpression<>(this, ex);
+		}
+
+		private <S2 extends S> Expression<S2> unwrap(Expression<S2> ex) {
+			return ex == null ? null : ((WrappedExpression<S2>) ex).theWrapped;
 		}
 
 		@Override
@@ -647,8 +653,14 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		}
 
 		@Override
-		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
-			Expression<S> ex = parser.nextMatch(theWrapped);
+		public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+			Expression<S> ex = parser.nextMatchHighPriority(theWrapped);
+			return ex == null ? null : new WrappedExpression<>(theType, ex);
+		}
+
+		@Override
+		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
+			Expression<S> ex = parser.nextMatchLowPriority(theWrapped, ((WrappedExpression<S>) limit).theWrapped);
 			return ex == null ? null : new WrappedExpression<>(theType, ex);
 		}
 

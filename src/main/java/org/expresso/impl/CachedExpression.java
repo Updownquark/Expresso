@@ -12,6 +12,7 @@ class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S
 	private final ExpressionType<? super S> theType;
 	Expression<S> thePossibility;
 	private CachedExpression<S> theNextMatch;
+	private CachedExpression<S> theNextHighPriorityMatch;
 	private CachedExpression<S> theNextLowPriorityMatch;
 	private int cachedHash = -1;
 
@@ -61,22 +62,36 @@ class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S
 		return theNextMatch.asPossibility();
 	}
 
-	boolean hasNextLowPriMatch() {
-		return theNextLowPriorityMatch != null;
+	boolean hasDiffPriMatch(boolean highPriority) {
+		return (highPriority ? theNextHighPriorityMatch : theNextLowPriorityMatch) != null;
 	}
 
 	@Override
-	public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
-		if (theNextLowPriorityMatch != null) {
-			return theNextLowPriorityMatch.asPossibility();
+	public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+		if (theNextHighPriorityMatch != null) {
+			return theNextHighPriorityMatch.asPossibility();
 		} else
-			return thePossibility.nextMatchLowPriority(parser);
+			return thePossibility.nextMatchHighPriority(parser);
 	}
 
-	Expression<S> cacheNextLowPriority(Expression<S> next) {
-		if (theNextLowPriorityMatch == null)
-			theNextLowPriorityMatch = new CachedExpression<S>(getType()).setPossibility(next);
-		return theNextLowPriorityMatch.asPossibility();
+	@Override
+	public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
+		if (limit == null && theNextLowPriorityMatch != null) {
+			return theNextLowPriorityMatch.asPossibility();
+		} else
+			return thePossibility.nextMatchLowPriority(parser, limit);
+	}
+
+	Expression<S> cacheNextDiffPriority(Expression<S> next, boolean highPriority) {
+		if (highPriority) {
+			if (theNextHighPriorityMatch == null)
+				theNextHighPriorityMatch = new CachedExpression<S>(getType()).setPossibility(next);
+			return theNextHighPriorityMatch.asPossibility();
+		} else {
+			if (theNextLowPriorityMatch == null)
+				theNextLowPriorityMatch = new CachedExpression<S>(getType()).setPossibility(next);
+			return theNextLowPriorityMatch.asPossibility();
+		}
 	}
 
 	@Override

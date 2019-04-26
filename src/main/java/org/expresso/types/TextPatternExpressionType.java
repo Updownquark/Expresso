@@ -60,7 +60,10 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 	}
 
 	@Override
-	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
+	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound, Expression<S2> highBound)
+		throws IOException {
+		if (lowBound != null || highBound != null)
+			return null;
 		TextPatternPossibility<S2> possibility = new TextPatternPossibility<>(this, parser);
 		if (possibility.getMatchQuality() >= parser.getQualityLevel())
 			return possibility;
@@ -140,7 +143,12 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 		}
 
 		@Override
-		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
+		public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+			return null;
+		}
+
+		@Override
+		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
 			return null;
 		}
 

@@ -133,7 +133,16 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 	 * @return Another interpretation of the stream by this expresssion's type
 	 * @throws IOException If an error occurs reading the stream
 	 */
-	Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException;
+	Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException;
+
+	/**
+	 * Allows another branch of matches
+	 * 
+	 * @param parser The parser parsing the expression
+	 * @return Another interpretation of the stream by this expresssion's type
+	 * @throws IOException If an error occurs reading the stream
+	 */
+	Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException;
 
 	/**
 	 * @return A measure of how certain this expression's {@link #getType() type} is that this expression accurately represents the intent
@@ -229,7 +238,12 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 			}
 
 			@Override
-			public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
+			public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+				return null;
+			}
+
+			@Override
+			public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
 				return null;
 			}
 

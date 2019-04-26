@@ -80,8 +80,17 @@ public class ExpressionField<S extends BranchableStream<?, ?>> implements Expres
 	}
 
 	@Override
-	public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
-		Expression<S> wrapFork = parser.nextMatchLowPriority(getWrapped());
+	public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+		Expression<S> wrapFork = parser.nextMatchHighPriority(getWrapped());
+		if (wrapFork == null)
+			return null;
+		else
+			return new ExpressionField<>(getType(), wrapFork);
+	}
+
+	@Override
+	public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
+		Expression<S> wrapFork = parser.nextMatchLowPriority(getWrapped(), limit);
 		if (wrapFork == null)
 			return null;
 		else

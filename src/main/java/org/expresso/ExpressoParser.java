@@ -34,7 +34,7 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> {
 	 * @return The most likely possibility for parsing the stream at this parser's position with the given expression type
 	 * @throws IOException If an error occurs reading the stream
 	 */
-	Expression<S> parseWith(ExpressionType<? super S> type) throws IOException;
+	Expression<S> parseWith(ExpressionType<? super S> type, Expression<S> lowBound, Expression<S> highBound) throws IOException;
 
 	/**
 	 * @param expression The expression to branch
@@ -44,9 +44,16 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> {
 	Expression<S> nextMatch(Expression<S> expression) throws IOException;
 
 	/**
+	 * @param expression The expression to branch with high priority
+	 * @return Another interpretation of the stream by the expresssion's type
+	 * @throws IOException If an error occurs reading the stream
+	 */
+	Expression<S> nextMatchHighPriority(Expression<S> expression) throws IOException;
+
+	/**
 	 * @param expression The expression to branch with lower priority
 	 * @return Another interpretation of the stream by the expresssion's type
 	 * @throws IOException If an error occurs reading the stream
 	 */
-	Expression<S> nextMatchLowPriority(Expression<S> expression) throws IOException;
+	Expression<S> nextMatchLowPriority(Expression<S> expression, Expression<S> limit) throws IOException;
 }

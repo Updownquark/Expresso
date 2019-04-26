@@ -32,14 +32,21 @@ public class ForbidExpressionType<S extends BranchableStream<?, ?>> extends Abst
 	}
 
 	@Override
-	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
-		Expression<S2> forbidden = parser.parseWith(theForbidden);
-		if (forbidden == null)
-			return Expression.empty(parser.getStream(), this);
-		ForbiddenPossibility<S2> p = new ForbiddenPossibility<>(this, parser, forbidden);
-		if (p.getMatchQuality() >= parser.getQualityLevel())
-			return p;
-		return null;
+	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound, Expression<S2> highBound)
+		throws IOException {
+		ForbiddenPossibility<S2> high = highBound instanceof ForbiddenPossibility ? (ForbiddenPossibility<S2>) highBound : null;
+		if (lowBound != null) {
+			if (!(lowBound instanceof ForbiddenPossibility)) // empty match
+				return null;
+			Expression<S2> fMatch = parser.parseWith(theForbidden, ((ForbiddenPossibility<S2>) lowBound).theForbidden, //
+				high == null ? null : high.theForbidden);
+			return fMatch == null ? null : new ForbiddenPossibility<>(this, parser, fMatch);
+		} else {
+			Expression<S2> forbidden = parser.parseWith(theForbidden, null, high == null ? null : high.theForbidden);
+			if (forbidden == null)
+				return Expression.empty(parser.getStream(), this);
+			return new ForbiddenPossibility<>(this, parser, forbidden);
+		}
 	}
 
 	@Override
@@ -77,7 +84,12 @@ public class ForbidExpressionType<S extends BranchableStream<?, ?>> extends Abst
 		}
 
 		@Override
-		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
+		public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+			return null;
+		}
+
+		@Override
+		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
 			return null;
 		}
 

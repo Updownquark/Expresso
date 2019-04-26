@@ -25,10 +25,20 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 	}
 
 	@Override
-	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
-		Expression<S2> superPossibility = super.parse(parser);
-		if (superPossibility == null)
+	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound, Expression<S2> highBound)
+		throws IOException {
+		OptionalPossibility<S2> low = (OptionalPossibility<S2>) lowBound;
+		if (low != null && low.theOption.length() == 0)
+			return null;
+		OptionalPossibility<S2> high = (OptionalPossibility<S2>) highBound;
+		Expression<S2> superPossibility = super.parse(parser, //
+			low == null ? null : low.theOption, //
+			(high == null || high.theOption.length() == 0) ? null : high);
+		if (superPossibility == null) {
+			if (high != null && high.theOption.length() == 0)
+				return null;
 			superPossibility = Expression.empty(parser.getStream(), this);
+		}
 		return new OptionalPossibility<>(this, parser, superPossibility);
 	}
 
@@ -66,7 +76,12 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 		}
 
 		@Override
-		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
+		public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+			return null;
+		}
+
+		@Override
+		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
 			return null;
 		}
 

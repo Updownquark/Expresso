@@ -52,7 +52,8 @@ public class TrailingIgnorableExpressionType<S extends BranchableStream<?, ?>> e
 	}
 
 	@Override
-	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser) throws IOException {
+	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound, Expression<S2> highBound)
+		throws IOException {
 		throw new IllegalStateException("This type does not parse itself");
 	}
 
@@ -107,7 +108,12 @@ public class TrailingIgnorableExpressionType<S extends BranchableStream<?, ?>> e
 		}
 
 		@Override
-		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser) throws IOException {
+		public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+			throw new IllegalStateException("This type does not parse itself");
+		}
+
+		@Override
+		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
 			throw new IllegalStateException("This type does not parse itself");
 		}
 	}
