@@ -71,6 +71,11 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 	}
 
 	@Override
+	public int compare(Expression<? extends S> o1, Expression<? extends S> o2) {
+		return 0; // No variance
+	}
+
+	@Override
 	public int hashCode() {
 		return thePattern.hashCode();
 	}

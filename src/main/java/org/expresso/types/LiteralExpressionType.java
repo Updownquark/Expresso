@@ -73,6 +73,11 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 	}
 
 	@Override
+	public int compare(Expression<? extends S> o1, Expression<? extends S> o2) {
+		return -(o1.length() - o2.length());
+	}
+
+	@Override
 	public String toString() {
 		return "L:" + theValue;
 	}

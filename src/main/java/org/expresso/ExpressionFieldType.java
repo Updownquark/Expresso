@@ -61,6 +61,12 @@ public class ExpressionFieldType<S extends BranchableStream<?, ?>> implements Ex
 	}
 
 	@Override
+	public int compare(Expression<? extends S> o1, Expression<? extends S> o2) {
+		return theWrapped.compare(//
+			((ExpressionField<? extends S>) o1).getWrapped(), ((ExpressionField<? extends S>) o2).getWrapped());
+	}
+
+	@Override
 	public Iterable<? extends ExpressionType<? super S>> getComponents() {
 		return Collections.unmodifiableList(Arrays.asList(theWrapped));
 	}

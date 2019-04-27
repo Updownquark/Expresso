@@ -50,6 +50,20 @@ public class ForbidExpressionType<S extends BranchableStream<?, ?>> extends Abst
 	}
 
 	@Override
+	public int compare(Expression<? extends S> o1, Expression<? extends S> o2) {
+		if (o1.length() == 0) {
+			if (o2.length() == 0)
+				return 0;
+			else
+				return 1;
+		} else if (o2.length() == 0)
+			return -1;
+		else
+			return theForbidden.compare(//
+				((ForbiddenPossibility<? extends S>) o1).theForbidden, ((ForbiddenPossibility<? extends S>) o2).theForbidden);
+	}
+
+	@Override
 	public Iterable<? extends ExpressionType<? super S>> getComponents() {
 		return Collections.unmodifiableList(Arrays.asList(theForbidden));
 	}

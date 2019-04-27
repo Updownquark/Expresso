@@ -56,6 +56,12 @@ public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends Abst
 	}
 
 	@Override
+	public int compare(Expression<? extends S> o1, Expression<? extends S> o2) {
+		return theTerminal.compare(//
+			((LeadUpPossibility<? extends S>) o1).theTerminalPossibility, ((LeadUpPossibility<? extends S>) o2).theTerminalPossibility);
+	}
+
+	@Override
 	public Iterable<? extends ExpressionType<? super S>> getComponents() {
 		return Collections.unmodifiableList(Arrays.asList(theTerminal));
 	}

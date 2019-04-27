@@ -147,10 +147,11 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		}
 	}
 
-	StackPushResult pushOnStack(ExpressionType<? super S> component, Expression<S> recursiveInterrupt, boolean interruptible) {
+	StackPushResult pushOnStack(ExpressionType<? super S> component, Expression<S> recursiveInterrupt, boolean interruptible,
+		boolean interrupting) {
 		CollectionElement<ComponentRecursiveInterrupt<S>> stackFrame = null;
 		boolean[] added = new boolean[1];
-		stackFrame = theStack.getOrAdd(new ComponentRecursiveInterrupt<>(component, interruptible, recursiveInterrupt, 0), false,
+		stackFrame = theStack.getOrAdd(new ComponentRecursiveInterrupt<>(component, interrupting, recursiveInterrupt, 0), false,
 			() -> added[0] = true);
 		if (added[0]) {
 			stackFrame.get().element = stackFrame.getElementId();
@@ -158,7 +159,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		}
 		if (interruptible) {
 			ComponentRecursiveInterrupt<S> interruptingCRI = stackFrame.get().leaf;
-			while (interruptingCRI != null && !interruptingCRI.interruptible)
+			while (interruptingCRI != null && !interruptingCRI.interrupting)
 				interruptingCRI = interruptingCRI.parent;
 			if (interruptingCRI != null) { // Interrupted
 				Expression<S> ri = interruptingCRI.result;
@@ -174,8 +175,8 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				return new StackPushResult(ri);
 			}
 		}
-		ComponentRecursiveInterrupt<S> newCRI = new ComponentRecursiveInterrupt<>(component, interruptible || recursiveInterrupt != null,
-			recursiveInterrupt, ++stackFrame.get().numDownstream);
+		ComponentRecursiveInterrupt<S> newCRI = new ComponentRecursiveInterrupt<>(component, interrupting, recursiveInterrupt,
+			++stackFrame.get().numDownstream);
 		newCRI.parent = stackFrame.get().leaf;
 		CollectionElement<ComponentRecursiveInterrupt<S>> lowStackFrame = theStack.addElement(newCRI, false);
 		newCRI.element = lowStackFrame.getElementId();
@@ -207,7 +208,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				method = DebugResultMethod.Excluded;
 			} else {
 				if (component.isCacheable() || recursive)
-					stackFrame = pushOnStack(component, recursiveInterrupt, lowBound == null && highBound == null);
+					stackFrame = pushOnStack(component, recursiveInterrupt, lowBound == null && highBound == null, true);
 
 				if (stackFrame != null && stackFrame.frame == null) {
 					result = stackFrame.interrupt;
@@ -465,7 +466,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 			// First, try to branch the component itself
 			// TODO I don't remember or understand why exactly I pushed to the stack here, since the parser's nextMatch already did it
 			// but when I take it out, things go much slower. Something to do with caching, I'm guessing.
-			ExpressoParserImpl<S>.StackPushResult stackFrame = parser.pushOnStack(theMatch.getType(), null, false);
+			ExpressoParserImpl<S>.StackPushResult stackFrame = parser.pushOnStack(theMatch.getType(), null, false, false);
 			Expression<S> next;
 			next = theMatch.getType().parse(parser, theMatch, highBound);
 			while (next != null && theInvariantContent != null && !find(next, theInvariantContent))
@@ -501,7 +502,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 			Expression<S> next;
 			// Next, parse other matches, using this match for the initial content
 			// Only do this and the rest at the top level, but don't let the caller cache results when they're interrupted like this
-			ExpressoParserImpl<S>.StackPushResult stackFrame = parser.pushOnStack(getType(), this, true);
+			ExpressoParserImpl<S>.StackPushResult stackFrame = parser.pushOnStack(getType(), this, true, true);
 			// boolean proceed = stackFrame.frame != null && stackFrame.frame.get().parent.parent == null;
 			boolean proceed = stackFrame.frame != null && stackFrame.frame.get().parent == null;
 			stackFrame.pop();
@@ -615,7 +616,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	static class ComponentRecursiveInterrupt<S extends BranchableStream<?, ?>> {
 		public ComponentRecursiveInterrupt<S> parent;
 		final ExpressionType<? super S> type;
-		final boolean interruptible;
+		final boolean interrupting;
 		ElementId element;
 		final int depth;
 		ComponentRecursiveInterrupt<S> leaf;
@@ -625,7 +626,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 
 		public ComponentRecursiveInterrupt(ExpressionType<? super S> type, boolean interruptible, Expression<S> result, int depth) {
 			this.type = type;
-			this.interruptible = interruptible;
+			this.interrupting = interruptible;
 			this.depth = depth;
 			this.result = result;
 			leaf = this;

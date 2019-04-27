@@ -57,6 +57,11 @@ public class TrailingIgnorableExpressionType<S extends BranchableStream<?, ?>> e
 		throw new IllegalStateException("This type does not parse itself");
 	}
 
+	@Override
+	public int compare(Expression<? extends S> o1, Expression<? extends S> o2) {
+		throw new IllegalStateException("This type is not valid for parsing");
+	}
+
 	/**
 	 * An expression used when only trailing ignorables are left after parsing an expression
 	 * 

@@ -95,6 +95,9 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		throws IOException {
 		boolean changed = false;
 		int childQuality = 0;
+		int [] highRepCompare=new int[highBound.size()];
+		for(int i=0;i<highRepCompare.length;i++)
+			highRepCompare[i]=(i<repetitions.size()) ? repetitions.get(
 		for (Expression<S2> rep : repetitions)
 			childQuality += rep.getMatchQuality();
 		while (true) {
@@ -204,6 +207,29 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 				return null;
 		} finally {
 			// bisNode.end();
+		}
+	}
+
+	@Override
+	public int compare(Expression<? extends S> o1, Expression<? extends S> o2) {
+		SequencePossibility<? extends S> seq1 = (SequencePossibility<S>) o1;
+		SequencePossibility<? extends S> seq2 = (SequencePossibility<S>) o2;
+		Iterator<? extends Expression<? extends S>> children1 = seq1.getChildren().iterator();
+		Iterator<? extends Expression<? extends S>> children2 = seq2.getChildren().iterator();
+		while (true) {
+			if (children1.hasNext()) {
+				if (children2.hasNext()) {
+					Expression<? extends S> child1 = children1.next();
+					int comp = ((ExpressionType<S>) child1.getType()).compare(child1, children2.next());
+					if (comp != 0)
+						return comp;
+				} else {
+					return 1;
+				}
+			} else if (children2.hasNext())
+				return -1;
+			else
+				return 0;
 		}
 	}
 

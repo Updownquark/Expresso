@@ -120,4 +120,16 @@ public class OrderOfOperationsTest extends JavaTest {
 						.withFieldContent("left", "f")//
 						.withFieldContent("right", "g")));
 	}
+
+	/** Tests atypical right-to-left associativity (a=b=c) */
+	@Test
+	public void testRTLAssociativity() {
+		testExpression("a=b=c", "result-producer", true, TIMEOUT, //
+			new ExpressionTester("a=b=c").withType("assign")//
+				.withFieldContent("variable", "a")//
+				.withField("operand",
+					op -> op.withType("assign")//
+						.withFieldContent("variable", "b")//
+						.withFieldContent("operand", "c")));
+	}
 }

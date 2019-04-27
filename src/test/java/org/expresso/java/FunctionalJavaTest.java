@@ -37,7 +37,7 @@ public class FunctionalJavaTest extends JavaTest {
 	@Test
 	public void testDoubleField() {
 		testExpression("vbl.field1.field2", "result-producer", true, TIMEOUT, //
-			new ExpressionTester("doubleField").withType("qualified-name")//
+			new ExpressionTester("doubleField").withType("qualified-name", "field-ref")//
 				.withField("target",
 					inner -> inner//
 						.withFieldContent("target", "vbl")//

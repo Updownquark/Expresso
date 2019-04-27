@@ -72,14 +72,10 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 			component = theComponents.getAdjacentElement(low.theComponentId, true);
 		} else
 			component = theComponents.getTerminalElement(true);
-		boolean isLowBound = low != null;
 		while (component != null) {
 			boolean isHighBound = high == null ? false : component.getElementId().equals(high.theComponentId);
 			Expression<S2> result = parser.parseWith(//
-				component.get(), //
-				isLowBound ? low.theComponent : null, //
-				isHighBound ? high.theComponent : null);
-			isLowBound = false;
+				component.get(), null, isHighBound ? high.theComponent : null);
 			if (result != null)
 				return new OneOfPossibility<>(this, result, component.getElementId());
 			if (isHighBound)
@@ -88,6 +84,16 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 				component = theComponents.getAdjacentElement(component.getElementId(), true);
 		}
 		return null;
+	}
+
+	@Override
+	public int compare(Expression<? extends S> o1, Expression<? extends S> o2) {
+		OneOfPossibility<? extends S> oo1 = (OneOfPossibility<? extends S>) o1;
+		OneOfPossibility<? extends S> oo2 = (OneOfPossibility<? extends S>) o2;
+		int comp = oo1.theComponentId.compareTo(oo2.theComponentId);
+		if (comp == 0)
+			comp = theComponents.getElement(oo1.theComponentId).get().compare(oo1.theComponent, oo2.theComponent);
+		return comp;
 	}
 
 	@Override

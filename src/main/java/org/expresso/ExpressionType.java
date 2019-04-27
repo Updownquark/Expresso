@@ -1,6 +1,7 @@
 package org.expresso;
 
 import java.io.IOException;
+import java.util.Comparator;
 
 import org.expresso.stream.BranchableStream;
 
@@ -9,7 +10,7 @@ import org.expresso.stream.BranchableStream;
  *
  * @param <S> The super type of stream that this component understands
  */
-public interface ExpressionType<S extends BranchableStream<?, ?>> {
+public interface ExpressionType<S extends BranchableStream<?, ?>> extends Comparator<Expression<? extends S>> {
 	// public static final ProgramTracker TRACKER = new ProgramTracker("Expresso Parsing");
 
 	/** @return An ID by which this type's results may be cached, or -1 if caching should not be used for this type */
