@@ -11,10 +11,8 @@ import org.expresso.debug.ExpressoDebugger.DebugExpressionParsing;
 import org.expresso.debug.ExpressoDebugger.DebugResultMethod;
 import org.expresso.stream.BranchableStream;
 import org.qommons.collect.BetterSet;
-import org.qommons.collect.BetterSortedSet;
 import org.qommons.collect.CollectionElement;
 import org.qommons.collect.ElementId;
-import org.qommons.tree.BetterTreeSet;
 
 /**
  * Default implementation of {@link ExpressoParser}
@@ -60,7 +58,6 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	private final S theStream;
 	private final int[] theExcludedTypes;
 	private final BetterSet<ComponentRecursiveInterrupt<S>> theStack;
-	private final BetterSortedSet<Integer> theStackPriorities;
 	private final Map<Integer, CachedExpression<S>> theCache;
 
 	/**
@@ -74,7 +71,6 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		theStream = stream;
 		theExcludedTypes = excludedTypes;
 		theStack = stack;
-		theStackPriorities = new BetterTreeSet<>(false, Integer::compareTo);
 		theCache = new HashMap<>();
 	}
 
@@ -204,11 +200,13 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 			if (component instanceof ConfiguredExpressionType) {
 				int priority = ((ConfiguredExpressionType<? super S>) component).getPriority();
 				if (priority != 0) {
-					if (!theStackPriorities.isEmpty() && priority < theStackPriorities.getLast()) {
+					if (!theSession.getPriorities().isEmpty() && priority < theSession.getPriorities().getLast()) {
 						result = null;
 						method = DebugResultMethod.Excluded;
+						debug.finished(result, method);
+						return result;
 					} else
-						addedPriority = CollectionElement.getElementId(theStackPriorities.addElement(priority, false));
+						addedPriority = CollectionElement.getElementId(theSession.getPriorities().addElement(priority, false));
 				}
 			}
 			int cacheId = component.getId();
@@ -269,9 +267,10 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 			if (stackFrame != null)
 				stackFrame.pop();
 			if (addedPriority != null)
-				theStackPriorities.mutableElement(addedPriority).remove();
+				theSession.getPriorities().mutableElement(addedPriority).remove();
 		}
-		if (result != null && !(result instanceof BranchingMatch) && recursive && method == DebugResultMethod.Parsed)
+		if (result != null && recursiveInterrupt == null && !(result instanceof BranchingMatch) && recursive
+			&& method == DebugResultMethod.Parsed)
 			result = new BranchingMatch<>(null, result, null, 0);
 		if (cached != null)
 			result = cached.setPossibility(result).asPossibility();

@@ -33,7 +33,7 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 		OptionalPossibility<S2> high = (OptionalPossibility<S2>) highBound;
 		Expression<S2> superPossibility = super.parse(parser, //
 			low == null ? null : low.theOption, //
-			(high == null || high.theOption.length() == 0) ? null : high);
+			(high == null || high.theOption.length() == 0) ? null : high.theOption);
 		if (superPossibility == null) {
 			if (high != null && high.theOption.length() == 0)
 				return null;

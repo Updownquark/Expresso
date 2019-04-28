@@ -19,12 +19,12 @@ public class OrderOfOperationsTest extends JavaTest {
 	public void testOperationOrder1() {
 		testExpression("-a*b", "result-producer", true, org.expresso.java.JavaTest.TIMEOUT, //
 			new ExpressionTester("-a*b")//
-				.withFieldContent("name", "-")//
-				.withField("operand",
-					op -> op//
-						.withFieldContent("name", "*")//
-						.withFieldContent("left", "a")//
-						.withFieldContent("right", "b")));
+				.withFieldContent("name", "*")//
+				.withField("left",
+					left -> left//
+						.withFieldContent("name", "-")//
+						.withFieldContent("operand", "a"))//
+				.withFieldContent("right", "b"));
 	}
 
 	/** Tests a*-b */

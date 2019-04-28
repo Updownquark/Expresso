@@ -6,13 +6,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import org.expresso.DefaultGrammarParser;
-import org.expresso.Expression;
-import org.expresso.ExpressionClass;
-import org.expresso.ExpressionType;
-import org.expresso.ExpressoGrammar;
-import org.expresso.ExpressoParser;
-import org.expresso.GrammarExpressionType;
+import org.expresso.*;
 import org.expresso.debug.ExpressoDebugUI;
 import org.expresso.debug.ExpressoDebugger;
 import org.expresso.impl.ExpressoParserImpl.ComponentRecursiveInterrupt;
@@ -20,10 +14,8 @@ import org.expresso.stream.BranchableStream;
 import org.expresso.types.SequenceExpressionType;
 import org.expresso.types.TrailingIgnorableExpressionType;
 import org.qommons.BreakpointHere;
-import org.qommons.collect.BetterHashSet;
-import org.qommons.collect.BetterSet;
-import org.qommons.collect.CollectionElement;
-import org.qommons.collect.ElementId;
+import org.qommons.collect.*;
+import org.qommons.tree.BetterTreeSet;
 
 /**
  * Does the work of parsing a stream
@@ -38,6 +30,7 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 	private final Map<Integer, BetterSet<ComponentRecursiveInterrupt<S>>> theStacks;
 	private final Map<Integer, Boolean> theRecursiveCache;
 	private final BetterSet<Integer> theRecursiveVisited;
+	private final BetterSortedSet<Integer> theStackPriorities;
 	private ExpressoDebugger theDebugger;
 	private int theQualityLevel;
 
@@ -48,6 +41,7 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 		theStacks = new HashMap<>();
 		theRecursiveCache = new HashMap<>();
 		theRecursiveVisited = BetterHashSet.build().unsafe().buildSet();
+		theStackPriorities = new BetterTreeSet<>(false, Integer::compareTo);
 
 		if (DEBUG_UI && BreakpointHere.isDebugEnabled() != null) {
 			ExpressoDebugUI debugger = new ExpressoDebugUI();
@@ -60,6 +54,10 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 	/** @return The current minimum quality level for matches parsed in this session */
 	public int getQualityLevel() {
 		return theQualityLevel;
+	}
+
+	public BetterSortedSet<Integer> getPriorities() {
+		return theStackPriorities;
 	}
 
 	/**
