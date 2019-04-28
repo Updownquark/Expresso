@@ -6,16 +6,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.expresso.Expression;
-import org.expresso.ExpressionType;
-import org.expresso.ExpressoParser;
-import org.expresso.GrammarExpressionType;
+import org.expresso.*;
 import org.expresso.debug.ExpressoDebugger.DebugExpressionParsing;
 import org.expresso.debug.ExpressoDebugger.DebugResultMethod;
 import org.expresso.stream.BranchableStream;
 import org.qommons.collect.BetterSet;
+import org.qommons.collect.BetterSortedSet;
 import org.qommons.collect.CollectionElement;
 import org.qommons.collect.ElementId;
+import org.qommons.tree.BetterTreeSet;
 
 /**
  * Default implementation of {@link ExpressoParser}
@@ -61,6 +60,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	private final S theStream;
 	private final int[] theExcludedTypes;
 	private final BetterSet<ComponentRecursiveInterrupt<S>> theStack;
+	private final BetterSortedSet<Integer> theStackPriorities;
 	private final Map<Integer, CachedExpression<S>> theCache;
 
 	/**
@@ -74,6 +74,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		theStream = stream;
 		theExcludedTypes = excludedTypes;
 		theStack = stack;
+		theStackPriorities = new BetterTreeSet<>(false, Integer::compareTo);
 		theCache = new HashMap<>();
 	}
 
@@ -198,10 +199,22 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		Expression<S> result;
 		DebugResultMethod method;
 		CachedExpression<S> cached = null;
+		ElementId addedPriority = null;
 		try {
+			if (component instanceof ConfiguredExpressionType) {
+				int priority = ((ConfiguredExpressionType<? super S>) component).getPriority();
+				if (priority != 0) {
+					if (!theStackPriorities.isEmpty() && priority < theStackPriorities.getLast()) {
+						result = null;
+						method = DebugResultMethod.Excluded;
+					} else
+						addedPriority = CollectionElement.getElementId(theStackPriorities.addElement(priority, false));
+				}
+			}
 			int cacheId = component.getId();
 			if (cacheId < 0) {
-				result = component.parse(this, unwrap(lowBound), unwrap(highBound));
+				result = component.parse(this, //
+					unwrap(lowBound), unwrap(highBound));
 				method = DebugResultMethod.Parsed;
 			} else if (theExcludedTypes != null && Arrays.binarySearch(theExcludedTypes, cacheId) >= 0) {
 				result = null;
@@ -222,7 +235,8 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 					// result = result.nextMatch(this);
 					// method = DebugResultMethod.Parsed;
 				} else/* if (!component.isCacheable()) */ {
-					result = component.parse(this, unwrap(lowBound), unwrap(highBound));
+					result = component.parse(this, //
+						unwrap(lowBound), unwrap(highBound));
 					method = DebugResultMethod.Parsed;
 				} /*else if(lowBound instanceof CachedExpression) {
 					CachedExpression<S> cachedLow=(CachedExpression<S>) lowBound;
@@ -254,6 +268,8 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		} finally {
 			if (stackFrame != null)
 				stackFrame.pop();
+			if (addedPriority != null)
+				theStackPriorities.mutableElement(addedPriority).remove();
 		}
 		if (result != null && !(result instanceof BranchingMatch) && recursive && method == DebugResultMethod.Parsed)
 			result = new BranchingMatch<>(null, result, null, 0);
@@ -470,7 +486,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 			Expression<S> next;
 			next = theMatch.getType().parse(parser, theMatch, highBound);
 			while (next != null && theInvariantContent != null && !find(next, theInvariantContent))
-				next = next.nextMatch(parser);
+				next = theMatch.getType().parse(parser, next, highBound);
 			stackFrame.pop();
 			if (next != null)
 				return new BranchingMatch<>(this, next, theInvariantContent, 2);
@@ -502,9 +518,9 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 			Expression<S> next;
 			// Next, parse other matches, using this match for the initial content
 			// Only do this and the rest at the top level, but don't let the caller cache results when they're interrupted like this
-			ExpressoParserImpl<S>.StackPushResult stackFrame = parser.pushOnStack(getType(), this, true, true);
+			ExpressoParserImpl<S>.StackPushResult stackFrame = parser.pushOnStack(getType(), this, false, false);
 			// boolean proceed = stackFrame.frame != null && stackFrame.frame.get().parent.parent == null;
-			boolean proceed = stackFrame.frame != null && stackFrame.frame.get().parent == null;
+			boolean proceed = stackFrame.frame != null && stackFrame.frame.get().parent.parent == null;
 			stackFrame.pop();
 			if (!proceed)
 				return null; // Only do the rest at the top level

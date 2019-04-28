@@ -95,9 +95,21 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 		throws IOException {
 		boolean changed = false;
 		int childQuality = 0;
-		int [] highRepCompare=new int[highBound.size()];
-		for(int i=0;i<highRepCompare.length;i++)
-			highRepCompare[i]=(i<repetitions.size()) ? repetitions.get(
+		boolean[] highRepEqual;
+		if (highBound != null) {
+			highRepEqual = new boolean[highBound.size()];
+			Iterator<Expression<S2>> repIter = repetitions.iterator();
+			Iterator<? extends Expression<S2>> highBoundIter = highBound.iterator();
+			int i = 0;
+			while (repIter.hasNext() && highBoundIter.hasNext()) {
+				Expression<S2> rep = repIter.next();
+				if (rep.getType().compare(rep, highBoundIter.next()) == 0)
+					highRepEqual[i] = true;
+				else
+					break;
+			}
+		} else
+			highRepEqual = new boolean[0];
 		for (Expression<S2> rep : repetitions)
 			childQuality += rep.getMatchQuality();
 		while (true) {
@@ -119,9 +131,19 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 				if (!repetitions.isEmpty() && repetitions.getLast().length() == 0 && repetitions.getLast().getType() == component) {
 					break; // Repeating the same type with zero length is bad
 				} else {
-					Expression<S2> repetition = branched.parseWith(component, null, //
-						(highBound == null || highBound.size() <= repetitions.size()) ? null : highBound.get(repetitions.size()));
+					Expression<S2> highBoundRep;
+					if (highRepEqual.length <= repetitions.size())
+						highBoundRep = null;
+					else if (repetitions.isEmpty() && highRepEqual.length > 0)
+						highBoundRep = highBound.get(repetitions.size());
+					else if (highRepEqual[repetitions.size() - 1])
+						highBoundRep = highBound.get(repetitions.size());
+					else
+						highBoundRep = null;
+					Expression<S2> repetition = branched.parseWith(component, null, highBoundRep);
 					if (repetition != null) {
+						if (highBoundRep != null && repetition.getType().compare(repetition, highBoundRep) == 0)
+							highRepEqual[repetitions.size()] = true;
 						int tempCQ = childQuality + repetition.getMatchQuality();
 						if (tempCQ >= parser.getQualityLevel()) {
 							childQuality = tempCQ;
@@ -147,19 +169,26 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 				int lastPos = ExpressoUtils.getLength(parser.getStream().getPosition(), repetitions);
 				childQuality -= last.getMatchQuality();
 				branched = parser.advance(lastPos);
+				Expression<S2> highBoundRep;
+				if (highRepEqual.length <= repetitions.size())
+					highBoundRep = null;
+				else if (repetitions.isEmpty() && highRepEqual.length > 0)
+					highBoundRep = highBound.get(repetitions.size());
+				else if (highRepEqual[repetitions.size() - 1])
+					highBoundRep = highBound.get(repetitions.size());
+				else
+					highBoundRep = null;
 				Expression<S2> repetition = branched.parseWith(//
-					last.getType(), last,
-					(highBound == null || highBound.size() <= repetitions.size()) ? null : highBound.get(repetitions.size()));
+					last.getType(), last, highBoundRep);
 				if (repetition != null) {
-					// If the match doesn't differ in length or quality, we won't have any better luck with it
-					if (repetition.length() != last.length() || repetition.getMatchQuality() >= last.getMatchQuality()) {
-						int tempCQ = childQuality + repetition.getMatchQuality();
-						if (tempCQ >= parser.getQualityLevel()) {
-							childQuality = tempCQ;
-							changed = true;
-							repetitions.add(repetition);
-							break;
-						}
+					if (highBoundRep != null && repetition.getType().compare(repetition, highBoundRep) == 0)
+						highRepEqual[repetitions.size()] = true;
+					int tempCQ = childQuality + repetition.getMatchQuality();
+					if (tempCQ >= parser.getQualityLevel()) {
+						childQuality = tempCQ;
+						changed = true;
+						repetitions.add(repetition);
+						break;
 					}
 				}
 			}

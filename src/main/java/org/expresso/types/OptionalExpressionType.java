@@ -43,6 +43,21 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 	}
 
 	@Override
+	public int compare(Expression<? extends S> o1, Expression<? extends S> o2) {
+		Expression<? extends S> opt1 = ((OptionalPossibility<? extends S>) o1).theOption;
+		Expression<? extends S> opt2 = ((OptionalPossibility<? extends S>) o2).theOption;
+		if (opt1.length() == 0) {
+			if (opt2.length() == 0)
+				return 0;
+			else
+				return 1;
+		} else if (opt2.length() == 0)
+			return -1;
+		else
+			return super.compare(opt1, opt2);
+	}
+
+	@Override
 	public int getEmptyQuality(int minQuality) {
 		return 0;
 	}
