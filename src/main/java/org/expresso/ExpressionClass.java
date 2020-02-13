@@ -1,6 +1,7 @@
 package org.expresso;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 import org.expresso.stream.BranchableStream;
 import org.expresso.types.OneOfExpressionType;
@@ -16,7 +17,8 @@ public abstract class ExpressionClass<S extends BranchableStream<?, ?>> extends 
 	private final String theName;
 	private final List<ExpressionClass<S>> theParentClasses;
 	private final List<ExpressionClass<S>> theChildClasses;
-	private final BetterList<? extends GrammarExpressionType<? super S>> theIgnorables;
+	private final BetterList<? extends ExpressionClass<S>> theLocalIgnorables;
+	private BetterList<? extends ExpressionClass<S>> theIgnorables;
 
 	/**
 	 * @param grammar The grammar that this class belongs to
@@ -25,21 +27,17 @@ public abstract class ExpressionClass<S extends BranchableStream<?, ?>> extends 
 	 * @param parentClasses The classes that this class extends
 	 * @param childClasses The classes that extend this class (populated later externally)
 	 * @param members The class's members, sorted by priority, then by order of occurrence
+	 * @param ignorables Classes of expressions that may be a part of this expression's content without affecting its syntax
 	 */
 	public ExpressionClass(ExpressoGrammar<S> grammar, int id, String name, List<ExpressionClass<S>> parentClasses,
 		List<ExpressionClass<S>> childClasses, BetterList<? extends GrammarExpressionType<S>> members,
-		BetterList<? extends GrammarExpressionType<? super S>> ignorables) {
+		BetterList<? extends ExpressionClass<S>> ignorables) {
 		super(id, members);
 		theGrammar = grammar;
 		theName = name;
 		theParentClasses = parentClasses;
 		theChildClasses = childClasses;
-		theIgnorables = ignorables;
-	}
-
-	@Override
-	public boolean isCacheable() {
-		return true;
+		theLocalIgnorables = ignorables;
 	}
 
 	@Override
@@ -68,7 +66,10 @@ public abstract class ExpressionClass<S extends BranchableStream<?, ?>> extends 
 	}
 
 	@Override
-	public BetterList<? extends GrammarExpressionType<? super S>> getIgnorables() {
+	public BetterList<? extends ExpressionClass<S>> getIgnorables() {
+		if (theIgnorables == null)
+			theIgnorables = BetterList
+				.of(Stream.concat(theParentClasses.stream().flatMap(pc -> pc.getIgnorables().stream()), theLocalIgnorables.stream()));
 		return theIgnorables;
 	}
 

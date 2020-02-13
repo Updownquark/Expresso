@@ -101,7 +101,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		private final List<ExpressionClass<S>> parentClasses;
 		private final BetterList<GrammarExpressionType<S>> types;
 		private final BetterList<ExpressionClass<S>> childClasses;
-		private BetterList<GrammarExpressionType<S>> ignorables;
+		private BetterList<ExpressionClass<S>> ignorables;
 
 		PreParsedClass(ExpressoGrammar<S> grammar, int id, String className, boolean superClass) {
 			if (superClass)
@@ -173,22 +173,11 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		void checkAgainstClasses(Map<String, ExpressionClass<S>> classes) {
 			Iterator<String> ignorable = ignorableNames.iterator();
 			while (ignorable.hasNext()) {
-				ExpressionClass<S> c = classes.get(ignorable.next());
+				String name = ignorable.next();
+				ExpressionClass<S> c = classes.get(name);
 				if (c != null) {
 					ignorable.remove();
 					ignorables.add(c);
-				}
-			}
-		}
-
-		void checkAgainstExpressions(Map<String, ConfiguredReferenceExpressionType<S>> expressionTypes) {
-			Iterator<String> ignorable = ignorableNames.iterator();
-			while (ignorable.hasNext()) {
-				String name = ignorable.next();
-				ConfiguredReferenceExpressionType<S> type = expressionTypes.get(name);
-				if (type != null) {
-					ignorable.remove();
-					ignorables.add(type.type);
 				} else
 					throw new IllegalArgumentException("No such expression " + name + " as ignorable for class " + clazz.getName());
 			}
@@ -277,6 +266,10 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 				}
 			}
 		}
+		for (PreParsedClass clazz : declaredClasses.values())
+			classes.put(clazz.clazz.getName(), clazz.clazz);
+		for (PreParsedClass clazz : declaredClasses.values())
+			clazz.checkAgainstClasses(classes);
 
 		Map<String, ConfiguredReferenceExpressionType<S>> declaredTypes = new LinkedHashMap<>();
 		// One run-though to populate the type references
@@ -318,10 +311,6 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 			if (declaredTypes.put(typeName, new ConfiguredReferenceExpressionType<>(id[0]++, priority, typeName, typeClasses)) != null)
 				throw new IllegalArgumentException("Duplicate expressions named " + typeName);
 		}
-		for (PreParsedClass clazz : declaredClasses.values())
-			classes.put(clazz.clazz.getName(), clazz.clazz);
-		for (PreParsedClass clazz : declaredClasses.values())
-			clazz.checkAgainstClasses(classes);
 		PreGrammar preGrammar = new PreGrammar() {
 			@Override
 			public int getTypeId(String typeName) {
@@ -366,14 +355,12 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 			types.add(typeRef.type);
 			typesByName.put(typeRef.name, typeRef.type);
 		}
-		for (PreParsedClass clazz : declaredClasses.values())
-			clazz.checkAgainstExpressions(declaredTypes);
 		return grammar;
 	}
 
 	private ExpressionType<S> parseComponent(QommonsConfig config, Map<String, ExpressionClass<S>> allClasses,
 		Map<String, ConfiguredReferenceExpressionType<S>> allTypes, Map<ExpressionType<S>, ExpressionType<S>> cachedExpressions, int[] id,
-		PreGrammar grammar, boolean throwIfNotFound, BetterList<GrammarExpressionType<? super S>> ignorables) {
+		PreGrammar grammar, boolean throwIfNotFound, BetterList<ExpressionClass<S>> ignorables) {
 		String componentType = config.getName();
 		String value = config.getValue();
 		if ("".equals(value))
@@ -476,10 +463,12 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		else
 			exType = found;
 		if (!ignorables.isEmpty() && found instanceof BareContentExpressionType) {
+			RepeatExpressionType<S> igRepeat = new RepeatExpressionType<>(-1, 0, Integer.MAX_VALUE,
+				BetterList.of(new OneOfExpressionType<>(-1, ignorables)));
 			List<ExpressionType<? super S>> seq = new ArrayList<>(ignorables.size() + 1);
 			seq.addAll(ignorables);
 			seq.add(exType);
-			exType = new SequenceExpressionType<>(id[0]++, Collections.unmodifiableList(seq));
+			exType = new SequenceExpressionType<>(id[0]++, BetterList.of(igRepeat, exType));
 		}
 		return exType;
 	}
@@ -601,7 +590,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		private final String name;
 		final BetterSortedSet<ExpressionClass<S>> classes;
 		ConfiguredExpressionType<S> type;
-		final BetterList<GrammarExpressionType<? super S>> ignorables;
+		final BetterList<ExpressionClass<S>> ignorables;
 
 		ConfiguredReferenceExpressionType(int id, int priority, String name, BetterSortedSet<ExpressionClass<S>> classes) {
 			this.id = id;
@@ -665,7 +654,7 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 			return Collections.unmodifiableList(Arrays.asList(type));
 		}
 
-		BetterList<GrammarExpressionType<? super S>> getIgnorables() {
+		BetterList<ExpressionClass<S>> getIgnorables() {
 			return ignorables;
 		}
 

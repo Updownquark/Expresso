@@ -18,7 +18,7 @@ public class ConfiguredExpressionType<S extends BranchableStream<?, ?>> extends 
 	private final String theName;
 	private final int thePriority;
 	private final BetterSortedSet<ExpressionClass<S>> theClasses;
-	private final BetterList<? extends GrammarExpressionType<? super S>> theIgnorables;
+	private final BetterList<? extends ExpressionClass<S>> theIgnorables;
 
 	/**
 	 * @param grammar The grammar that this expression type belongs to
@@ -31,7 +31,7 @@ public class ConfiguredExpressionType<S extends BranchableStream<?, ?>> extends 
 	 */
 	public ConfiguredExpressionType(ExpressoGrammar<S> grammar, int id, int priority, String name,
 		BetterSortedSet<ExpressionClass<S>> classes, List<ExpressionType<S>> components,
-		BetterList<? extends GrammarExpressionType<? super S>> ignorables) {
+		BetterList<? extends ExpressionClass<S>> ignorables) {
 		super(id, components);
 		theGrammar = grammar;
 		thePriority = priority;
@@ -73,7 +73,7 @@ public class ConfiguredExpressionType<S extends BranchableStream<?, ?>> extends 
 	}
 
 	@Override
-	public BetterList<? extends GrammarExpressionType<? super S>> getIgnorables() {
+	public BetterList<? extends ExpressionClass<S>> getIgnorables() {
 		return theIgnorables;
 	}
 

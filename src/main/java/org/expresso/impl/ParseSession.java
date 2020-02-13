@@ -6,7 +6,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import org.expresso.ConfiguredExpressionType;
 import org.expresso.Expression;
 import org.expresso.ExpressionType;
 import org.expresso.ExpressoGrammar;
@@ -31,7 +30,7 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 	// private final Map<Integer, BetterSet<ComponentRecursiveInterrupt<S>>> theStacks;
 	// private final Map<Integer, Boolean> theRecursiveCache;
 	// private final BetterSet<Integer> theRecursiveVisited;
-	private final LinkedList<ExpressionType<? super S>> theStack;
+	private ExpressoStack<S> theStack;
 	private final LinkedList<Integer> thePriorityStack;
 	private ExpressoDebugger theDebugger;
 	private int theQualityLevel;
@@ -43,7 +42,7 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 		// theStacks = new HashMap<>();
 		// theRecursiveCache = new HashMap<>();
 		// theRecursiveVisited = BetterHashSet.build().unsafe().buildSet();
-		theStack = new LinkedList<>();
+		theStack = new ExpressoStack<>();
 		thePriorityStack = new LinkedList<>();
 
 		if (DEBUG_UI && BreakpointHere.isDebugEnabled() != null) {
@@ -104,7 +103,7 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 						break roundLoop;
 				}
 			}
-			// Clear the cache between rounds
+			// Clear the cache between rounds, since the quality will affect what should be in the cache
 			theParsers.clear();
 			// theRecursiveCache.clear();
 
@@ -144,24 +143,8 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 			theDebugger = ExpressoDebugger.IDLE;
 	}
 
-	boolean push(ExpressionType<? super S> type) {
-		if (type.isEnclosed())
-			thePriorityStack.add(0);
-		else if (type instanceof ConfiguredExpressionType) {
-			Integer priority = thePriorityStack.peekLast();
-			ConfiguredExpressionType<? super S> configured = (ConfiguredExpressionType<? super S>) type;
-			if (priority != null && configured.getPriority() >= 0 && configured.getPriority() < priority)
-				return false;
-			thePriorityStack.add(configured.getPriority());
-		}
-		theStack.add(type);
-		return true;
-	}
-
-	void pop() {
-		ExpressionType<? super S> popped = theStack.removeLast();
-		if (popped.isEnclosed() || popped instanceof ConfiguredExpressionType)
-			thePriorityStack.removeLast();
+	ExpressoStack<S>.Frame push(ExpressionType<? super S> type, S stream) {
+		return theStack.push(type, stream);
 	}
 
 	// /**

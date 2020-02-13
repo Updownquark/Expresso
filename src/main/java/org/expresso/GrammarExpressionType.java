@@ -18,9 +18,15 @@ public interface GrammarExpressionType<S extends BranchableStream<?, ?>> extends
 	String getName();
 
 	@Override
+	default boolean isCacheable() {
+		return true;
+	}
+
+	@Override
 	default int compareTo(GrammarExpressionType<?> o) {
 		return QommonsUtils.compareNumberTolerant(getName(), o.getName(), true, true);
 	}
 
-	BetterList<? extends GrammarExpressionType<? super S>> getIgnorables();
+	/** @return Classes of expressions that may be a part of this expression's content without affecting its syntax */
+	BetterList<? extends ExpressionClass<S>> getIgnorables();
 }

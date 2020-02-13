@@ -7,7 +7,7 @@ import org.qommons.collect.BetterList;
 
 public class ExpressionSuperClass<S extends BranchableStream<?, ?>> extends ExpressionClass<S> {
 	public ExpressionSuperClass(ExpressoGrammar<S> grammar, int id, String name, List<ExpressionClass<S>> parentClasses,
-		BetterList<ExpressionClass<S>> childClasses, BetterList<? extends GrammarExpressionType<? super S>> ignorables) {
+		BetterList<ExpressionClass<S>> childClasses, BetterList<? extends ExpressionClass<S>> ignorables) {
 		super(grammar, id, name, parentClasses, childClasses, childClasses, ignorables);
 	}
 

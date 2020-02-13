@@ -151,7 +151,8 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 							changed = true;
 							repetitions.add(repetition);
 							branched = branched.advance(repetition.length());
-						}
+						} else
+							break;// TODO Added this, should it be here?
 					} else
 						break;
 				}

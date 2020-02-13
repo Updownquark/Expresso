@@ -135,7 +135,7 @@ public class FunctionalJavaTest extends JavaTest {
 	 * }
 	 * </pre>
 	 */
-	@Test
+	// @Test
 	public void testBlock() {
 		String expression = "{\n";
 		expression += "\tjava.util.ArrayList<Integer> list;\n";
@@ -167,7 +167,7 @@ public class FunctionalJavaTest extends JavaTest {
 	 * Tests A fairly complex expression
 	 * (<code>org.observe.collect.ObservableCollection.create(org.observe.util.TypeTokens.get().STRING,new org.qommons.tree.SortedTreeList&lt;String&gt;(true, org.qommons.QommonsUtils.DISTINCT_NUMBER_TOLERANT))</code>)
 	 */
-	@Test
+	// @Test
 	public void testWow() {
 		String expression = "org.observe.collect.ObservableCollection.create(org.observe.util.TypeTokens.get().STRING,"
 			+ " new org.qommons.tree.SortedTreeList<String>(true, org.qommons.QommonsUtils.DISTINCT_NUMBER_TOLERANT))";
@@ -248,7 +248,7 @@ public class FunctionalJavaTest extends JavaTest {
 	 * 
 	 * @throws IOException If the file cannot be read
 	 */
-	@Test
+	// @Test
 	public void testSimpleJavaFile() throws IOException {
 		testExpressionOnFile("SimpleParseableJavaFile.java", TIMEOUT * 5,
 			new ExpressionTester("SimpleParseableJavaFile").withType("java-file")//
@@ -371,7 +371,7 @@ public class FunctionalJavaTest extends JavaTest {
 	 * 
 	 * @throws IOException If the file cannot be read
 	 */
-	@Test
+	// @Test
 	public void testParseSelf() throws IOException {
 		testExpressionOnFile(getClass().getSimpleName() + ".java", TIMEOUT * 4, //
 			new ExpressionTester(getClass().getSimpleName())//

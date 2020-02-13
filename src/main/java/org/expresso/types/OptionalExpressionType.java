@@ -28,18 +28,64 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound, Expression<S2> highBound)
 		throws IOException {
 		OptionalPossibility<S2> low = (OptionalPossibility<S2>) lowBound;
-		if (low != null && low.theOption.length() == 0)
+		/* TODO For posterity, in case I don't get to come back to this soon, there's an extremely difficult bug here.
+		 * 
+		 * This code is meant to generate a sequence of all the expression space of the component(s), followed by an empty expression. So
+		 * the empty expression is always last, and asking for more content will return null.
+		 * 
+		 * However, this is causing a problem, specifically with the qualified-name expression in Java.  Qualified name is defined like so:
+		 * 	<expression name="qualified-name"...>
+		 * 		<option>
+		 * 			<qualified-name field="target" />
+		 * 			<literal>.</literal>
+		 * 		</option>
+		 * 		<identifier field="name" />
+		 * </expression>
+		 * When the option above is evaluated the first time, it always results in the empty expression, because evaluated qualified-name
+		 * recursively is blocked by the parser.  The idea is that when evaluating the next qualified name in the sequence, the option
+		 * would attempt the parsing again, in which case the cache would return the previously parsed expression (with empty option),
+		 * enabling something like "a.b.c" to be parsed, first as "a", then "a.b", then "a.b.c".
+		 * 
+		 * But since the first option is empty, re-evaluating just gives null, i.e. no more expressions in the sequence.
+		 * 
+		 * One solution I thought of is:
+		 * * To advertise from the parser that the most recent parsing result was only null as a result of a recursive interrupt,
+		 * * then the option could tag its expression with that information,
+		 * * then, when evaluating the next expression in the sequence, the option would see the recursive interrupt flag and attempt
+		 * to re-evaluate.
+		 * 
+		 * This solution is not valid though, for several reasons:
+		 * 1. If the next expression in the sequence is asked for and the cache has not changed, this results in an infinite loop.
+		 * 2. Although I'm first seeing the problem manifest here, all the other composite expressions (one-of, sequence) have the same
+		 * vulnerability, where a parse operation may return null, but really it should be re-evaluated when the cache changes.  Just
+		 * thinking about the code changes to accommodate this change makes me cringe.
+		 * 
+		 * Another possible solution:
+		 * * Every single expression returned from the parser is wrapped by an expression implementation that has some information about
+		 * the cache state of the parser (immediately after parsing, I think) that implemented it.
+		 * * When another element in the sequence returns null, the parser would inspect this cache information to determine if it's
+		 * possible there may have be new elements in the sequence due to new cache entries.  Ideally this should be extremely targeted
+		 * (instead of just a stamp or something) for performance's sake.
+		 * * If the possibility exists, the parser would then return the start of the sequence to try again.
+		 * * An idea that might not be valuable or easy to do is to include further information in expressions from subsequent iterations
+		 * through the sequence so that elements that were encountered before do not need to be returned again.
+		 * 
+		 * TODO At the moment, it seems to me that this is a fundamental problem with the recursive solution that Expresso is intended to be.
+		 * If I can't solve it, this project may be fundamentally broken.
+		 */
+		if (low != null && low.isEmpty())
 			return null;
 		OptionalPossibility<S2> high = (OptionalPossibility<S2>) highBound;
 		Expression<S2> superPossibility = super.parse(parser, //
-			low == null ? null : low.theOption, //
-			(high == null || high.theOption.length() == 0) ? null : high.theOption);
-		if (superPossibility == null) {
-			if (high != null && high.theOption.length() == 0)
+			(low == null || low.isEmpty()) ? null : low.theOption, //
+			(high == null || high.isEmpty()) ? null : high.theOption);
+		boolean empty = superPossibility == null;
+		if (empty) {
+			if (high != null && high.isEmpty())
 				return null;
 			superPossibility = Expression.empty(parser.getStream(), this);
 		}
-		return new OptionalPossibility<>(this, parser, superPossibility);
+		return new OptionalPossibility<>(this, parser, superPossibility, empty);
 	}
 
 	@Override
@@ -69,15 +115,22 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 
 	private static class OptionalPossibility<S extends BranchableStream<?, ?>> extends ComposedExpression<S> {
 		private final Expression<S> theOption;
+		private final boolean isEmpty;
 
-		OptionalPossibility(OptionalExpressionType<? super S> type, ExpressoParser<S> parser, Expression<S> option) {
+		OptionalPossibility(OptionalExpressionType<? super S> type, ExpressoParser<S> parser, Expression<S> option, boolean empty) {
 			super(type, parser, Arrays.asList(option));
 			theOption = option;
+			isEmpty = empty;
 		}
 
 		OptionalPossibility(OptionalPossibility<S> toCopy, List<Expression<S>> children) {
 			super(toCopy, children);
 			theOption = toCopy.theOption.unwrap();
+			isEmpty = toCopy.isEmpty;
+		}
+
+		public boolean isEmpty() {
+			return isEmpty;
 		}
 
 		@Override

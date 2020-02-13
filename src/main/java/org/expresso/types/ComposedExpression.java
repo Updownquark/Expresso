@@ -186,6 +186,12 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 		return copyForChildren(children);
 	}
 
+	/**
+	 * {@link #unwrap()} implementation helper
+	 * 
+	 * @param children The children for the copy
+	 * @return Creates a copy of this expression, but with the given children
+	 */
 	protected abstract Expression<S> copyForChildren(List<Expression<S>> children);
 
 	@Override

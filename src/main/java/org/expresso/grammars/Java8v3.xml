@@ -325,7 +325,7 @@
 	</expression>
 	
 	<!-- Types -->
-	<expression name="identifier">
+	<expression name="identifier" class="complex-content">
 		<pattern field="name">[_a-zA-Z][_a-zA-Z0-9]*</pattern>
 	</expression>
 	<expression name="primitive" class="concrete-type">
@@ -654,7 +654,7 @@
 		</option>
 		<literal>;</literal>
 	</expression>
-	<expression name="java-file">
+	<expression name="java-file" class="complex-content">
 		<option>
 			<literal>package</literal>
 			<sequence field="package">
@@ -672,7 +672,7 @@
 	</expression>
 	
 	<!-- Normal operators -->
-	<expression name="argument-list">
+	<expression name="argument-list" class="complex-content">
 		<option>
 			<result-producer field="argument" enclosed="true" />
 			<repeat>
