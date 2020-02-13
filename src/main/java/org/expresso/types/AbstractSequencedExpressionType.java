@@ -267,9 +267,18 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 			super(type, parser, repetitions);
 		}
 
+		SequencePossibility(SequencePossibility<S> toCopy, List<Expression<S>> children) {
+			super(toCopy, children);
+		}
+
 		@Override
 		public AbstractSequencedExpressionType<? super S> getType() {
 			return (AbstractSequencedExpressionType<? super S>) super.getType();
+		}
+
+		@Override
+		protected Expression<S> copyForChildren(List<Expression<S>> children) {
+			return new SequencePossibility<>(this, children);
 		}
 
 		@Override
@@ -277,27 +286,22 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 			return getType().getErrorForComponents(getChildren(), parser.getQualityLevel());
 		}
 
-		@Override
-		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
-			return getType()//
-				.branch(//
-					new LinkedList<>(getChildren()), parser, true);
-		}
-
-		@Override
-		public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
-			return getType().parse(parser);
-		}
-
-		@Override
-		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
-			return null;
-		}
-
-		@Override
-		public Expression<S> unwrap() {
-			return this;
-		}
+		// @Override
+		// public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+		// return getType()//
+		// .branch(//
+		// new LinkedList<>(getChildren()), parser, true);
+		// }
+		//
+		// @Override
+		// public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+		// return getType().parse(parser);
+		// }
+		//
+		// @Override
+		// public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
+		// return null;
+		// }
 
 		@Override
 		protected boolean shouldPrintErrorInfo() {

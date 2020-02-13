@@ -1,5 +1,6 @@
 package org.expresso.types;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -38,6 +39,25 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 		theChildren = Collections.unmodifiableList(children);
 		theLength = -1;
 		theSelfError = getSelfError(parser);
+	}
+
+	/**
+	 * {@link #unwrap() unwrap} constructor
+	 * 
+	 * @param toCopy The expression to copy
+	 * @param children The children for the expression
+	 */
+	protected ComposedExpression(ComposedExpression<S> toCopy, List<Expression<S>> children) {
+		theType = toCopy.theType;
+		theStream = toCopy.theStream;
+		theChildren = Collections.unmodifiableList(children);
+		theLength = toCopy.theLength;
+		theSelfError = toCopy.theSelfError;
+
+		isQualityComputed = toCopy.isQualityComputed;
+		theFirstError = toCopy.theFirstError == null ? null : toCopy.theFirstError.unwrap();
+		theErrorCount = toCopy.theErrorCount;
+		theQuality = toCopy.theQuality;
 	}
 
 	@Override
@@ -150,8 +170,23 @@ public abstract class ComposedExpression<S extends BranchableStream<?, ?>> imple
 
 	@Override
 	public Expression<S> unwrap() {
-		return this;
+		List<Expression<S>> children = null;
+		for (int i = 0; i < theChildren.size(); i++) {
+			Expression<S> unwrapped = theChildren.get(i).unwrap();
+			if (children != null || unwrapped != theChildren.get(i)) {
+				if (children == null) {
+					children = new ArrayList<>(theChildren.size());
+					children.addAll(theChildren.subList(0, i));
+				}
+				children.add(unwrapped);
+			}
+		}
+		if (children == null)
+			return this;
+		return copyForChildren(children);
 	}
+
+	protected abstract Expression<S> copyForChildren(List<Expression<S>> children);
 
 	@Override
 	public boolean equals(Object o) {

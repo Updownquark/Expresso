@@ -3,6 +3,7 @@ package org.expresso.types;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 
 import org.expresso.BareContentExpressionType;
 import org.expresso.Expression;
@@ -82,27 +83,38 @@ public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends Abst
 			theTerminalPossibility = terminalPossibility;
 		}
 
+		LeadUpPossibility(LeadUpPossibility<S> toCopy, List<Expression<S>> children) {
+			super(toCopy, children);
+			theTerminal = toCopy.theTerminal;
+			theTerminalPossibility = toCopy.theTerminalPossibility.unwrap();
+		}
+
 		@Override
 		public LeadUpExpressionType<? super S> getType() {
 			return (LeadUpExpressionType<? super S>) super.getType();
 		}
 
 		@Override
-		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
-			Expression<S> next = parser.nextMatch(theTerminalPossibility);
-			if (next != null)
-				return new LeadUpPossibility<>(getType(), parser, theTerminal, next);
-			return null;
+		protected Expression<S> copyForChildren(List<Expression<S>> children) {
+			return new LeadUpPossibility<>(this, children);
 		}
-
-		@Override
-		public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
-			return null;
-		}
-
-		@Override
-		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
-			return null;
-		}
+		//
+		// @Override
+		// public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+		// Expression<S> next = parser.nextMatch(theTerminalPossibility);
+		// if (next != null)
+		// return new LeadUpPossibility<>(getType(), parser, theTerminal, next);
+		// return null;
+		// }
+		//
+		// @Override
+		// public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+		// return null;
+		// }
+		//
+		// @Override
+		// public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
+		// return null;
+		// }
 	}
 }

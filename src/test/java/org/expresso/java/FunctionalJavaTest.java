@@ -73,16 +73,26 @@ public class FunctionalJavaTest extends JavaTest {
 				.withField("arguments.argument", arg -> arg.withType("number").withContent("5")));
 	}
 
-	/** Tests a multi-argument static method invocation (list.addAll(java.util.Arrays.asList(1, 2, 3, 4, 5))) */
+	/** Tests a no-argument static method invocation (list.toArray()) */
 	@Test
 	public void testMethod() {
+		testExpression("list.toArray()", //
+			"result-producer", //
+			true, TIMEOUT, new ExpressionTester("method").withType("method")//
+				.withField("target", target -> target.withType("identifier", "qualified-name").withContent("list"))//
+				.withFieldContent("method.name", "toArray"));
+	}
+
+	/** Tests a multi-argument static method invocation (list.addAll(java.util.Arrays.asList(1, 2, 3, 4, 5))) */
+	@Test
+	public void testMethod2() {
 		testExpression("java.util.Arrays.asList(1, 2, 3, 4, 5)", "result-producer", true, TIMEOUT,
-			checkArraysAsList(new ExpressionTester("method")));
+			checkArraysAsList(new ExpressionTester("method2")));
 	}
 
 	private static ExpressionTester checkArraysAsList(ExpressionTester tester) {
 		return tester.withType("method")//
-			.withField("target", "qualified-name", "java.util.Arrays")//
+			.withField("target", target -> target.withType("qualified-name", "field-ref").withContent("java.util.Arrays"))//
 			.withFieldContent("method.name", "asList")//
 			.withFieldContents("method.arguments.argument", "1", "2", "3", "4", "5");
 	}

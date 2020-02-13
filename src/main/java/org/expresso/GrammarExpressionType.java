@@ -2,6 +2,7 @@ package org.expresso;
 
 import org.expresso.stream.BranchableStream;
 import org.qommons.QommonsUtils;
+import org.qommons.collect.BetterList;
 
 /**
  * A top-level expression type (either a {@link ConfiguredExpressionType} or a {@link ExpressionClass}) configured in a
@@ -20,4 +21,6 @@ public interface GrammarExpressionType<S extends BranchableStream<?, ?>> extends
 	default int compareTo(GrammarExpressionType<?> o) {
 		return QommonsUtils.compareNumberTolerant(getName(), o.getName(), true, true);
 	}
+
+	BetterList<? extends GrammarExpressionType<? super S>> getIgnorables();
 }

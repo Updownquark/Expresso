@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.expresso.stream.BranchableStream;
 import org.expresso.types.SequenceExpressionType;
+import org.qommons.collect.BetterList;
 import org.qommons.collect.BetterSortedSet;
 
 /**
@@ -17,6 +18,7 @@ public class ConfiguredExpressionType<S extends BranchableStream<?, ?>> extends 
 	private final String theName;
 	private final int thePriority;
 	private final BetterSortedSet<ExpressionClass<S>> theClasses;
+	private final BetterList<? extends GrammarExpressionType<? super S>> theIgnorables;
 
 	/**
 	 * @param grammar The grammar that this expression type belongs to
@@ -25,14 +27,17 @@ public class ConfiguredExpressionType<S extends BranchableStream<?, ?>> extends 
 	 * @param name The name of the type
 	 * @param classes The classes the type belongs to
 	 * @param components The sequence of components composing this type
+	 * @param ignorables The ignorable expressions that apply to this type
 	 */
 	public ConfiguredExpressionType(ExpressoGrammar<S> grammar, int id, int priority, String name,
-		BetterSortedSet<ExpressionClass<S>> classes, List<ExpressionType<S>> components) {
+		BetterSortedSet<ExpressionClass<S>> classes, List<ExpressionType<S>> components,
+		BetterList<? extends GrammarExpressionType<? super S>> ignorables) {
 		super(id, components);
 		theGrammar = grammar;
 		thePriority = priority;
 		theName = name;
 		theClasses = classes;
+		theIgnorables = ignorables;
 	}
 
 	@Override
@@ -65,6 +70,11 @@ public class ConfiguredExpressionType<S extends BranchableStream<?, ?>> extends 
 				return c;
 		}
 		return null;
+	}
+
+	@Override
+	public BetterList<? extends GrammarExpressionType<? super S>> getIgnorables() {
+		return theIgnorables;
 	}
 
 	@Override

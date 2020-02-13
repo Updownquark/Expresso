@@ -7,7 +7,6 @@ import java.util.Collections;
 import java.util.List;
 
 import org.expresso.Expression;
-import org.expresso.ExpressionClass;
 import org.expresso.ExpressionType;
 import org.expresso.ExpressoParser;
 import org.expresso.stream.BranchableStream;
@@ -18,22 +17,12 @@ import org.expresso.stream.BranchableStream;
  * @param <S> The type of the stream parsed
  */
 public class TrailingIgnorableExpressionType<S extends BranchableStream<?, ?>> extends AbstractExpressionType<S> {
-	private final ExpressionClass<? super S> theIgnorableClass;
 	private final ExpressionType<? super S> theTargetType;
 
-	/**
-	 * @param ignorableClass The ignorable expression class
-	 * @param targetType The target expression type parsed
-	 */
-	public TrailingIgnorableExpressionType(ExpressionClass<? super S> ignorableClass, ExpressionType<? super S> targetType) {
+	/** @param targetType The target expression type parsed */
+	public TrailingIgnorableExpressionType(ExpressionType<? super S> targetType) {
 		super(-1);
-		theIgnorableClass = ignorableClass;
 		theTargetType = targetType;
-	}
-
-	/** @return The ignorable expression class */
-	public ExpressionClass<? super S> getIgnorableClass() {
-		return theIgnorableClass;
 	}
 
 	/** @return The target expression type parsed */
@@ -48,7 +37,7 @@ public class TrailingIgnorableExpressionType<S extends BranchableStream<?, ?>> e
 
 	@Override
 	public List<? extends ExpressionType<? super S>> getComponents() {
-		return Collections.<ExpressionType<? super S>> unmodifiableList(Arrays.asList(theIgnorableClass, theTargetType));
+		return Collections.<ExpressionType<? super S>> unmodifiableList(Arrays.asList(theTargetType));
 	}
 
 	@Override
@@ -72,16 +61,20 @@ public class TrailingIgnorableExpressionType<S extends BranchableStream<?, ?>> e
 		private final List<Expression<S>> theIgnorables;
 
 		/**
-		 * @param ignorableClass The ignorable expression classs
 		 * @param parser The parser that the expression was parsed out of
 		 * @param target The content of the parsed expression
 		 * @param ignorables The trailing ignorables
 		 */
-		public TrailingIgnorableExpression(ExpressionClass<? super S> ignorableClass, ExpressoParser<S> parser, Expression<S> target,
-			List<Expression<S>> ignorables) {
-			super(new TrailingIgnorableExpressionType<>(ignorableClass, target.getType()), parser, buildChildren(target, ignorables));
+		public TrailingIgnorableExpression(ExpressoParser<S> parser, Expression<S> target, List<Expression<S>> ignorables) {
+			super(new TrailingIgnorableExpressionType<>(target.getType()), parser, buildChildren(target, ignorables));
 			theTarget = target;
 			theIgnorables = ignorables;
+		}
+
+		TrailingIgnorableExpression(TrailingIgnorableExpression<S> toCopy, List<Expression<S>> children) {
+			super(toCopy, children);
+			theTarget = children.get(0);
+			theIgnorables = children.subList(1, children.size());
 		}
 
 		private static <S extends BranchableStream<?, ?>> List<Expression<S>> buildChildren(Expression<S> target,
@@ -108,18 +101,23 @@ public class TrailingIgnorableExpressionType<S extends BranchableStream<?, ?>> e
 		}
 
 		@Override
-		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
-			throw new IllegalStateException("This type does not parse itself");
+		protected Expression<S> copyForChildren(List<Expression<S>> children) {
+			return new TrailingIgnorableExpression<>(this, children);
 		}
-
-		@Override
-		public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
-			throw new IllegalStateException("This type does not parse itself");
-		}
-
-		@Override
-		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
-			throw new IllegalStateException("This type does not parse itself");
-		}
+		//
+		// @Override
+		// public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+		// throw new IllegalStateException("This type does not parse itself");
+		// }
+		//
+		// @Override
+		// public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+		// throw new IllegalStateException("This type does not parse itself");
+		// }
+		//
+		// @Override
+		// public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
+		// throw new IllegalStateException("This type does not parse itself");
+		// }
 	}
 }

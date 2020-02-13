@@ -27,6 +27,10 @@ public interface ExpressionType<S extends BranchableStream<?, ?>> extends Compar
 	 */
 	int getEmptyQuality(int minQuality);
 
+	default boolean isEnclosed() {
+		return false;
+	}
+
 	/** @return The component expression types that this type uses */
 	Iterable<? extends ExpressionType<? super S>> getComponents();
 

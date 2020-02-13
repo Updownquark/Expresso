@@ -9,9 +9,9 @@ import java.util.function.Supplier;
 import org.expresso.DefaultGrammarParser;
 import org.expresso.Expression;
 import org.expresso.ExpressionTester;
-import org.expresso.ExpressionType;
 import org.expresso.ExpressoGrammar;
 import org.expresso.ExpressoGrammarParser;
+import org.expresso.GrammarExpressionType;
 import org.expresso.stream.CharSequenceStream;
 import org.junit.Assert;
 import org.qommons.ArrayUtils;
@@ -33,7 +33,7 @@ public abstract class JavaTest {
 	 */
 	public void setupParser() throws IOException {
 		ExpressoGrammarParser<CharSequenceStream> grammarParser = ExpressoGrammarParser.defaultText();
-		theParser = grammarParser.parseGrammar(DefaultGrammarParser.class.getResource("/org/expresso/grammars/Java8.xml"));
+		theParser = grammarParser.parseGrammar(DefaultGrammarParser.class.getResource("/org/expresso/grammars/Java8v3.xml"));
 	}
 
 	@SuppressWarnings("deprecation")
@@ -86,7 +86,7 @@ public abstract class JavaTest {
 
 	private Expression<CharSequenceStream> parse(CharSequenceStream stream, String type, boolean checkForErrors, long time) {
 		return getWithin(() -> {
-			ExpressionType<CharSequenceStream> component = theParser.getExpressionsByName().get(type);
+			GrammarExpressionType<CharSequenceStream> component = theParser.getExpressionsByName().get(type);
 			if (component == null)
 				component = theParser.getExpressionClasses().get(type);
 			if (component == null)

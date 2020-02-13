@@ -23,11 +23,11 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> {
 	 */
 	ExpressoParser<S> advance(int spaces) throws IOException;
 
-	/**
-	 * @param expressionIds The expression type IDs to exclude
-	 * @return A parser for the same place in the stream that will not parse expressions with the given types
-	 */
-	ExpressoParser<S> exclude(int... expressionIds);
+	// /**
+	// * @param expressionIds The expression type IDs to exclude
+	// * @return A parser for the same place in the stream that will not parse expressions with the given types
+	// */
+	// ExpressoParser<S> exclude(int... expressionIds);
 
 	/**
 	 * @param type The expression type to parse with
@@ -36,24 +36,24 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> {
 	 */
 	Expression<S> parseWith(ExpressionType<? super S> type, Expression<S> lowBound, Expression<S> highBound) throws IOException;
 
-	/**
-	 * @param expression The expression to branch
-	 * @return Another interpretation of the stream by the expresssion's type
-	 * @throws IOException If an error occurs reading the stream
-	 */
-	Expression<S> nextMatch(Expression<S> expression) throws IOException;
-
-	/**
-	 * @param expression The expression to branch with high priority
-	 * @return Another interpretation of the stream by the expresssion's type
-	 * @throws IOException If an error occurs reading the stream
-	 */
-	Expression<S> nextMatchHighPriority(Expression<S> expression) throws IOException;
-
-	/**
-	 * @param expression The expression to branch with lower priority
-	 * @return Another interpretation of the stream by the expresssion's type
-	 * @throws IOException If an error occurs reading the stream
-	 */
-	Expression<S> nextMatchLowPriority(Expression<S> expression, Expression<S> limit) throws IOException;
+	// /**
+	// * @param expression The expression to branch
+	// * @return Another interpretation of the stream by the expresssion's type
+	// * @throws IOException If an error occurs reading the stream
+	// */
+	// Expression<S> nextMatch(Expression<S> expression) throws IOException;
+	//
+	// /**
+	// * @param expression The expression to branch with high priority
+	// * @return Another interpretation of the stream by the expresssion's type
+	// * @throws IOException If an error occurs reading the stream
+	// */
+	// Expression<S> nextMatchHighPriority(Expression<S> expression) throws IOException;
+	//
+	// /**
+	// * @param expression The expression to branch with lower priority
+	// * @return Another interpretation of the stream by the expresssion's type
+	// * @throws IOException If an error occurs reading the stream
+	// */
+	// Expression<S> nextMatchLowPriority(Expression<S> expression, Expression<S> limit) throws IOException;
 }

@@ -62,12 +62,38 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 	@Override
 	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound, Expression<S2> highBound)
 		throws IOException {
-		if (lowBound != null || highBound != null)
+		if (highBound != null) {
+			if (!LOOK_FOR_SHORTER_PATTERNS)
+				return null;
+			int length = highBound.length();
+			if (lowBound != null && length < lowBound.length() + 1)
+				return null;
+			if (length < 1)
+				return null;
+			CharSequence subSequence = parser.getStream().subSequence(0, length - 1);
+			Matcher matcher = getPattern().matcher(subSequence);
+			TextPatternPossibility<S2> possibility = new TextPatternPossibility<>(this, parser, matcher);
+			if (possibility.getMatchQuality() >= parser.getQualityLevel())
+				return possibility;
 			return null;
-		TextPatternPossibility<S2> possibility = new TextPatternPossibility<>(this, parser);
-		if (possibility.getMatchQuality() >= parser.getQualityLevel())
-			return possibility;
-		return null;
+		} else if (lowBound != null) {
+			if (!LOOK_FOR_SHORTER_PATTERNS)
+				return null;
+			int length = lowBound.length();
+			if (parser.getStream().discoverTo(length + 1) <= length)
+				return null;
+			CharSequence subSequence = parser.getStream().subSequence(0, length + 1);
+			Matcher matcher = getPattern().matcher(subSequence);
+			TextPatternPossibility<S2> possibility = new TextPatternPossibility<>(this, parser, matcher);
+			if (possibility.getMatchQuality() >= parser.getQualityLevel())
+				return possibility;
+			return null;
+		} else {
+			TextPatternPossibility<S2> possibility = new TextPatternPossibility<>(this, parser);
+			if (possibility.getMatchQuality() >= parser.getQualityLevel())
+				return possibility;
+			return null;
+		}
 	}
 
 	@Override
@@ -98,18 +124,24 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 		private final TextPatternExpressionType<? super S> theType;
 		private final ExpressoParser<S> theParser;
 		private final Matcher theMatcher;
+		private final boolean isMatch;
+		private final int theLength;
 
 		private TextPatternPossibility(TextPatternExpressionType<? super S> type, ExpressoParser<S> parser) throws IOException {
 			theType = type;
 			theParser = parser;
 			parser.getStream().discoverTo(theType.getMaxLength());
 			theMatcher = theType.getPattern().matcher(parser.getStream());
+			isMatch = theMatcher.lookingAt();
+			theLength = isMatch ? theMatcher.end() : 0;
 		}
 
 		TextPatternPossibility(TextPatternExpressionType<? super S> type, ExpressoParser<S> parser, Matcher matcher) throws IOException {
 			theType = type;
 			theParser = parser;
 			theMatcher = matcher;
+			isMatch = theMatcher.lookingAt();
+			theLength = isMatch ? theMatcher.end() : 0;
 		}
 
 		@Override
@@ -124,7 +156,7 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 
 		@Override
 		public int length() {
-			return theMatcher.lookingAt() ? theMatcher.end() : 0;
+			return theLength;
 		}
 
 		@Override
@@ -132,54 +164,54 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 			return Collections.emptyList();
 		}
 
-		@Override
-		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
-			if (!LOOK_FOR_SHORTER_PATTERNS)
-				return null;
-			int length = length();
-			if (length < 1)
-				return null;
-			CharSequence subSequence = theParser.getStream().subSequence(0, length - 1);
-			Matcher matcher = theType.getPattern().matcher(subSequence);
-			TextPatternPossibility<S> possibility = new TextPatternPossibility<>(theType, theParser, matcher);
-			if (possibility.getMatchQuality() >= theParser.getQualityLevel())
-				return possibility;
-			return null;
-		}
-
-		@Override
-		public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
-			return null;
-		}
-
-		@Override
-		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
-			return null;
-		}
+		// @Override
+		// public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+		// if (!LOOK_FOR_SHORTER_PATTERNS)
+		// return null;
+		// int length = length();
+		// if (length < 1)
+		// return null;
+		// CharSequence subSequence = theParser.getStream().subSequence(0, length - 1);
+		// Matcher matcher = theType.getPattern().matcher(subSequence);
+		// TextPatternPossibility<S> possibility = new TextPatternPossibility<>(theType, theParser, matcher);
+		// if (possibility.getMatchQuality() >= theParser.getQualityLevel())
+		// return possibility;
+		// return null;
+		// }
+		//
+		// @Override
+		// public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+		// return null;
+		// }
+		//
+		// @Override
+		// public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
+		// return null;
+		// }
 
 		@Override
 		public int getErrorCount() {
-			return theMatcher.lookingAt() ? 0 : 1;
+			return isMatch ? 0 : 1;
 		}
 
 		@Override
 		public Expression<S> getFirstError() {
-			return theMatcher.lookingAt() ? null : this;
+			return isMatch ? null : this;
 		}
 
 		@Override
 		public int getLocalErrorRelativePosition() {
-			return theMatcher.lookingAt() ? -5 : 0;
+			return isMatch ? -5 : 0;
 		}
 
 		@Override
 		public String getLocalErrorMessage() {
-			return theMatcher.lookingAt() ? null : "Text matching " + getType().getPattern() + " expected";
+			return isMatch ? null : "Text matching " + getType().getPattern() + " expected";
 		}
 
 		@Override
 		public int getMatchQuality() {
-			return theMatcher.lookingAt() ? 0 : -2;
+			return isMatch ? 0 : -2;
 		}
 
 		@Override
@@ -207,7 +239,7 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 			for (int i = 0; i < indent; i++)
 				str.append('\t');
 			str.append(theType).append(metadata);
-			if (theMatcher.lookingAt()) {
+			if (isMatch) {
 				str.append(": ");
 				theParser.getStream().printContent(0, theMatcher.end(), str);
 			} else

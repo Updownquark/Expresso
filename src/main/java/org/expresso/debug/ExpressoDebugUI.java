@@ -29,7 +29,7 @@ import javax.swing.tree.TreePath;
 
 import org.expresso.BareContentExpressionType;
 import org.expresso.Expression;
-import org.expresso.ExpressionFieldType;
+import org.expresso.ComponentExpressionType;
 import org.expresso.ExpressionType;
 import org.expresso.ExpressoGrammar;
 import org.expresso.GrammarExpressionType;
@@ -158,15 +158,15 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 		public String toString() {
 			if (theExpressionType instanceof BareContentExpressionType || theExpressionType instanceof GrammarExpressionType)
 				return theExpressionType.toString();
-			else if (theExpressionType instanceof ExpressionFieldType)
-				return "Field " + ((ExpressionFieldType<?>) theExpressionType).getFields();
+			else if (theExpressionType instanceof ComponentExpressionType)
+				return "Field " + ((ComponentExpressionType<?>) theExpressionType).getFields();
 			String name = theExpressionType.getClass().getSimpleName();
 			if (name.endsWith("Type")) {
 				name = name.substring(0, name.length() - 4);
 				if (name.endsWith("Expression"))
 					name = name.substring(0, name.length() - 10);
-				if (theExpressionType instanceof ExpressionFieldType)
-					name += " " + ((ExpressionFieldType<?>) theExpressionType).getFields();
+				if (theExpressionType instanceof ComponentExpressionType)
+					name += " " + ((ComponentExpressionType<?>) theExpressionType).getFields();
 			}
 			return name;
 		}

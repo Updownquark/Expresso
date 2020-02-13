@@ -1,6 +1,5 @@
 package org.expresso;
 
-import java.io.IOException;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
@@ -32,7 +31,7 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 	 * @param fields The nested fields to get
 	 * @return A list with all expressions matching the given field path
 	 */
-	default BetterList<ExpressionField<S>> getField(String... fields) {
+	default BetterList<ComponentExpression<S>> getField(String... fields) {
 		if (fields.length == 0)
 			throw new IllegalArgumentException("Fields expected");
 		BetterList<Expression<S>> result = new BetterTreeList<>(false);
@@ -49,7 +48,7 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 			lastFieldResult = temp;
 			result.clear();
 			for (Expression<S> lfr : lastFieldResult) {
-				if (lfr instanceof ExpressionField) {
+				if (lfr instanceof ComponentExpression) {
 					for (Expression<S> child : lfr.getChildren()) {
 						if (!FieldSearcher.findFields(child, field, result) && optional)
 							result.add(lfr);
@@ -62,7 +61,7 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 			if (result.isEmpty()) {
 				for (Expression<S> lfr : lastFieldResult) {
 					boolean found = false;
-					if (lfr instanceof ExpressionField) {
+					if (lfr instanceof ComponentExpression) {
 						for (Expression<S> child : lfr.getChildren()) {
 							found |= FieldSearcher.findFields(child.getType(), field);
 							if (found)
@@ -75,7 +74,7 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 				}
 			}
 		}
-		return (BetterList<ExpressionField<S>>) (Deque<?>) result;
+		return (BetterList<ComponentExpression<S>>) (Deque<?>) result;
 	}
 
 	/**
@@ -119,30 +118,30 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 	/** @return An expression equivalent to this with possibly condensed structure */
 	Expression<S> unwrap();
 
-	/**
-	 * @param parser The parser parsing the expression
-	 * @return Another interpretation of the stream by this expresssion's type
-	 * @throws IOException If an error occurs reading the stream
-	 */
-	Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException;
+	// /**
+	// * @param parser The parser parsing the expression
+	// * @return Another interpretation of the stream by this expresssion's type
+	// * @throws IOException If an error occurs reading the stream
+	// */
+	// Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException;
 
-	/**
-	 * Allows another branch of matches
-	 * 
-	 * @param parser The parser parsing the expression
-	 * @return Another interpretation of the stream by this expresssion's type
-	 * @throws IOException If an error occurs reading the stream
-	 */
-	Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException;
-
-	/**
-	 * Allows another branch of matches
-	 * 
-	 * @param parser The parser parsing the expression
-	 * @return Another interpretation of the stream by this expresssion's type
-	 * @throws IOException If an error occurs reading the stream
-	 */
-	Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException;
+	// /**
+	// * Allows another branch of matches
+	// *
+	// * @param parser The parser parsing the expression
+	// * @return Another interpretation of the stream by this expresssion's type
+	// * @throws IOException If an error occurs reading the stream
+	// */
+	// Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException;
+	//
+	// /**
+	// * Allows another branch of matches
+	// *
+	// * @param parser The parser parsing the expression
+	// * @return Another interpretation of the stream by this expresssion's type
+	// * @throws IOException If an error occurs reading the stream
+	// */
+	// Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException;
 
 	/**
 	 * @return A measure of how certain this expression's {@link #getType() type} is that this expression accurately represents the intent
@@ -232,20 +231,20 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 				return Collections.emptyList();
 			}
 
-			@Override
-			public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
-				return null;
-			}
-
-			@Override
-			public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
-				return null;
-			}
-
-			@Override
-			public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
-				return null;
-			}
+			// @Override
+			// public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+			// return null;
+			// }
+			//
+			// @Override
+			// public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+			// return null;
+			// }
+			//
+			// @Override
+			// public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
+			// return null;
+			// }
 
 			@Override
 			public int getErrorCount() {
@@ -306,8 +305,8 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 	public static class FieldSearcher {
 		static <S extends BranchableStream<?, ?>> boolean findFields(Expression<S> expr, String field, Deque<Expression<S>> results) {
 			boolean found;
-			if (expr instanceof ExpressionField) {
-				found = ((ExpressionField<S>) expr).getType().getFields().contains(field);
+			if (expr instanceof ComponentExpression) {
+				found = ((ComponentExpression<S>) expr).getType().getFields().contains(field);
 				if (found)
 					results.add(expr);
 				return found;
@@ -320,8 +319,8 @@ public interface Expression<S extends BranchableStream<?, ?>> extends Comparable
 
 		static boolean findFields(ExpressionType<?> expr, String field) {
 			boolean found;
-			if (expr instanceof ExpressionFieldType)
-				return ((ExpressionFieldType<?>) expr).getFields().contains(field);
+			if (expr instanceof ComponentExpressionType)
+				return ((ComponentExpressionType<?>) expr).getFields().contains(field);
 			found = false;
 			ExpressionType<?> lastChild = null;
 			for (ExpressionType<?> child : expr.getComponents()) {

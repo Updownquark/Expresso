@@ -144,14 +144,14 @@ public class ExpressionTester {
 			theContentTest.accept(expression.printContent(false).trim());
 		if (theFieldTests != null) {
 			for (Map.Entry<List<String>, ExpressionFieldsTester> field : theFieldTests.entrySet()) {
-				BetterList<? extends ExpressionField<?>> fieldExs = expression.getField(//
+				BetterList<? extends ComponentExpression<?>> fieldExs = expression.getField(//
 					field.getKey().toArray(new String[field.getKey().size()]));
 				test(field.getValue().expressions.size() == fieldExs.size(), () -> theName + ": Expected "
 					+ field.getValue().expressions.size() + " " + field.getKey() + " fields, but found " + fieldExs.size());
-				Iterator<? extends ExpressionField<?>> exIter = fieldExs.iterator();
+				Iterator<? extends ComponentExpression<?>> exIter = fieldExs.iterator();
 				Iterator<ExpressionTester> mockIter = field.getValue().expressions.iterator();
 				while (exIter.hasNext())
-					mockIter.next().test(exIter.next().unwrap());
+					mockIter.next().test(exIter.next().unwrapFully());
 			}
 		}
 	}

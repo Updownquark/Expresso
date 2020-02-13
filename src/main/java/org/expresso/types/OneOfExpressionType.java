@@ -132,44 +132,44 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 			return Arrays.asList(theComponent);
 		}
 
-		@Override
-		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
-			Expression<S> next = parser.nextMatch(theComponent);
-			if (next != null)
-				return new OneOfPossibility<>(theType, next, theComponentId);
-			return null;
-		}
-
-		@Override
-		public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
-			CollectionElement<? extends ExpressionType<? super S>> component = theType.getComponents().getTerminalElement(true);
-			while (true) {
-				Expression<S> result = parser.parseWith(component.get());
-				if (result != null)
-					return new OneOfPossibility<>(theType, result, component.getElementId());
-				if (component.getElementId().equals(theComponentId))
-					break;
-				else
-					component = theType.getComponents().getAdjacentElement(component.getElementId(), true);
-			}
-			return null;
-		}
-
-		@Override
-		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
-			CollectionElement<? extends ExpressionType<? super S>> component = theType.getComponents().getAdjacentElement(theComponentId,
-				true);
-			while (component != null) {
-				Expression<S> result = parser.parseWith(component.get());
-				if (result != null)
-					return new OneOfPossibility<>(theType, result, component.getElementId());
-				if (limit != null && component.getElementId().equals(((OneOfPossibility<S>) limit).theComponentId))
-					break;
-				else
-					component = theType.getComponents().getAdjacentElement(component.getElementId(), true);
-			}
-			return null;
-		}
+		// @Override
+		// public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+		// Expression<S> next = parser.nextMatch(theComponent);
+		// if (next != null)
+		// return new OneOfPossibility<>(theType, next, theComponentId);
+		// return null;
+		// }
+		//
+		// @Override
+		// public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+		// CollectionElement<? extends ExpressionType<? super S>> component = theType.getComponents().getTerminalElement(true);
+		// while (true) {
+		// Expression<S> result = parser.parseWith(component.get());
+		// if (result != null)
+		// return new OneOfPossibility<>(theType, result, component.getElementId());
+		// if (component.getElementId().equals(theComponentId))
+		// break;
+		// else
+		// component = theType.getComponents().getAdjacentElement(component.getElementId(), true);
+		// }
+		// return null;
+		// }
+		//
+		// @Override
+		// public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
+		// CollectionElement<? extends ExpressionType<? super S>> component = theType.getComponents().getAdjacentElement(theComponentId,
+		// true);
+		// while (component != null) {
+		// Expression<S> result = parser.parseWith(component.get());
+		// if (result != null)
+		// return new OneOfPossibility<>(theType, result, component.getElementId());
+		// if (limit != null && component.getElementId().equals(((OneOfPossibility<S>) limit).theComponentId))
+		// break;
+		// else
+		// component = theType.getComponents().getAdjacentElement(component.getElementId(), true);
+		// }
+		// return null;
+		// }
 
 		@Override
 		public int getErrorCount() {

@@ -75,30 +75,40 @@ public class OptionalExpressionType<S extends BranchableStream<?, ?>> extends Se
 			theOption = option;
 		}
 
+		OptionalPossibility(OptionalPossibility<S> toCopy, List<Expression<S>> children) {
+			super(toCopy, children);
+			theOption = toCopy.theOption.unwrap();
+		}
+
 		@Override
 		public OptionalExpressionType<? super S> getType() {
 			return (OptionalExpressionType<? super S>) super.getType();
 		}
 
 		@Override
-		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
-			Expression<S> optionNext = parser.nextMatch(theOption);
-			if (optionNext != null)
-				return new OptionalPossibility<>(getType(), parser, optionNext);
-			if (theOption.length() > 0)
-				new OptionalPossibility<>(getType(), parser, Expression.empty(parser.getStream(), theOption.getType()));
-			return null;
+		protected Expression<S> copyForChildren(List<Expression<S>> children) {
+			return new OptionalPossibility<>(this, children);
 		}
 
-		@Override
-		public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
-			return null;
-		}
-
-		@Override
-		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
-			return null;
-		}
+		// @Override
+		// public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+		// Expression<S> optionNext = parser.nextMatch(theOption);
+		// if (optionNext != null)
+		// return new OptionalPossibility<>(getType(), parser, optionNext);
+		// if (theOption.length() > 0)
+		// new OptionalPossibility<>(getType(), parser, Expression.empty(parser.getStream(), theOption.getType()));
+		// return null;
+		// }
+		//
+		// @Override
+		// public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+		// return null;
+		// }
+		//
+		// @Override
+		// public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
+		// return null;
+		// }
 
 		@Override
 		public StringBuilder print(StringBuilder str, int indent, String metadata) {

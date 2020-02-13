@@ -6,16 +6,17 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import org.expresso.*;
+import org.expresso.ConfiguredExpressionType;
+import org.expresso.Expression;
+import org.expresso.ExpressionType;
+import org.expresso.ExpressoGrammar;
+import org.expresso.ExpressoParser;
+import org.expresso.GrammarExpressionType;
 import org.expresso.debug.ExpressoDebugUI;
 import org.expresso.debug.ExpressoDebugger;
-import org.expresso.impl.ExpressoParserImpl.ComponentRecursiveInterrupt;
 import org.expresso.stream.BranchableStream;
-import org.expresso.types.SequenceExpressionType;
 import org.expresso.types.TrailingIgnorableExpressionType;
 import org.qommons.BreakpointHere;
-import org.qommons.collect.*;
-import org.qommons.tree.BetterTreeSet;
 
 /**
  * Does the work of parsing a stream
@@ -26,11 +27,12 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 	private static final boolean DEBUG_UI = true;
 
 	private final ExpressoGrammar<? super S> theGrammar;
-	private final Map<ExpressoParserImpl.Template, ExpressoParserImpl<S>> theParsers;
-	private final Map<Integer, BetterSet<ComponentRecursiveInterrupt<S>>> theStacks;
-	private final Map<Integer, Boolean> theRecursiveCache;
-	private final BetterSet<Integer> theRecursiveVisited;
-	private final BetterSortedSet<Integer> theStackPriorities;
+	private final Map<Integer, ExpressoParser<S>> theParsers;
+	// private final Map<Integer, BetterSet<ComponentRecursiveInterrupt<S>>> theStacks;
+	// private final Map<Integer, Boolean> theRecursiveCache;
+	// private final BetterSet<Integer> theRecursiveVisited;
+	private final LinkedList<ExpressionType<? super S>> theStack;
+	private final LinkedList<Integer> thePriorityStack;
 	private ExpressoDebugger theDebugger;
 	private int theQualityLevel;
 
@@ -38,10 +40,11 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 	public ParseSession(ExpressoGrammar<? super S> grammar) {
 		theGrammar = grammar;
 		theParsers = new HashMap<>();
-		theStacks = new HashMap<>();
-		theRecursiveCache = new HashMap<>();
-		theRecursiveVisited = BetterHashSet.build().unsafe().buildSet();
-		theStackPriorities = new BetterTreeSet<>(false, Integer::compareTo);
+		// theStacks = new HashMap<>();
+		// theRecursiveCache = new HashMap<>();
+		// theRecursiveVisited = BetterHashSet.build().unsafe().buildSet();
+		theStack = new LinkedList<>();
+		thePriorityStack = new LinkedList<>();
 
 		if (DEBUG_UI && BreakpointHere.isDebugEnabled() != null) {
 			ExpressoDebugUI debugger = new ExpressoDebugUI();
@@ -56,10 +59,6 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 		return theQualityLevel;
 	}
 
-	public BetterSortedSet<Integer> getPriorities() {
-		return theStackPriorities;
-	}
-
 	/**
 	 * @param stream The stream whose content to parse
 	 * @param component The root component with which to parse the stream
@@ -67,12 +66,11 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 	 * @return The best interpretation of the stream content
 	 * @throws IOException If an error occurs reading the stream data
 	 */
-	public Expression<S> parse(S stream, ExpressionType<? super S> component, int minQuality) throws IOException {
+	public Expression<S> parse(S stream, GrammarExpressionType<? super S> component, int minQuality) throws IOException {
 		theDebugger.init(theGrammar, stream, component);
 		theQualityLevel = 0;
 		Expression<S> best = null;
-		ExpressoParser<S> parser = getParser(stream, 0, new int[0]);
-		ExpressionClass<? super S> ignorable = theGrammar.getExpressionClasses().get(DefaultGrammarParser.IGNORABLE);
+		ExpressoParser<S> parser = getParser(stream, 0);
 		roundLoop: for (int round = 1; round < 10; round++) {
 			Expression<S> match = parser.parseWith(component, null, null);
 			for (; match != null; match = parser.parseWith(component, match, null)) {
@@ -82,15 +80,23 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 					if (!stream.isFullyDiscovered() || best.length() < stream.getDiscoveredLength()) {
 						// Account for trailing ignorables
 						ExpressoParser<S> ignoreParser = parser.advance(best.length());
-						Expression<S> ignoreExp = ignoreParser.parseWith(ignorable, null, null);
-						if (ignoreExp != null) {
-							List<Expression<S>> ignorables = new LinkedList<>();
-							do {
-								ignorables.add(ignoreExp);
-								ignoreParser = ignoreParser.advance(ignoreExp.length());
-								ignoreExp = ignoreParser.parseWith(ignorable, null, null);
-							} while (ignoreExp != null);
-							best = new TrailingIgnorableExpressionType.TrailingIgnorableExpression<>(ignorable, parser, best, ignorables);
+						Expression<S> ignoreExp;
+						List<Expression<S>> ignorables = null;
+						do {
+							ignoreExp = null;
+							for (GrammarExpressionType<? super S> ig : component.getIgnorables()) {
+								ignoreExp = ignoreParser.parseWith(ig, null, null);
+								if (ignoreExp != null) {
+									if (ignorables == null)
+										ignorables = new LinkedList<>();
+									ignorables.add(ignoreExp);
+									ignoreParser = ignoreParser.advance(ignoreExp.length());
+									break;
+								}
+							}
+						} while (ignoreExp != null);
+						if (ignorables != null) {
+							best = new TrailingIgnorableExpressionType.TrailingIgnorableExpression<>(parser, best, ignorables);
 						}
 					}
 
@@ -100,7 +106,7 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 			}
 			// Clear the cache between rounds
 			theParsers.clear();
-			theRecursiveCache.clear();
+			// theRecursiveCache.clear();
 
 			theQualityLevel--;
 			if (theQualityLevel < minQuality)
@@ -138,68 +144,86 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 			theDebugger = ExpressoDebugger.IDLE;
 	}
 
-	/**
-	 * @param type The component to test
-	 * @return If the component could possibly use itself as a component
-	 */
-	@SuppressWarnings("unused")
-	private boolean isRecursive(ExpressionType<?> type) {
-		if (!cacheRecursive(type))
-			return false;
-		return theRecursiveCache.computeIfAbsent(type.getId(), //
-			id -> isRecursive(type, type, theQualityLevel, true));
+	boolean push(ExpressionType<? super S> type) {
+		if (type.isEnclosed())
+			thePriorityStack.add(0);
+		else if (type instanceof ConfiguredExpressionType) {
+			Integer priority = thePriorityStack.peekLast();
+			ConfiguredExpressionType<? super S> configured = (ConfiguredExpressionType<? super S>) type;
+			if (priority != null && configured.getPriority() >= 0 && configured.getPriority() < priority)
+				return false;
+			thePriorityStack.add(configured.getPriority());
+		}
+		theStack.add(type);
+		return true;
 	}
 
-	private boolean isRecursive(ExpressionType<?> toSearch, ExpressionType<?> target, int minQuality, boolean topLevel) {
-		if (!topLevel && (toSearch == target || Boolean.TRUE.equals(theRecursiveCache.get(toSearch.getId()))))
-			return true;
-		ElementId added = null;
-		if (toSearch.getId() >= 0) {
-			added = CollectionElement.getElementId(theRecursiveVisited.addElement(toSearch.getId(), false));
-			if (added == null)
-				return false; // Found a loop, but not with the expression type we're searching for
-		}
-		try {
-			ExpressionType<?> prevChild = null;
-			for (ExpressionType<?> child : toSearch.getComponents()) {
-				if (prevChild == child)
-					return false;
-				prevChild = child;
-				if (isRecursive(child, target, minQuality, false)) {
-					return true;
-				} else {
-					if (toSearch instanceof SequenceExpressionType) {
-						minQuality -= child.getEmptyQuality(minQuality);
-						if (minQuality > 0)
-							break;
-					}
-				}
-			}
-			return false;
-		} finally {
-			if (added != null)
-				theRecursiveVisited.mutableElement(added).remove();
-		}
+	void pop() {
+		ExpressionType<? super S> popped = theStack.removeLast();
+		if (popped.isEnclosed() || popped instanceof ConfiguredExpressionType)
+			thePriorityStack.removeLast();
 	}
 
-	private static boolean cacheRecursive(ExpressionType<?> type) {
-		return type.getId() >= 0 || type instanceof GrammarExpressionType;
-	}
+	// /**
+	// * @param type The component to test
+	// * @return If the component could possibly use itself as a component
+	// */
+	// @SuppressWarnings("unused")
+	// private boolean isRecursive(ExpressionType<?> type) {
+	// if (!cacheRecursive(type))
+	// return false;
+	// return theRecursiveCache.computeIfAbsent(type.getId(), //
+	// id -> isRecursive(type, type, theQualityLevel, true));
+	// }
+	//
+	// private boolean isRecursive(ExpressionType<?> toSearch, ExpressionType<?> target, int minQuality, boolean topLevel) {
+	// if (!topLevel && (toSearch == target || Boolean.TRUE.equals(theRecursiveCache.get(toSearch.getId()))))
+	// return true;
+	// ElementId added = null;
+	// if (toSearch.getId() >= 0) {
+	// added = CollectionElement.getElementId(theRecursiveVisited.addElement(toSearch.getId(), false));
+	// if (added == null)
+	// return false; // Found a loop, but not with the expression type we're searching for
+	// }
+	// try {
+	// ExpressionType<?> prevChild = null;
+	// for (ExpressionType<?> child : toSearch.getComponents()) {
+	// if (prevChild == child)
+	// return false;
+	// prevChild = child;
+	// if (isRecursive(child, target, minQuality, false)) {
+	// return true;
+	// } else {
+	// if (toSearch instanceof SequenceExpressionType) {
+	// minQuality -= child.getEmptyQuality(minQuality);
+	// if (minQuality > 0)
+	// break;
+	// }
+	// }
+	// }
+	// return false;
+	// } finally {
+	// if (added != null)
+	// theRecursiveVisited.mutableElement(added).remove();
+	// }
+	// }
+	//
+	// private static boolean cacheRecursive(ExpressionType<?> type) {
+	// return type.getId() >= 0 || type instanceof GrammarExpressionType;
+	// }
 
 	private static boolean isSatisfied(Expression<?> best, BranchableStream<?, ?> stream) {
 		return stream.isFullyDiscovered() && best.length() == stream.getDiscoveredLength();
 	}
 
-	ExpressoParser<S> getParser(S stream, int advance, int[] excludedTypes) throws IOException {
+	ExpressoParser<S> getParser(S stream, int advance) throws IOException {
 		if (!stream.hasMoreData(advance))
 			return null;
 		int streamPosition = stream.getPosition() + advance;
-		ExpressoParserImpl.Template key = new ExpressoParserImpl.Template(streamPosition, excludedTypes);
-		ExpressoParserImpl<S> parser = theParsers.get(key);
+		ExpressoParser<S> parser = theParsers.get(streamPosition);
 		if (parser == null) {
-			parser = new ExpressoParserImpl<>(this, (S) stream.advance(advance), excludedTypes, //
-				theStacks.computeIfAbsent(streamPosition, s -> BetterHashSet.build().unsafe().buildSet()));
-			theParsers.put(key, parser);
+			parser = new ExpressoParserImpl2<>(this, (S) stream.advance(advance));
+			theParsers.put(streamPosition, parser);
 		}
 		return parser;
 	}

@@ -3,6 +3,7 @@ package org.expresso.types;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 
 import org.expresso.Expression;
 import org.expresso.ExpressionType;
@@ -81,31 +82,41 @@ public class ForbidExpressionType<S extends BranchableStream<?, ?>> extends Abst
 			theForbidden = forbidden;
 		}
 
+		public ForbiddenPossibility(ForbiddenPossibility<S> toCopy, List<Expression<S>> children) {
+			super(toCopy, children);
+			theForbidden = toCopy.theForbidden.unwrap();
+		}
+
 		@Override
 		public ForbidExpressionType<? super S> getType() {
 			return (ForbidExpressionType<? super S>) super.getType();
 		}
 
 		@Override
-		public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
-			Expression<S> fMatch = parser.nextMatch(theForbidden);
-			if (fMatch == null)
-				return null;
-			ForbiddenPossibility<S> next = new ForbiddenPossibility<>(getType(), parser, fMatch);
-			if (next.getMatchQuality() >= parser.getQualityLevel())
-				return next;
-			return null;
+		protected Expression<S> copyForChildren(List<Expression<S>> children) {
+			return new ForbiddenPossibility<>(this, children);
 		}
 
-		@Override
-		public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
-			return null;
-		}
-
-		@Override
-		public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
-			return null;
-		}
+		// @Override
+		// public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+		// Expression<S> fMatch = parser.nextMatch(theForbidden);
+		// if (fMatch == null)
+		// return null;
+		// ForbiddenPossibility<S> next = new ForbiddenPossibility<>(getType(), parser, fMatch);
+		// if (next.getMatchQuality() >= parser.getQualityLevel())
+		// return next;
+		// return null;
+		// }
+		//
+		// @Override
+		// public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+		// return null;
+		// }
+		//
+		// @Override
+		// public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
+		// return null;
+		// }
 
 		@Override
 		protected CompositionError getSelfError(ExpressoParser<S> parser) {

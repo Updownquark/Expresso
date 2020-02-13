@@ -69,7 +69,7 @@ public class ExpressoGrammar<S extends BranchableStream<?, ?>> {
 	 * @return The parsed expression
 	 * @throws IOException If an error occurs parsing the stream
 	 */
-	public <SS extends S> Expression<SS> parse(SS stream, ExpressionType<S> type, int minQuality) throws IOException {
+	public <SS extends S> Expression<SS> parse(SS stream, GrammarExpressionType<S> type, int minQuality) throws IOException {
 		return new ParseSession<SS>(this).parse(stream, type, minQuality);
 	}
 }

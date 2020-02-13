@@ -1,6 +1,5 @@
 package org.expresso;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -12,21 +11,21 @@ import org.expresso.stream.BranchableStream;
  *
  * @param <S> The type of this expression's stream
  */
-public class ExpressionField<S extends BranchableStream<?, ?>> implements Expression<S> {
-	private final ExpressionFieldType<? super S> theType;
+public class ComponentExpression<S extends BranchableStream<?, ?>> implements Expression<S> {
+	private final ComponentExpressionType<? super S> theType;
 	private final Expression<S> theWrapped;
 
 	/**
 	 * @param type The field type
 	 * @param wrapped The wrapped expression
 	 */
-	public ExpressionField(ExpressionFieldType<? super S> type, Expression<S> wrapped) {
+	public ComponentExpression(ComponentExpressionType<? super S> type, Expression<S> wrapped) {
 		theType = type;
 		theWrapped = wrapped;
 	}
 
 	@Override
-	public ExpressionFieldType<? super S> getType() {
+	public ComponentExpressionType<? super S> getType() {
 		return theType;
 	}
 
@@ -70,32 +69,32 @@ public class ExpressionField<S extends BranchableStream<?, ?>> implements Expres
 		return getWrapped().length();
 	}
 
-	@Override
-	public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
-		Expression<S> wrapFork = parser.nextMatch(getWrapped());
-		if (wrapFork == null)
-			return null;
-		else
-			return new ExpressionField<>(getType(), wrapFork);
-	}
+	// @Override
+	// public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
+	// Expression<S> wrapFork = parser.nextMatch(getWrapped());
+	// if (wrapFork == null)
+	// return null;
+	// else
+	// return new ExpressionField<>(getType(), wrapFork);
+	// }
 
-	@Override
-	public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
-		Expression<S> wrapFork = parser.nextMatchHighPriority(getWrapped());
-		if (wrapFork == null)
-			return null;
-		else
-			return new ExpressionField<>(getType(), wrapFork);
-	}
-
-	@Override
-	public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
-		Expression<S> wrapFork = parser.nextMatchLowPriority(getWrapped(), limit);
-		if (wrapFork == null)
-			return null;
-		else
-			return new ExpressionField<>(getType(), wrapFork);
-	}
+	// @Override
+	// public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
+	// Expression<S> wrapFork = parser.nextMatchHighPriority(getWrapped());
+	// if (wrapFork == null)
+	// return null;
+	// else
+	// return new ExpressionField<>(getType(), wrapFork);
+	// }
+	//
+	// @Override
+	// public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
+	// Expression<S> wrapFork = parser.nextMatchLowPriority(getWrapped(), limit);
+	// if (wrapFork == null)
+	// return null;
+	// else
+	// return new ExpressionField<>(getType(), wrapFork);
+	// }
 
 	@Override
 	public int getMatchQuality() {
@@ -109,20 +108,27 @@ public class ExpressionField<S extends BranchableStream<?, ?>> implements Expres
 
 	@Override
 	public Expression<S> unwrap() {
-		// Expression<S> wrappedUnwrapped = getWrapped().unwrap();
-		// if (wrappedUnwrapped != null && wrappedUnwrapped != getWrapped())
-		// return new SimpleExpressionField<>(getType(), wrappedUnwrapped);
-		// return this;
-		return getWrapped().unwrap();
+		Expression<S> wrappedUnwrapped = getWrapped().unwrap();
+		if (wrappedUnwrapped != null && wrappedUnwrapped != getWrapped())
+			return new ComponentExpression<>(getType(), wrappedUnwrapped);
+		else
+			return this;
+	}
+
+	public Expression<S> unwrapFully() {
+		Expression<S> wrappedUnwrapped = getWrapped().unwrap();
+		if (wrappedUnwrapped instanceof ComponentExpression)
+			wrappedUnwrapped = ((ComponentExpression<S>) wrappedUnwrapped).unwrapFully();
+		return wrappedUnwrapped;
 	}
 
 	@Override
 	public boolean equals(Object o) {
 		if (o == this)
 			return true;
-		else if (!(o instanceof ExpressionField))
+		else if (!(o instanceof ComponentExpression))
 			return false;
-		ExpressionField<S> other = (ExpressionField<S>) o;
+		ComponentExpression<S> other = (ComponentExpression<S>) o;
 		return theType.equals(other.getType()) && theWrapped.equals(other.getWrapped());
 	}
 

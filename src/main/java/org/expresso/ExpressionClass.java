@@ -16,6 +16,7 @@ public abstract class ExpressionClass<S extends BranchableStream<?, ?>> extends 
 	private final String theName;
 	private final List<ExpressionClass<S>> theParentClasses;
 	private final List<ExpressionClass<S>> theChildClasses;
+	private final BetterList<? extends GrammarExpressionType<? super S>> theIgnorables;
 
 	/**
 	 * @param grammar The grammar that this class belongs to
@@ -26,12 +27,14 @@ public abstract class ExpressionClass<S extends BranchableStream<?, ?>> extends 
 	 * @param members The class's members, sorted by priority, then by order of occurrence
 	 */
 	public ExpressionClass(ExpressoGrammar<S> grammar, int id, String name, List<ExpressionClass<S>> parentClasses,
-		List<ExpressionClass<S>> childClasses, BetterList<? extends GrammarExpressionType<S>> members) {
+		List<ExpressionClass<S>> childClasses, BetterList<? extends GrammarExpressionType<S>> members,
+		BetterList<? extends GrammarExpressionType<? super S>> ignorables) {
 		super(id, members);
 		theGrammar = grammar;
 		theName = name;
 		theParentClasses = parentClasses;
 		theChildClasses = childClasses;
+		theIgnorables = ignorables;
 	}
 
 	@Override
@@ -62,6 +65,11 @@ public abstract class ExpressionClass<S extends BranchableStream<?, ?>> extends 
 	/** @return The classes that extend this class */
 	public List<ExpressionClass<S>> getChildClasses() {
 		return theChildClasses;
+	}
+
+	@Override
+	public BetterList<? extends GrammarExpressionType<? super S>> getIgnorables() {
+		return theIgnorables;
 	}
 
 	/**
