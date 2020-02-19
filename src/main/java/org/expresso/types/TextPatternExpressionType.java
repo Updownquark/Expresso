@@ -60,23 +60,9 @@ public class TextPatternExpressionType<S extends CharSequenceStream> extends Abs
 	}
 
 	@Override
-	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound, Expression<S2> highBound)
+	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound)
 		throws IOException {
-		if (highBound != null) {
-			if (!LOOK_FOR_SHORTER_PATTERNS)
-				return null;
-			int length = highBound.length();
-			if (lowBound != null && length < lowBound.length() + 1)
-				return null;
-			if (length < 1)
-				return null;
-			CharSequence subSequence = parser.getStream().subSequence(0, length - 1);
-			Matcher matcher = getPattern().matcher(subSequence);
-			TextPatternPossibility<S2> possibility = new TextPatternPossibility<>(this, parser, matcher);
-			if (possibility.getMatchQuality() >= parser.getQualityLevel())
-				return possibility;
-			return null;
-		} else if (lowBound != null) {
+		if (lowBound != null) {
 			if (!LOOK_FOR_SHORTER_PATTERNS)
 				return null;
 			int length = lowBound.length();

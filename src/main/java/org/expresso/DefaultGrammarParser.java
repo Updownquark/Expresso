@@ -462,13 +462,25 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 			exType = new ComponentExpressionType<>(found, Collections.unmodifiableNavigableSet(fields), enclosed);
 		else
 			exType = found;
-		if (!ignorables.isEmpty() && found instanceof BareContentExpressionType) {
-			RepeatExpressionType<S> igRepeat = new RepeatExpressionType<>(-1, 0, Integer.MAX_VALUE,
-				BetterList.of(new OneOfExpressionType<>(-1, ignorables)));
-			List<ExpressionType<? super S>> seq = new ArrayList<>(ignorables.size() + 1);
-			seq.addAll(ignorables);
-			seq.add(exType);
-			exType = new SequenceExpressionType<>(id[0]++, BetterList.of(igRepeat, exType));
+		if (!ignorables.isEmpty()) {
+			if (found instanceof BareContentExpressionType) {
+				RepeatExpressionType<S> igRepeat = new RepeatExpressionType<>(-1, 0, Integer.MAX_VALUE,
+					BetterList.of(new OneOfExpressionType<>(-1, ignorables)));
+				exType = new SequenceExpressionType<>(id[0]++, BetterList.of(igRepeat, exType));
+			} else if (found instanceof ConfiguredReferenceExpressionType
+				&& !((ConfiguredReferenceExpressionType<S>) found).getIgnorables().containsAll(ignorables)) {
+				BetterList<ExpressionClass<S>> foundIgnorables = ((ConfiguredReferenceExpressionType<S>) found).getIgnorables();
+				BetterList<ExpressionClass<S>> otherIgnorables;
+				if (foundIgnorables.isEmpty())
+					otherIgnorables = ignorables;
+				else {
+					otherIgnorables = new BetterTreeList<ExpressionClass<S>>(false).withAll(ignorables);
+					otherIgnorables.removeAll(foundIgnorables);
+				}
+				RepeatExpressionType<S> igRepeat = new RepeatExpressionType<>(-1, 0, Integer.MAX_VALUE,
+					BetterList.of(new OneOfExpressionType<>(-1, otherIgnorables)));
+				exType = new SequenceExpressionType<>(id[0]++, BetterList.of(igRepeat, exType));
+			}
 		}
 		return exType;
 	}
@@ -632,10 +644,10 @@ public class DefaultGrammarParser<S extends BranchableStream<?, ?>> implements E
 		}
 
 		@Override
-		public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound, Expression<S2> highBound)
+		public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound)
 			throws IOException {
 			Expression<S2> ex = parser.parseWith(type, //
-				unwrap(lowBound), unwrap(highBound));
+				unwrap(lowBound));
 			return ex == null ? null : new WrappedExpression<>(this, ex);
 		}
 

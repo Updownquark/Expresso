@@ -59,29 +59,24 @@ public class OneOfExpressionType<S extends BranchableStream<?, ?>> extends Abstr
 	}
 
 	@Override
-	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound, Expression<S2> highBound)
+	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound)
 		throws IOException {
 		OneOfPossibility<S2> low = (OneOfPossibility<S2>) lowBound;
-		OneOfPossibility<S2> high = (OneOfPossibility<S2>) highBound;
 		CollectionElement<? extends ExpressionType<? super S>> component;
 		if (low != null) {
 			Expression<S2> lowNext = parser.parseWith(//
-				low.theComponent.getType(), low.theComponent, high == null ? null : high.theComponent);
+				low.theComponent.getType(), low.theComponent);
 			if (lowNext != null)
 				return new OneOfPossibility<>(this, lowNext, low.theComponentId);
 			component = theComponents.getAdjacentElement(low.theComponentId, true);
 		} else
 			component = theComponents.getTerminalElement(true);
 		while (component != null) {
-			boolean isHighBound = high == null ? false : component.getElementId().equals(high.theComponentId);
 			Expression<S2> result = parser.parseWith(//
-				component.get(), null, isHighBound ? high.theComponent : null);
+				component.get(), null);
 			if (result != null)
 				return new OneOfPossibility<>(this, result, component.getElementId());
-			if (isHighBound)
-				break;
-			else
-				component = theComponents.getAdjacentElement(component.getElementId(), true);
+			component = theComponents.getAdjacentElement(component.getElementId(), true);
 		}
 		return null;
 	}

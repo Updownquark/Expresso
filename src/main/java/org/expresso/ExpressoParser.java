@@ -34,7 +34,7 @@ public interface ExpressoParser<S extends BranchableStream<?, ?>> {
 	 * @return The most likely possibility for parsing the stream at this parser's position with the given expression type
 	 * @throws IOException If an error occurs reading the stream
 	 */
-	Expression<S> parseWith(ExpressionType<? super S> type, Expression<S> lowBound, Expression<S> highBound) throws IOException;
+	Expression<S> parseWith(ExpressionType<? super S> type, Expression<S> lowBound) throws IOException;
 
 	// /**
 	// * @param expression The expression to branch

@@ -40,5 +40,5 @@ public interface ExpressionType<S extends BranchableStream<?, ?>> extends Compar
 	 * @return The parsed expression, or null if this type could not understand the information in the parser's stream
 	 * @throws IOException If an error occurs reading the stream
 	 */
-	<S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> start, Expression<S2> end) throws IOException;
+	<S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> start) throws IOException;
 }

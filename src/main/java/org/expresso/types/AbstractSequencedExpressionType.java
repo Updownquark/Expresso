@@ -82,12 +82,13 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 	protected abstract CompositionError getErrorForComponents(List<? extends Expression<? extends S>> components, int minQuality);
 
 	@Override
-	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound, Expression<S2> highBound)
+	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound)
 		throws IOException {
 		return branch(//
 			lowBound == null ? new LinkedList<>() : new LinkedList<>(lowBound.getChildren()), //
 			parser, lowBound != null, //
-			highBound == null ? null : highBound.getChildren());
+			// highBound == null ? null : highBound.getChildren());
+			null);
 	}
 
 	<S2 extends S> Expression<S2> branch(LinkedList<Expression<S2>> repetitions, ExpressoParser<S2> parser, boolean mustChange, //
@@ -140,7 +141,7 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 						highBoundRep = highBound.get(repetitions.size());
 					else
 						highBoundRep = null;
-					Expression<S2> repetition = branched.parseWith(component, null, highBoundRep);
+					Expression<S2> repetition = branched.parseWith(component, null);
 					if (repetition != null) {
 						if (highBoundRep != null && repetition.getType().compare(repetition, highBoundRep) == 0)
 							highRepEqual[repetitions.size()] = true;
@@ -180,7 +181,14 @@ public abstract class AbstractSequencedExpressionType<S extends BranchableStream
 				else
 					highBoundRep = null;
 				Expression<S2> repetition = branched.parseWith(//
-					last.getType(), last, highBoundRep);
+					last.getType(), last);
+				// Now, as a performance optimization, see if the new match is actually useful to us.
+				// If it's the same length and lesser or equal quality, it won't get us anywhere better
+				while (repetition != null && repetition.length() == last.length()
+					&& repetition.getMatchQuality() <= last.getMatchQuality()) {
+					repetition = branched.parseWith(//
+						last.getType(), repetition);
+				}
 				if (repetition != null) {
 					if (highBoundRep != null && repetition.getType().compare(repetition, highBoundRep) == 0)
 						highRepEqual[repetitions.size()] = true;

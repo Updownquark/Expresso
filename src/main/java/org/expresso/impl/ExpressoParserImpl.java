@@ -186,7 +186,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 	}
 
 	@Override
-	public Expression<S> parseWith(ExpressionType<? super S> component, Expression<S> lowBound, Expression<S> highBound)
+	public Expression<S> parseWith(ExpressionType<? super S> component, Expression<S> lowBound)
 		throws IOException {
 		return parseWith(component, lowBound, highBound, null);
 	}
@@ -240,7 +240,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 		int cacheId = component.getId();
 		if (cacheId < 0) {
 			result = component.parse(this, //
-				unwrap(lowBound), unwrap(highBound));
+				unwrap(lowBound));
 			method[0] = DebugResultMethod.Parsed;
 		} else if (theExcludedTypes != null && Arrays.binarySearch(theExcludedTypes, cacheId) >= 0) {
 			result = null;
@@ -262,7 +262,7 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 				// method = DebugResultMethod.Parsed;
 			} else/* if (!component.isCacheable()) */ {
 				result = component.parse(this, //
-					unwrap(lowBound), unwrap(highBound));
+					unwrap(lowBound));
 				method[0] = DebugResultMethod.Parsed;
 			} /*else if(lowBound instanceof CachedExpression) {
 				CachedExpression<S> cachedLow=(CachedExpression<S>) lowBound;
@@ -504,9 +504,9 @@ public class ExpressoParserImpl<S extends BranchableStream<?, ?>> implements Exp
 			// but when I take it out, things go much slower. Something to do with caching, I'm guessing.
 			ExpressoParserImpl<S>.StackPushResult stackFrame = parser.pushOnStack(theMatch.getType(), null, false, false);
 			Expression<S> next;
-			next = theMatch.getType().parse(parser, theMatch, highBound);
+			next = theMatch.getType().parse(parser, theMatch);
 			while (next != null && theInvariantContent != null && !find(next, theInvariantContent))
-				next = theMatch.getType().parse(parser, next, highBound);
+				next = theMatch.getType().parse(parser, next);
 			stackFrame.pop();
 			if (next != null)
 				return new BranchingMatch<>(this, next, theInvariantContent, 2);

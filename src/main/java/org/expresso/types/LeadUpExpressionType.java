@@ -35,19 +35,17 @@ public class LeadUpExpressionType<S extends BranchableStream<?, ?>> extends Abst
 	}
 
 	@Override
-	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound, Expression<S2> highBound)
+	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound)
 		throws IOException {
 		ExpressoParser<S2> branched = parser;
-		LeadUpPossibility<S2> high = (LeadUpPossibility<S2>) highBound;
 		if (lowBound != null) {
 			LeadUpPossibility<S2> low = (LeadUpPossibility<S2>) lowBound;
 			branched = parser.advance(low.theTerminalPossibility.getStream().getPosition() - low.getStream().getPosition());
-			Expression<S2> terminal = branched.parseWith(theTerminal, low.theTerminalPossibility, //
-				high == null ? null : high.theTerminalPossibility);
+			Expression<S2> terminal = branched.parseWith(theTerminal, low.theTerminalPossibility);
 			return terminal == null ? null : new LeadUpPossibility<>(this, parser, theTerminal, terminal);
 		} else {
 			while (branched != null) {
-				Expression<S2> terminal = branched.parseWith(theTerminal, null, high == null ? null : high.theTerminalPossibility);
+				Expression<S2> terminal = branched.parseWith(theTerminal, null);
 				if (terminal != null)
 					return new LeadUpPossibility<>(this, parser, theTerminal, terminal);
 				branched = branched.advance(1);

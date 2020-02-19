@@ -31,7 +31,6 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 	// private final Map<Integer, Boolean> theRecursiveCache;
 	// private final BetterSet<Integer> theRecursiveVisited;
 	private ExpressoStack<S> theStack;
-	private final LinkedList<Integer> thePriorityStack;
 	private ExpressoDebugger theDebugger;
 	private int theQualityLevel;
 
@@ -43,7 +42,6 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 		// theRecursiveCache = new HashMap<>();
 		// theRecursiveVisited = BetterHashSet.build().unsafe().buildSet();
 		theStack = new ExpressoStack<>();
-		thePriorityStack = new LinkedList<>();
 
 		if (DEBUG_UI && BreakpointHere.isDebugEnabled() != null) {
 			ExpressoDebugUI debugger = new ExpressoDebugUI();
@@ -71,8 +69,8 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 		Expression<S> best = null;
 		ExpressoParser<S> parser = getParser(stream, 0);
 		roundLoop: for (int round = 1; round < 10; round++) {
-			Expression<S> match = parser.parseWith(component, null, null);
-			for (; match != null; match = parser.parseWith(component, match, null)) {
+			Expression<S> match = parser.parseWith(component, null);
+			for (; match != null; match = parser.parseWith(component, match)) {
 				if (best == null || match.compareTo(best) < 0) {
 					best = match;
 
@@ -84,7 +82,7 @@ public class ParseSession<S extends BranchableStream<?, ?>> {
 						do {
 							ignoreExp = null;
 							for (GrammarExpressionType<? super S> ig : component.getIgnorables()) {
-								ignoreExp = ignoreParser.parseWith(ig, null, null);
+								ignoreExp = ignoreParser.parseWith(ig, null);
 								if (ignoreExp != null) {
 									if (ignorables == null)
 										ignorables = new LinkedList<>();

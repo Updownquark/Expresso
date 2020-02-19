@@ -1,6 +1,10 @@
 package org.expresso.impl;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.expresso.ConfiguredExpressionType;
+import org.expresso.Expression;
 import org.expresso.ExpressionClass;
 import org.expresso.ExpressionType;
 import org.expresso.stream.BranchableStream;
@@ -52,7 +56,7 @@ public class ExpressoStack<S extends BranchableStream<?, ?>> {
 		public final ExpressionType<? super S> type;
 		public final S stream;
 		private Frame theChild;
-		private boolean isInterrupted;
+		private List<Expression<S>> theInterrupts;
 		final int priority;
 
 		public Frame(Frame parent, ExpressionType<? super S> type, S stream, int priority) {
@@ -72,14 +76,16 @@ public class ExpressoStack<S extends BranchableStream<?, ?>> {
 				parent.theChild = null;
 		}
 
-		public boolean isInterrupted() {
-			return isInterrupted;
+		public List<Expression<S>> getInterrupted() {
+			return theInterrupts;
 		}
 
-		public void interrupt() {
+		public void interrupt(Expression<S> interrupt) {
 			Frame frame = theChild;
 			while (frame != null) {
-				frame.isInterrupted = true;
+				if (frame.theInterrupts == null)
+					frame.theInterrupts = new ArrayList<>();
+				frame.theInterrupts.add(interrupt);
 				frame = frame.theChild;
 			}
 		}

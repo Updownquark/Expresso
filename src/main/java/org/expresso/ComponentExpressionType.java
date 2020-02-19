@@ -59,10 +59,10 @@ public class ComponentExpressionType<S extends BranchableStream<?, ?>> implement
 	}
 
 	@Override
-	public <S2 extends S> ComponentExpression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound, Expression<S2> highBound)
+	public <S2 extends S> ComponentExpression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound)
 		throws IOException {
 		return ComponentExpressionType.wrap(this, parser.parseWith(theWrapped, //
-			unwrap(lowBound), unwrap(highBound)));
+			unwrap(lowBound)));
 	}
 
 	private <S2 extends S> Expression<S2> unwrap(Expression<S2> ex) {

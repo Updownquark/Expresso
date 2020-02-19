@@ -1,11 +1,10 @@
 package org.expresso.impl;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 
 import org.expresso.Expression;
 import org.expresso.ExpressionType;
@@ -17,14 +16,12 @@ import org.expresso.stream.BranchableStream;
 public class ExpressoParserImpl2<S extends BranchableStream<?, ?>> implements ExpressoParser<S> {
 	private final ParseSession<S> theSession;
 	private final S theStream;
-	private final Map<Integer, CachedExpression<S>> theCache;
-	private final Set<Integer> theRecursiveFilter;
+	private final Map<Integer, CachedExpressionSequence<S>> theCache;
 
 	ExpressoParserImpl2(ParseSession<S> session, S stream) {
 		theSession = session;
 		theStream = stream;
 		theCache = new HashMap<>();
-		theRecursiveFilter = new TreeSet<>();
 	}
 
 	@Override
@@ -46,22 +43,8 @@ public class ExpressoParserImpl2<S extends BranchableStream<?, ?>> implements Ex
 	}
 
 	@Override
-	public Expression<S> parseWith(ExpressionType<? super S> type, Expression<S> lowBound, Expression<S> highBound) throws IOException {
+	public Expression<S> parseWith(ExpressionType<? super S> type, Expression<S> lowBound) throws IOException {
 		DebugExpressionParsing debug = theSession.getDebugger().begin(type, theStream, null);
-		Expression<S> result = null;
-		DebugResultMethod method = null;
-		try {
-			if (lowBound instanceof CachedExpression && ((CachedExpression<S>) lowBound).hasNext) {
-				method = DebugResultMethod.UsedCache;
-				return result = ((CachedExpression<S>) lowBound).getNext();
-			} else if (highBound instanceof CachedExpression && ((CachedExpression<S>) highBound).hasPrevious) {
-				method = DebugResultMethod.UsedCache;
-				return result = ((CachedExpression<S>) highBound).getPrevious();
-			}
-		} finally {
-			if (method != null)
-				debug.finished(result, method);
-		}
 
 		int id = type.getId();
 		ExpressoStack<S>.Frame frame = theSession.push(type, theStream);
@@ -69,83 +52,115 @@ public class ExpressoParserImpl2<S extends BranchableStream<?, ?>> implements Ex
 			debug.finished(null, DebugResultMethod.RecursiveInterrupt);
 			return null;
 		}
+
+		DebugResultMethod[] method = new DebugResultMethod[1];
+		Expression<S> result = null;
 		try {
 			if (id >= 0) {
-				if (type.isCacheable() && lowBound == null && highBound == null) {
-					CachedExpression<S> cached = theCache.get(id);
-					if (cached != null) {
-						method = DebugResultMethod.UsedCache;
-						return getReturn(cached);
-					}
-				}
-				if (lowBound instanceof CachedExpression) {
-					if (((CachedExpression<S>) lowBound).parsingNext != null) {
-						((CachedExpression<S>) lowBound).parsingNext.interrupt();
-						method = DebugResultMethod.RecursiveInterrupt;
-						return null;
-					}
-				} else if (highBound instanceof CachedExpression) {
-					if (((CachedExpression<S>) highBound).parsingPrevious != null) {
-						((CachedExpression<S>) highBound).parsingPrevious.interrupt();
-						method = DebugResultMethod.RecursiveInterrupt;
-						return null;
-					}
-				} else if (!theRecursiveFilter.add(type.getId())) {
-					method = DebugResultMethod.RecursiveInterrupt;
-					return null;
-				}
+				CachedExpression<S> cachedLow = (CachedExpression<S>) lowBound;
+				CachedExpressionSequence<S> cache;
+				if (cachedLow != null)
+					cache = cachedLow.theSequence;
+				else
+					cache = theCache.computeIfAbsent(id, __ -> new CachedExpressionSequence<>(type));
+				result = parseCached(cache, cachedLow, frame, method);
+			} else {
+				method[0] = DebugResultMethod.Parsed;
+				result = type.parse(this, lowBound);
 			}
-
-			method = DebugResultMethod.Parsed;
-			try {
-				if (lowBound instanceof CachedExpression)
-					((CachedExpression<S>) lowBound).parsingNext = frame;
-				else if (highBound instanceof CachedExpression)
-					((CachedExpression<S>) highBound).parsingPrevious = frame;
-				result = type.parse(//
-					this, unwrap(lowBound), unwrap(highBound));
-				if (id >= 0 && type.isCacheable() && !frame.isInterrupted()) {
-					CachedExpression<S> cached = new CachedExpression<>(result);
-					if (lowBound instanceof CachedExpression || highBound instanceof CachedExpression)
-						cached.setPrevious(lowBound);
-					if (highBound instanceof CachedExpression)
-						cached.setNext(highBound);
-					if (lowBound == null && highBound == null)
-						theCache.put(id, cached);
-					return getReturn(cached);
-				}
-				return result;
-			} finally {
-				if (lowBound instanceof CachedExpression)
-					((CachedExpression<S>) lowBound).parsingNext = null;
-				else if (highBound instanceof CachedExpression)
-					((CachedExpression<S>) highBound).parsingPrevious = null;
-				if (id >= 0)
-					theRecursiveFilter.remove(id);
-			}
+			return result;
 		} catch (RuntimeException e) {
 			theSession.getDebugger().suspend();
-			method = null;
+			method[0] = null;
 			throw e;
 		} finally {
 			frame.pop();
-			if (method != null)
-				debug.finished(result, method);
+			if (method[0] != null)
+				debug.finished(result, method[0]);
 		}
 	}
 
-	private static <S extends BranchableStream<?, ?>> Expression<S> unwrap(Expression<S> ex) {
-		if (ex instanceof CachedExpression)
-			return ((CachedExpression<S>) ex).theWrapped;
+	private Expression<S> parseCached(CachedExpressionSequence<S> cache, CachedExpression<S> lowBound, ExpressoStack<S>.Frame frame,
+		DebugResultMethod[] method) throws IOException {
+		while (lowBound != null && !lowBound.isValid())
+			lowBound = lowBound.thePrevious;
+
+		ExpressoStack<S>.Frame interruptFrame;
+		Expression<S> unwrappedLow;
+		CachedExpression<S> cached;
+		if (lowBound != null) {
+			interruptFrame = lowBound.parsingNext;
+			unwrappedLow = lowBound.theWrapped;
+			cached = lowBound.theNext;
+		} else {
+			interruptFrame = cache.parsingStart;
+			unwrappedLow = null;
+			cached = cache.theStart;
+		}
+
+		if (cached != null) {
+			method[0] = DebugResultMethod.UsedCache;
+			if (interruptFrame != null)
+				interruptFrame.interrupt(cached);
+		} else if (interruptFrame != null) {
+			method[0] = DebugResultMethod.RecursiveInterrupt;
+			cached = new CachedExpression<>(cache, null, lowBound, null);
+			interruptFrame.interrupt(cached);
+		} else {
+			method[0] = DebugResultMethod.Parsed;
+			if (lowBound != null)
+				lowBound.parsingNext = frame;
+			else
+				cache.parsingStart = frame;
+			Expression<S> uncached = cache.theType.parse(this, unwrappedLow);
+			/* I've found a problem with the currently implemented solution to the cache-poisoning solution I implemented to solve the
+			 * problem documented in OptionalExpression.
+			 * 
+			 * E.g. parsing java.util.Arrays.asList() with
+			 * <result-producer>
+			 * 		...
+			 * 		<field-ref>
+			 * 			<one-of>
+			 * 				<result-producer>
+			 * 				<type>
+			 *			</one-of>
+			 *			<literal>.</literal>
+			 *			<identifier />
+			 *		</field-ref>
+			 * <result-producer>
+			 * 
+			 * It's difficult to explain, but the one-of's match with a result-producer can be poisoned by the root, which causes a cycle.
+			 * 
+			 * The next 2 lines were an attempt to mitigate this problem, but the sequence can be cyclic, in which case this still breaks
+			 */
+			if (uncached != null && unwrappedLow != null && equal(unwrappedLow, uncached))
+				uncached = cache.theType.parse(this, uncached);// Cache poisoning can cause this issue
+			cached = new CachedExpression<>(cache, uncached, lowBound, frame.getInterrupted());
+			if (lowBound != null)
+				lowBound.parsingNext = interruptFrame;
+			else
+				cache.parsingStart = interruptFrame;
+		}
+
+		return getReturn(cached);
+	}
+
+	static <S extends BranchableStream<?, ?>> Expression<S> getReturn(CachedExpression<S> ex) {
+		if (ex.theWrapped == null)
+			return null;
 		else
 			return ex;
 	}
 
-	static <S extends BranchableStream<?, ?>> Expression<S> getReturn(Expression<S> ex) {
-		if (ex instanceof CachedExpression && ((CachedExpression<S>) ex).theWrapped == null)
-			return null;
-		else
-			return ex;
+	static boolean equal(Expression<?> ex1, Expression<?> ex2) {
+		if (ex1.getType() != ex2.getType()//
+			|| ex1.getStream().getPosition() != ex2.getStream().getPosition()//
+			|| ex1.getChildren().size() != ex2.getChildren().size())
+			return false;
+		for (int i = 0; i < ex1.getChildren().size(); i++)
+			if (!equal(ex1.getChildren().get(i), ex2.getChildren().get(i)))
+				return false;
+		return true;
 	}
 
 	@Override
@@ -153,50 +168,84 @@ public class ExpressoParserImpl2<S extends BranchableStream<?, ?>> implements Ex
 		return theStream.toString();
 	}
 
+	private static class CachedExpressionSequence<S extends BranchableStream<?, ?>> {
+		final ExpressionType<? super S> theType;
+		ExpressoStack<S>.Frame parsingStart;
+		CachedExpression<S> theStart;
+
+		CachedExpressionSequence(ExpressionType<? super S> type) {
+			theType = type;
+		}
+	}
+
+	private static boolean USE_INTERRUPTS = true;
+
 	private static class CachedExpression<S extends BranchableStream<?, ?>> implements Expression<S> {
+		final CachedExpressionSequence<S> theSequence;
 		final Expression<S> theWrapped;
-		boolean hasPrevious;
-		ExpressoStack<S>.Frame parsingPrevious;
-		private CachedExpression<S> thePrevious;
-		boolean hasNext;
+		final CachedExpression<S> thePrevious;
+		boolean trimmed;
 		ExpressoStack<S>.Frame parsingNext;
-		private CachedExpression<S> theNext;
+		CachedExpression<S> theNext;
+		private List<CachedExpression<S>> theReferences;
 
-		CachedExpression(Expression<S> wrapped) {
+		CachedExpression(CachedExpressionSequence<S> sequence, Expression<S> wrapped, CachedExpression<S> previous,
+			List<Expression<S>> interrupts) {
+			theSequence = sequence;
 			theWrapped = wrapped;
-		}
 
-		CachedExpression<S> setPrevious(Expression<S> previous) {
-			hasPrevious = true;
+			CachedExpression<S> replaced;
 			if (previous != null) {
-				thePrevious = (CachedExpression<S>) previous;
-				thePrevious.hasNext = true;
+				thePrevious = previous;
+				replaced = thePrevious.theNext;
 				thePrevious.theNext = this;
+			} else {
+				thePrevious = null;
+				replaced = theSequence.theStart;
+				theSequence.theStart = this;
+			}
+			if (USE_INTERRUPTS) {
+				if (replaced != null)
+					replaced.trim();
+
+				if (interrupts != null)
+					for (Expression<S> interrupt : interrupts)
+						((CachedExpression<S>) interrupt).addReference(this);
+			}
+		}
+
+		boolean isValid() {
+			return !trimmed;
+		}
+
+		private CachedExpression<S> trim() {
+			trimmed = true;
+			if (theNext != null)
+				theNext.trim();
+			theNext = null;
+			if (thePrevious != null) {
+				if (thePrevious.theNext == this)
+					thePrevious.theNext = null;
+			} else {
+				if (theSequence.theStart == this)
+					theSequence.theStart = null;
+			}
+			if (theReferences != null) {
+				for (CachedExpression<S> reference : theReferences)
+					reference.trim();
 			}
 			return this;
 		}
 
-		CachedExpression<S> setNext(Expression<S> next) {
-			hasNext = true;
-			if (next != null) {
-				theNext = (CachedExpression<S>) next;
-				theNext.hasPrevious = true;
-				theNext.thePrevious = this;
-			}
-			return this;
-		}
-
-		Expression<S> getPrevious() {
-			return getReturn(thePrevious);
-		}
-
-		Expression<S> getNext() {
-			return getReturn(theNext);
+		private void addReference(CachedExpression<S> reference) {
+			if (theReferences == null)
+				theReferences = new ArrayList<>();
+			theReferences.add(reference);
 		}
 
 		@Override
 		public ExpressionType<? super S> getType() {
-			return theWrapped.getType();
+			return theSequence.theType;
 		}
 
 		@Override
@@ -265,7 +314,7 @@ public class ExpressoParserImpl2<S extends BranchableStream<?, ?>> implements Ex
 
 		@Override
 		public String toString() {
-			return theWrapped.toString();
+			return theWrapped == null ? "(empty)" : theWrapped.toString();
 		}
 	}
 }

@@ -536,7 +536,8 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 				breakpoint.setText(state.isBreakpoint ? "BP Off" : "BP On");
 			} else
 				breakpoint.setText("BP");
-			((ExpressionTreeModel) theResultTree.getModel()).setRoot(state == null ? null : state.theResult);
+			if (((ExpressionTreeModel) theResultTree.getModel()).setRoot(state == null ? null : state.theResult))
+				theResultTree.setSelectionRow(0);
 		});
 		theSelectedState.combine((state, result) -> new BiTuple<>(state, result), theSelectedResult).changes().act(evt -> {
 			ParsingState state = evt.getNewValue().getValue1();
@@ -702,13 +703,14 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 		private Expression<?> theRoot;
 		private List<TreeModelListener> theListeners = new ArrayList<>();
 
-		void setRoot(Expression<?> root) {
+		boolean setRoot(Expression<?> root) {
 			if (theRoot == root)
-				return;
+				return false;
 			theRoot = root;
 			TreeModelEvent evt = new TreeModelEvent(this, root == null ? null : new Object[] { root });
 			for (TreeModelListener listener : theListeners)
 				listener.treeStructureChanged(evt);
+			return true;
 		}
 
 		@Override

@@ -56,7 +56,7 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 	public abstract boolean equals(Object o);
 
 	@Override
-	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound, Expression<S2> highBound)
+	public <S2 extends S> Expression<S2> parse(ExpressoParser<S2> parser, Expression<S2> lowBound)
 		throws IOException {
 		LiteralPossibility<C, S2> possibility;
 		if (lowBound != null) {
@@ -65,7 +65,7 @@ public abstract class LiteralExpressionType<C, S extends BranchableStream<?, ? s
 			possibility = new LiteralPossibility<>(this, parser, lowBound.length() - 1);
 		} else
 			possibility = new LiteralPossibility<>(this, parser);
-		if (possibility.length() <= (highBound == null ? 0 : highBound.length()))
+		if (possibility.length() <= 0)
 			return null;
 		else if (possibility.getMatchQuality() >= parser.getQualityLevel())
 			return possibility;
