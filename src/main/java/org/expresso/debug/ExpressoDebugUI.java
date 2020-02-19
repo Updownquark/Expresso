@@ -8,9 +8,11 @@ import java.awt.Font;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.function.Supplier;
 
 import javax.swing.BorderFactory;
@@ -22,14 +24,17 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextPane;
 import javax.swing.JTree;
 import javax.swing.border.Border;
+import javax.swing.event.TreeModelEvent;
+import javax.swing.event.TreeModelListener;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.DefaultTreeCellRenderer;
+import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreePath;
 
 import org.expresso.BareContentExpressionType;
-import org.expresso.Expression;
 import org.expresso.ComponentExpressionType;
+import org.expresso.Expression;
 import org.expresso.ExpressionType;
 import org.expresso.ExpressoGrammar;
 import org.expresso.GrammarExpressionType;
@@ -43,6 +48,7 @@ import org.observe.collect.ObservableCollection;
 import org.observe.util.TypeTokens;
 import org.observe.util.swing.ObservableSwingUtils;
 import org.observe.util.swing.ObservableTreeModel;
+import org.qommons.BiTuple;
 import org.qommons.BreakpointHere;
 import org.qommons.tree.BetterTreeList;
 
@@ -89,15 +95,15 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 				for (ParsingState child : theChildren) {
 					if (child.theExpressionType == component)
 						return child;
-					else if (child.theResult != null && child.theStream.getPosition() == streamPos) {
-						// The parser didn't use this match for some reason
-						child.theResult = null;
-						if (child.theLastParseTime.compareTo(theLastParseTime) < 0)
-							child.theMethod = null;
-						else
-							child.theMethod = DebugResultMethod.Excluded;
-						child.theStateChange.onNext(null);
-					}
+					// else if (child.theResult != null && child.theStream.getPosition() == streamPos) {
+					// // The parser didn't use this match for some reason
+					// child.theResult = null;
+					// if (child.theLastParseTime.compareTo(theLastParseTime) < 0)
+					// child.theMethod = null;
+					// else
+					// child.theMethod = DebugResultMethod.Excluded;
+					// child.theStateChange.onNext(null);
+					// }
 				}
 			} else {
 				int pos = theStream.getPosition();
@@ -156,20 +162,24 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 
 		@Override
 		public String toString() {
-			if (theExpressionType instanceof BareContentExpressionType || theExpressionType instanceof GrammarExpressionType)
-				return theExpressionType.toString();
-			else if (theExpressionType instanceof ComponentExpressionType)
-				return "Field " + ((ComponentExpressionType<?>) theExpressionType).getFields();
-			String name = theExpressionType.getClass().getSimpleName();
-			if (name.endsWith("Type")) {
-				name = name.substring(0, name.length() - 4);
-				if (name.endsWith("Expression"))
-					name = name.substring(0, name.length() - 10);
-				if (theExpressionType instanceof ComponentExpressionType)
-					name += " " + ((ComponentExpressionType<?>) theExpressionType).getFields();
-			}
-			return name;
+			return printExpressionType(theExpressionType);
 		}
+	}
+
+	private static String printExpressionType(ExpressionType<?> type) {
+		if (type instanceof BareContentExpressionType || type instanceof GrammarExpressionType)
+			return type.toString();
+		else if (type instanceof ComponentExpressionType)
+			return "Field " + ((ComponentExpressionType<?>) type).getFields();
+		String name = type.getClass().getSimpleName();
+		if (name.endsWith("Type")) {
+			name = name.substring(0, name.length() - 4);
+			if (name.endsWith("Expression"))
+				name = name.substring(0, name.length() - 10);
+			if (type instanceof ComponentExpressionType)
+				name += " " + ((ComponentExpressionType<?>) type).getFields();
+		}
+		return name;
 	}
 
 	static class ParseResult {
@@ -188,9 +198,11 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 
 	private BranchableStream<?, ?> theStream;
 	private final SettableValue<ParsingState> theRoot;
-	private final SettableValue<ParsingState> theSelection;
+	private final SettableValue<ParsingState> theSelectedState;
+	private final SettableValue<Expression<?>> theSelectedResult;
 	private final LinkedList<ParsingState> theStack;
 	private final JTree theStateTree;
+	private final JTree theResultTree;
 	private StepRequest theStepRequest;
 	private int theStepRequestDepth;
 	private final SettableValue<Boolean> isSuspended;
@@ -201,7 +213,8 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 	public ExpressoDebugUI() {
 		super(new MigLayout("fill"));
 		theRoot = new SimpleSettableValue<>(ParsingState.class, true);
-		theSelection = new SimpleSettableValue<>(ParsingState.class, true);
+		theSelectedState = new SimpleSettableValue<>(ParsingState.class, true);
+		theSelectedResult = new SimpleSettableValue<>(new TypeToken<Expression<?>>() {}, true);
 		theStack = new LinkedList<>();
 		isSuspended = new SimpleSettableValue<>(boolean.class, false);
 		isSuspended.set(false, null);
@@ -209,6 +222,7 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 		isDebugging.set(false, null);
 
 		theStateTree = new JTree(new ParseStackTreeModel(theRoot));
+		theResultTree = new JTree(new ExpressionTreeModel());
 		initComponents();
 	}
 
@@ -316,9 +330,9 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 	public void suspend() {
 		isReallySuspended = true;
 		if (!theStack.isEmpty()) {
-			if (theSelection.get() == theStack.getLast()) {
+			if (theSelectedState.get() == theStack.getLast()) {
 				// Refresh the selection, since it may have changed
-				theSelection.set(theStack.getLast(), null);
+				theSelectedState.set(theStack.getLast(), null);
 			}
 			TreePath path = new TreePath(stackPath());
 			EventQueue.invokeLater(() -> {
@@ -379,7 +393,7 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 		treeScroll.getVerticalScrollBar().setUnitIncrement(15);
 		treeScroll.getHorizontalScrollBar().setUnitIncrement(15);
 		treeScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-		add(treeScroll, "grow");
+		add(treeScroll, "grow, wrap");
 		theStateTree.setEditable(false);
 		theStateTree.setExpandsSelectedPaths(true);
 		theStateTree.setCellRenderer(new DefaultTreeCellRenderer() {
@@ -438,13 +452,63 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 			public void valueChanged(TreeSelectionEvent e) {
 				TreePath[] selection = theStateTree.getSelectionPaths();
 				if (selection == null || selection.length != 1)
-					theSelection.set(null, e);
+					theSelectedState.set(null, e);
 				else {
 					Object lpc = selection[0].getLastPathComponent();
 					if (lpc instanceof ObservableValue)
-						theSelection.set(((ObservableValue<ParsingState>) lpc).get(), e);
+						theSelectedState.set(((ObservableValue<ParsingState>) lpc).get(), e);
 					else
-						theSelection.set((ParsingState) lpc, e);
+						theSelectedState.set((ParsingState) lpc, e);
+				}
+			}
+		});
+
+		JScrollPane resultScroll = new JScrollPane(theResultTree);
+		resultScroll.getVerticalScrollBar().setUnitIncrement(15);
+		resultScroll.getHorizontalScrollBar().setUnitIncrement(15);
+		resultScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+		add(resultScroll, "grow");
+		theResultTree.setEditable(false);
+		theResultTree.setExpandsSelectedPaths(true);
+		theResultTree.setCellRenderer(new DefaultTreeCellRenderer() {
+			private final Border selectedBorder;
+
+			{
+				selectedBorder = BorderFactory.createLineBorder(Color.black);
+				setOpaque(true);
+			}
+
+			@Override
+			public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, boolean expanded, boolean leaf, int row,
+				boolean focused) {
+				if (value instanceof ObservableValue)
+					value = ((ObservableValue<?>) value).get();
+				Expression<?> state = (Expression<?>) value;
+				String text;
+				if (state == null) {
+					text = "";
+				} else {
+					text = printExpressionType(state.getType());
+					text += "(";
+					text += "length=" + state.length();
+					if (state.getErrorCount() > 0)
+						text += ", " + state.getErrorCount() + " errors";
+					text += ")";
+				}
+				super.getTreeCellRendererComponent(tree, text, sel, expanded, leaf, row, focused);
+				setBorder(selected ? selectedBorder : null);
+				return this;
+			}
+		});
+		theResultTree.getSelectionModel().addTreeSelectionListener(new TreeSelectionListener() {
+			@Override
+			public void valueChanged(TreeSelectionEvent e) {
+				TreePath[] selection = theResultTree.getSelectionPaths();
+				if (selection == null || selection.length != 1)
+					theSelectedResult.set(null, e);
+				else {
+					Object lpc = selection[0].getLastPathComponent();
+					theSelectedResult.set((Expression<?>) lpc, e);
 				}
 			}
 		});
@@ -465,13 +529,18 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 		buttonPanel.add(debug);
 		buttonPanel.add(breakpoint);
 
-		theSelection.changes().act(evt -> {
+		theSelectedState.changes().act(evt -> {
 			ParsingState state = evt.getNewValue();
 			breakpoint.setEnabled(state != null);
 			if (state != null) {
 				breakpoint.setText(state.isBreakpoint ? "BP Off" : "BP On");
 			} else
 				breakpoint.setText("BP");
+			((ExpressionTreeModel) theResultTree.getModel()).setRoot(state == null ? null : state.theResult);
+		});
+		theSelectedState.combine((state, result) -> new BiTuple<>(state, result), theSelectedResult).changes().act(evt -> {
+			ParsingState state = evt.getNewValue().getValue1();
+			Expression<?> result = evt.getNewValue().getValue2();
 			boolean local = true;
 			if (state != null) {
 				while (state != null && state.theStream == null) {
@@ -482,7 +551,6 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 				state = theRoot.get();
 			BranchableStream<?, ?> stream = state == null ? null : state.theStream;
 			if (stream != null) {
-				Expression<?> result = state.theResult;
 				StringBuilder text = new StringBuilder("<html>");
 				int len = text.length();
 				if (!local || result == null || result.length() == 0) {
@@ -533,10 +601,10 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 			resume();
 		});
 		breakpoint.addActionListener(evt -> {
-			ParsingState state = theSelection.get();
+			ParsingState state = theSelectedState.get();
 			if (state != null) {
 				state.isBreakpoint = !state.isBreakpoint;
-				theSelection.set(state, evt);
+				theSelectedState.set(state, evt);
 			}
 		});
 
@@ -627,6 +695,58 @@ public class ExpressoDebugUI extends JPanel implements ExpressoDebugger {
 				}));
 			} else
 				return ((ParsingState) parent).theChildren;
+		}
+	}
+
+	class ExpressionTreeModel implements TreeModel {
+		private Expression<?> theRoot;
+		private List<TreeModelListener> theListeners = new ArrayList<>();
+
+		void setRoot(Expression<?> root) {
+			if (theRoot == root)
+				return;
+			theRoot = root;
+			TreeModelEvent evt = new TreeModelEvent(this, root == null ? null : new Object[] { root });
+			for (TreeModelListener listener : theListeners)
+				listener.treeStructureChanged(evt);
+		}
+
+		@Override
+		public Object getRoot() {
+			return theRoot;
+		}
+
+		@Override
+		public Object getChild(Object parent, int index) {
+			return ((Expression<?>) parent).getChildren().get(index);
+		}
+
+		@Override
+		public int getChildCount(Object parent) {
+			return ((Expression<?>) parent).getChildren().size();
+		}
+
+		@Override
+		public boolean isLeaf(Object node) {
+			return ((Expression<?>) node).getChildren().isEmpty();
+		}
+
+		@Override
+		public void valueForPathChanged(TreePath path, Object newValue) {}
+
+		@Override
+		public int getIndexOfChild(Object parent, Object child) {
+			return ((Expression<?>) parent).getChildren().indexOf(child);
+		}
+
+		@Override
+		public void addTreeModelListener(TreeModelListener l) {
+			theListeners.add(l);
+		}
+
+		@Override
+		public void removeTreeModelListener(TreeModelListener l) {
+			theListeners.remove(l);
 		}
 	}
 }
