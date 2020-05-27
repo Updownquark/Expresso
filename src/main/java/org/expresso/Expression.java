@@ -1,338 +1,625 @@
 package org.expresso;
 
-import java.util.Collections;
-import java.util.Deque;
+import java.text.ParseException;
+import java.util.AbstractList;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Objects;
+import java.util.NoSuchElementException;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
-import org.expresso.stream.BranchableStream;
+import org.antlr.v4.runtime.Parser;
+import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.tree.ErrorNode;
+import org.antlr.v4.runtime.tree.ParseTree;
+import org.antlr.v4.runtime.tree.ParseTreeListener;
+import org.antlr.v4.runtime.tree.ParseTreeWalker;
+import org.antlr.v4.runtime.tree.TerminalNode;
+import org.qommons.LambdaUtils;
+import org.qommons.StringUtils;
 import org.qommons.collect.BetterList;
-import org.qommons.tree.BetterTreeList;
 
-/**
- * Represents a possible interpretation of content at a particular place in a stream
- *
- * @param <S> The type of the stream
- */
-public interface Expression<S extends BranchableStream<?, ?>> extends Comparable<Expression<?>> {
-	/** @return The expression type whose interpretation this is */
-	ExpressionType<? super S> getType();
+/** This class compiles text parsing results from ANTLR v4 into a structure that is easy to navigate and search */
+public interface Expression {
+	/** Thrown from {@link Expression#of(Parser, ParseTree)} in response to text parse errors encountered by ANTLR */
+	public static class ExpressoParseException extends ParseException {
+		private final int theEndIndex;
+		private final String theType;
+		private final String theText;
 
-	/** @return The stream whose content this is an interpretation of */
-	S getStream();
+		/**
+		 * @param errorOffset The start index of the error
+		 * @param endIndex The end index of the error
+		 * @param type The token type of the error
+		 * @param text The text content that is the source of the error
+		 */
+		public ExpressoParseException(int errorOffset, int endIndex, String type, String text) {
+			super("Unexpected token ( " + text + ", type " + type + " ) at position " + errorOffset, errorOffset);
+			theEndIndex = endIndex;
+			theType = type;
+			theText = text;
+		}
 
-	/** @return The number of places in the stream that this interpretation thinks it understands */
-	int length();
+		/** @return The start index of the error */
+		@Override
+		public int getErrorOffset() {
+			return super.getErrorOffset();
+		}
 
-	/** @return Any components that may make up this expression */
-	List<? extends Expression<S>> getChildren();
+		/** @return The end index of the error */
+		public int getEndIndex() {
+			return theEndIndex;
+		}
+
+		/** @return The token type of the error */
+		public String getType() {
+			return theType;
+		}
+
+		/** @return The text content that is the source of the error */
+		public String getText() {
+			return theText;
+		}
+	}
+
+	/** @return The token type of this expression */
+	String getType();
+
+	/** @return The start index of this expression in the content */
+	int getStartIndex();
+
+	/** @return The component expressions that this expression is composed of */
+	BetterList<Expression> getComponents();
 
 	/**
-	 * @param fields The nested fields to get
-	 * @return A list with all expressions matching the given field path
+	 * A simplified and more performant form of {@link #search()}
+	 * 
+	 * @param type The type name path of the component to get
+	 * @return The first expression under this expression that follows the given type path
 	 */
-	default BetterList<ComponentExpression<S>> getField(String... fields) {
-		if (fields.length == 0)
-			throw new IllegalArgumentException("Fields expected");
-		BetterList<Expression<S>> result = new BetterTreeList<>(false);
-		BetterList<Expression<S>> lastFieldResult = new BetterTreeList<>(false);
-		result.add(this);
-		for (String field : fields) {
-			boolean optional = field.length() > 1 && field.charAt(0) == '?';
-			if (optional)
-				field = field.substring(1);
-
-			// We could clear out lastFieldResult and add all the results to it, then clear the results, but this is more efficient
-			BetterList<Expression<S>> temp = result;
-			result = lastFieldResult;
-			lastFieldResult = temp;
-			result.clear();
-			for (Expression<S> lfr : lastFieldResult) {
-				if (lfr instanceof ComponentExpression) {
-					for (Expression<S> child : lfr.getChildren()) {
-						if (!FieldSearcher.findFields(child, field, result) && optional)
-							result.add(lfr);
-					}
-				} else {
-					if (!FieldSearcher.findFields(lfr, field, result) && optional)
-						result.add(lfr);
-				}
-			}
-			if (result.isEmpty()) {
-				for (Expression<S> lfr : lastFieldResult) {
-					boolean found = false;
-					if (lfr instanceof ComponentExpression) {
-						for (Expression<S> child : lfr.getChildren()) {
-							found |= FieldSearcher.findFields(child.getType(), field);
-							if (found)
-								break;
-						}
-					} else
-						found = FieldSearcher.findFields(lfr.getType(), field);
-					if (!found)
-						throw new IllegalArgumentException(lfr.getType() + " does not declare a field \"" + field + "\"");
-				}
-			}
-		}
-		return (BetterList<ComponentExpression<S>>) (Deque<?>) result;
+	default Expression getComponent(String... type) {
+		return DirectSearch.getComponent(this, type);
 	}
 
 	/**
-	 * @param inline If true, the resulting string will have all newlines and tabs replaced with "\n" and "\t", respectively
-	 * @return The stream content that this expression represents
+	 * A simplified and more performant form of {@link #search()}
+	 * 
+	 * @param type The type name path of the component to get
+	 * @return All expressions under this expression that follows the given type path
 	 */
-	default String printContent(boolean inline) {
-		StringBuilder str = getStream().printContent(0, length(), null);
-		if (inline) {
-			for (int i = 0; i < str.length(); i++) {
-				char c = str.charAt(i);
-				switch (c) {
-				case '\n':
-					str.setCharAt(i, '\\');
-					str.insert(i + 1, 'n');
-					i++;
-					break;
-				case '\t':
-					str.setCharAt(i, '\\');
-					str.insert(i + 1, 't');
-					i++;
-					break;
-				}
-			}
-		}
-		return str.toString();
+	default BetterList<Expression> getComponents(String... type) {
+		return DirectSearch.getComponents(this, type);
 	}
 
-	/** @return The number of errors in this possibility */
-	int getErrorCount();
-
-	/** @return The expression in this structure containing the first error in this possibility (or null if there is no error) */
-	Expression<S> getFirstError();
-
-	/** @return The position in this expression where an error is recognized (or -1 if this expression itself does not have an error) */
-	int getLocalErrorRelativePosition();
-
-	/** @return The error message in this expression */
-	String getLocalErrorMessage();
-
-	/** @return An expression equivalent to this with possibly condensed structure */
-	Expression<S> unwrap();
-
-	// /**
-	// * @param parser The parser parsing the expression
-	// * @return Another interpretation of the stream by this expresssion's type
-	// * @throws IOException If an error occurs reading the stream
-	// */
-	// Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException;
-
-	// /**
-	// * Allows another branch of matches
-	// *
-	// * @param parser The parser parsing the expression
-	// * @return Another interpretation of the stream by this expresssion's type
-	// * @throws IOException If an error occurs reading the stream
-	// */
-	// Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException;
-	//
-	// /**
-	// * Allows another branch of matches
-	// *
-	// * @param parser The parser parsing the expression
-	// * @return Another interpretation of the stream by this expresssion's type
-	// * @throws IOException If an error occurs reading the stream
-	// */
-	// Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException;
-
 	/**
-	 * @return A measure of how certain this expression's {@link #getType() type} is that this expression accurately represents the intent
-	 *         of the stream content
-	 */
-	int getMatchQuality();
-
-	/**
-	 * Prints a multi-line text representation of this possibility to a string builder
+	 * Prints this expression's structure in a multi-line format
 	 * 
-	 * @param str The string builder to print to
-	 * @param indent The number of tabs to insert after each newline in the text representation
-	 * @param metadata Metadata that will be appended to the first line
-	 * @return The same string builder
+	 * @param str The StringBuilder to append to (one will be created if null)
+	 * @param indent The amount by which to indent the first line
+	 * @return The StringBuilder
 	 */
-	StringBuilder print(StringBuilder str, int indent, String metadata);
+	StringBuilder printStructure(StringBuilder str, int indent);
 
-	/**
-	 * Compares this expression to another for likelihood that each expression matches the true intent of the stream content.
-	 * 
-	 * @param p2 The expression to compare this to
-	 * @return
-	 *         <ul>
-	 *         <li>&lt;0 if this expression is more likely to be the true intent of the stream content than <code>p2</code></li>
-	 *         <li>&gt;0 if this expression is less likely to be the true intent of the stream content than <code>p2</code></li>
-	 *         <li>0 if this expression and <code>p2</code> are equally likely to be the true intent of the stream content</li>
-	 *         </ul>
-	 */
+	/** @return A structure to use to configure and execute a search for content within this expression tree */
+	default ExpressionSearch search() {
+		return new ExpressionSearch(this);
+	}
+
+	/** @return The content of this expression */
 	@Override
-	default int compareTo(Expression<?> p2) {
-		int mq1 = getMatchQuality();
-		int mq2 = p2.getMatchQuality();
-		if (mq1 != mq2)
-			return mq2 - mq1;
-
-		Expression<?> firstErr1 = getFirstError();
-		Expression<?> firstErr2 = p2.getFirstError();
-		int len1 = length();
-		int len2 = p2.length();
-
-		// The possibility that understands the most content without error is the best
-		int understood1 = firstErr1 != null ? firstErr1.getLocalErrorRelativePosition() : len1;
-		int understood2 = firstErr2 != null ? firstErr2.getLocalErrorRelativePosition() : len2;
-		if (understood1 != understood2)
-			return understood2 - understood1;
-
-		// If both understand the same but one is complete, it is the best
-		if ((firstErr1 == null) != (firstErr2 == null)) {
-			if (firstErr1 == null)
-				return -1;
-			else if (firstErr2 == null)
-				return 1;
-		}
-
-		// If both are incomplete but one thinks it might understand more, give it a chance
-		if (len1 != len2)
-			return len2 - len1;
-
-		return 0;
-	}
+	String toString();
 
 	/**
-	 * @param <S> The type of the stream being parsed
-	 * @param stream The stream
-	 * @param type The expression type
-	 * @return An empty expression possibility for the given type and stream
+	 * @param parser The ANTLR parser that did the text parsing
+	 * @param expression The expression to translate
+	 * @return An {@link Expression} representing the same parsed information as the given expression
+	 * @throws ExpressoParseException If there was an error in the expression
 	 */
-	static <S extends BranchableStream<?, ?>> Expression<S> empty(S stream, ExpressionType<? super S> type) {
-		return new Expression<S>() {
-			@Override
-			public ExpressionType<? super S> getType() {
-				return type;
+	public static Expression of(Parser parser, ParseTree expression) throws ExpressoParseException {
+		ParseTreeWalker walker = new ParseTreeWalker();
+
+		ExpressoAntlrCompiler compiler = new ExpressoAntlrCompiler(parser);
+		try {
+			walker.walk(compiler, expression);
+		} catch (ExpressoAntlrCompiler.InternalExpressoErrorException e) {
+			String displayType = parser.getVocabulary().getDisplayName(e.token.getType());
+			throw new ExpressoParseException(e.token.getStartIndex(), e.token.getStopIndex(), displayType, e.token.getText());
+		}
+		return compiler.getRoot();
+	}
+
+	/** Implements the simple {@link Expression#getComponent(String[]) getComponent(s)(String...)} methods */
+	static class DirectSearch {
+		static Expression getComponent(Expression root, String[] type) {
+			return getComponents(root, type, 0, null);
+		}
+
+		static BetterList<Expression> getComponents(Expression root, String[] type) {
+			List<Expression> found = new ArrayList<>(3);
+			getComponents(root, type, 0, found::add);
+			return BetterList.of(found);
+		}
+
+		private static Expression getComponents(Expression parent, String[] type, int pathIndex, Consumer<Expression> onFind) {
+			for (Expression child : parent.getComponents()) {
+				if (!child.getType().equals(type[pathIndex])) {//
+				} else if (pathIndex + 1 == type.length) {
+					if (onFind != null)
+						onFind.accept(child);
+					else
+						return child;
+				} else {
+					Expression childFound = getComponents(child, type, pathIndex + 1, onFind);
+					if (childFound != null)
+						return childFound;
+				}
 			}
+			return null;
+		}
+	}
 
-			@Override
-			public S getStream() {
-				return stream;
-			}
+	/** A search operation against an expression */
+	public static class ExpressionSearch {
+		private final Expression theRoot;
+		private final List<ExpressionSearchOp> theSequence;
 
-			@Override
-			public int length() {
-				return 0;
-			}
+		/** @param root The expression to search within */
+		public ExpressionSearch(Expression root) {
+			theRoot = root;
+			theSequence = new ArrayList<>();
+		}
 
-			@Override
-			public List<? extends Expression<S>> getChildren() {
-				return Collections.emptyList();
-			}
+		/**
+		 * Causes the search to descend to a descendant of the searched expression. When this is used, any results will be at or underneath
+		 * the given path.
+		 * 
+		 * @param path A path of expression types to descend into
+		 * @return This search
+		 */
+		public ExpressionSearch get(String... path) {
+			theSequence.add(new PathSearchOp(path));
+			return this;
+		}
 
-			// @Override
-			// public Expression<S> nextMatch(ExpressoParser<S> parser) throws IOException {
-			// return null;
-			// }
-			//
-			// @Override
-			// public Expression<S> nextMatchHighPriority(ExpressoParser<S> parser) throws IOException {
-			// return null;
-			// }
-			//
-			// @Override
-			// public Expression<S> nextMatchLowPriority(ExpressoParser<S> parser, Expression<S> limit) throws IOException {
-			// return null;
-			// }
+		/**
+		 * Causes the search to descend to a child of the searched expression. When this is used, any results will be at or underneath the
+		 * given child.
+		 * 
+		 * @param child The function to select from the search node's children
+		 * @return This search
+		 */
+		public ExpressionSearch child(Function<BetterList<Expression>, Expression> child) {
+			theSequence.add(new ChildSearchOp(child));
+			return this;
+		}
 
-			@Override
-			public int getErrorCount() {
-				return 0;
-			}
+		/**
+		 * Causes the search to descend to the first child of the searched expression. When this is used, any results will be at or
+		 * underneath the child.
+		 * 
+		 * @return This search
+		 */
+		public ExpressionSearch firstChild() {
+			theSequence.add(new ChildSearchOp(LambdaUtils.printableFn(BetterList::peekFirst, "first", null)));
+			return this;
+		}
 
-			@Override
-			public Expression<S> getFirstError() {
+		/**
+		 * Applies a test to any search results matched so far
+		 * 
+		 * @param filter A test for any expressions matched so far
+		 * @return This search
+		 */
+		public ExpressionSearch iff(Predicate<Expression> filter) {
+			theSequence.add(new SimpleSearchFilter(filter));
+			return this;
+		}
+
+		/**
+		 * Allows filtering of search results based on deep content. E.g.
+		 * <p>
+		 * <code>expression.search().get("a").where(srch->srch.get("b").text("c"))</code>
+		 * </p>
+		 * will search for "a"-typed elements in expression that have a "b"-typed expression with text "c". I.e., the result(s) of the
+		 * search will be of type "a", and will all have at least one descendant of type "b" with text "c".
+		 * 
+		 * @param filter The filter search
+		 * @return This search
+		 */
+		public ExpressionSearch where(Consumer<ExpressionSearch> filter) {
+			ExpressionSearch search = new ExpressionSearch(null);
+			filter.accept(search);
+			theSequence.add(new ComplexSearchFilter(search));
+			return this;
+		}
+
+		/**
+		 * Filters the current search results for text content
+		 * 
+		 * @param text The text to match against the current search results
+		 * @return This search
+		 */
+		public ExpressionSearch text(String text) {
+			return iff(LambdaUtils.printablePred(ex -> ex.toString().equals(text), "text:" + text, null));
+		}
+
+		/**
+		 * Filters the current search results for text content with a pattern
+		 * 
+		 * @param pattern The pattern to match against the text of the current search results
+		 * @return This search
+		 */
+		public ExpressionSearch textLike(String pattern) {
+			return textLike(Pattern.compile(pattern));
+		}
+
+		/**
+		 * Filters the current search results for text content with a pattern
+		 * 
+		 * @param pattern The pattern to match against the text of the current search results
+		 * @return This search
+		 */
+		public ExpressionSearch textLike(Pattern pattern) {
+			return iff(LambdaUtils.printablePred(ex -> pattern.matcher(ex.toString()).matches(), "textLike:" + pattern.pattern(), null));
+		}
+
+		/**
+		 * Same as {@link #findAny()}, but throws a {@link NoSuchElementException} if no expression matches the search.
+		 * 
+		 * @return The first expression (depth-first) under the root that matches the search
+		 * @throws NoSuchElementException If no expression matches the search
+		 */
+		public Expression find() throws NoSuchElementException {
+			Expression found = findAny();
+			if (found == null)
+				throw new IllegalArgumentException("No such expression found: " + this);
+			return found;
+		}
+
+		/** @return The first expression (depth-first) under the root that matches the search, or null if no expressions matched */
+		public Expression findAny() {
+			return findAny(theRoot);
+		}
+
+		/** @return All expressions (in depth-first order) under the root that match the search */
+		public BetterList<Expression> findAll() {
+			List<Expression> found = new ArrayList<>();
+			findAll(Arrays.asList(theRoot), found);
+			return BetterList.of(found);
+		}
+
+		Expression findAny(Expression root) {
+			List<Expression> found = new ArrayList<>();
+			findAll(Arrays.asList(root), found);
+			if (found.isEmpty())
 				return null;
+			return found.get(0);
+		}
+
+		void findAll(List<Expression> root, List<Expression> found) {
+			List<Expression> intermediate = new ArrayList<>();
+			boolean first = true;
+			for (ExpressionSearchOp search : theSequence) {
+				if (first) {
+					intermediate.addAll(root);
+					first = false;
+				} else {
+					intermediate.clear();
+					intermediate.addAll(found);
+					found.clear();
+				}
+				search.findAll(intermediate, found);
+			}
+		}
+
+		@Override
+		public String toString() {
+			return theSequence.toString();
+		}
+
+		interface ExpressionSearchOp {
+			void findAll(List<Expression> intermediate, List<Expression> found);
+		}
+
+		static class PathSearchOp implements ExpressionSearchOp {
+			private final String[] thePath;
+
+			PathSearchOp(String[] path) {
+				thePath = path;
 			}
 
 			@Override
-			public int getLocalErrorRelativePosition() {
-				return -1;
+			public void findAll(List<Expression> intermediate, List<Expression> found) {
+				for (Expression ex : intermediate)
+					find(ex, 0, found::add, true);
 			}
 
-			@Override
-			public String getLocalErrorMessage() {
+			Expression find(Expression ex, int pathIndex, Consumer<Expression> found, boolean multi) {
+				if (ex.getType().equalsIgnoreCase(thePath[pathIndex])) {
+					pathIndex++;
+					if (pathIndex == thePath.length) {
+						if (found != null)
+							found.accept(ex);
+						return ex;
+					}
+				}
+				for (Expression child : ex.getComponents()) {
+					Expression childFound = find(child, pathIndex, found, multi);
+					if (!multi && childFound != null)
+						return childFound;
+				}
 				return null;
-			}
-
-			@Override
-			public Expression<S> unwrap() {
-				return this;
-			}
-
-			@Override
-			public int getMatchQuality() {
-				return 0;
-			}
-
-			@Override
-			public boolean equals(Object o) {
-				return o.getClass() == getClass() && getType().equals(((Expression<S>) o).getType());
-			}
-
-			@Override
-			public int hashCode() {
-				return Objects.hash(type, stream.getPosition());
-			}
-
-			@Override
-			public StringBuilder print(StringBuilder str, int indent, String metadata) {
-				for (int i = 0; i < indent; i++)
-					str.append('\t');
-				str.append(type).append("(empty)").append(metadata);
-				return str;
 			}
 
 			@Override
 			public String toString() {
-				return "(empty)";
+				return StringUtils.print(".", Arrays.asList(thePath), p -> p).toString();
 			}
-		};
-	}
-
-	/** A worker class that searches an expression's tree structure for fields */
-	public static class FieldSearcher {
-		static <S extends BranchableStream<?, ?>> boolean findFields(Expression<S> expr, String field, Deque<Expression<S>> results) {
-			boolean found;
-			if (expr instanceof ComponentExpression) {
-				found = ((ComponentExpression<S>) expr).getType().getFields().contains(field);
-				if (found)
-					results.add(expr);
-				return found;
-			}
-			found = false;
-			for (Expression<S> child : expr.getChildren())
-				found |= findFields(child, field, results);
-			return found;
 		}
 
-		static boolean findFields(ExpressionType<?> expr, String field) {
-			boolean found;
-			if (expr instanceof ComponentExpressionType)
-				return ((ComponentExpressionType<?>) expr).getFields().contains(field);
-			found = false;
-			ExpressionType<?> lastChild = null;
-			for (ExpressionType<?> child : expr.getComponents()) {
-				if (lastChild == null)
-					lastChild = child;
-				else if (child == lastChild)
-					break;
-				found |= findFields(child, field);
-				if (found)
-					break;
+		static class ChildSearchOp implements ExpressionSearchOp {
+			private final Function<BetterList<Expression>, Expression> theChild;
+
+			ChildSearchOp(Function<BetterList<Expression>, Expression> child) {
+				theChild = child;
 			}
-			return found;
+
+			@Override
+			public void findAll(List<Expression> intermediate, List<Expression> found) {
+				for (Expression ex : intermediate) {
+					Expression child = theChild.apply(ex.getComponents());
+					if (child != null)
+						found.add(child);
+				}
+			}
+
+			@Override
+			public String toString() {
+				return "child:" + theChild;
+			}
+		}
+
+		static class SimpleSearchFilter implements ExpressionSearchOp {
+			private final Predicate<Expression> theFilter;
+
+			SimpleSearchFilter(Predicate<Expression> filter) {
+				theFilter = filter;
+			}
+
+			@Override
+			public void findAll(List<Expression> intermediate, List<Expression> found) {
+				for (Expression ex : intermediate)
+					if (theFilter.test(ex))
+						found.add(ex);
+			}
+
+			@Override
+			public String toString() {
+				return "if:" + theFilter;
+			}
+		}
+
+		static class ComplexSearchFilter implements ExpressionSearchOp {
+			private final ExpressionSearch theSearch;
+
+			ComplexSearchFilter(ExpressionSearch search) {
+				theSearch = search;
+			}
+
+			@Override
+			public void findAll(List<Expression> intermediate, List<Expression> found) {
+				for (Expression ex : intermediate) {
+					Expression exFound = theSearch.findAny(ex);
+					if (exFound != null)
+						found.add(ex);
+				}
+			}
+
+			@Override
+			public String toString() {
+				return theSearch.toString();
+			}
+		}
+	}
+
+	/** A simple expression with no children--generally a literal or pattern match */
+	public class Terminal implements Expression {
+		private final String theType;
+		private final int theStart;
+		private final String theText;
+
+		/**
+		 * @param type The type name of the expression
+		 * @param start The start index of the expression
+		 * @param text The expression text
+		 */
+		public Terminal(String type, int start, String text) {
+			theType = type;
+			theStart = start;
+			theText = text;
+		}
+
+		@Override
+		public String getType() {
+			return theType;
+		}
+
+		@Override
+		public int getStartIndex() {
+			return theStart;
+		}
+
+		@Override
+		public BetterList<Expression> getComponents() {
+			return BetterList.empty();
+		}
+
+		@Override
+		public StringBuilder printStructure(StringBuilder str, int indent) {
+			if (str == null)
+				str = new StringBuilder();
+			for (int i = 0; i < indent; i++)
+				str.append('\t');
+			str.append(theType).append(": ").append(theText);
+			return str;
+		}
+
+		@Override
+		public String toString() {
+			return theText;
+		}
+	}
+
+	/** An expression made up of other expressions */
+	public class Composite implements Expression {
+		private final String theType;
+		private final BetterList<Expression> theComponents;
+
+		/**
+		 * @param type The type of the expression
+		 * @param components The components for the expression
+		 */
+		public Composite(String type, BetterList<Expression> components) {
+			theType = type;
+			theComponents = components;
+		}
+
+		@Override
+		public String getType() {
+			return theType;
+		}
+
+		@Override
+		public int getStartIndex() {
+			return theComponents.get(0).getStartIndex();
+		}
+
+		@Override
+		public BetterList<Expression> getComponents() {
+			return theComponents;
+		}
+
+		@Override
+		public StringBuilder printStructure(StringBuilder str, int indent) {
+			if (str == null)
+				str = new StringBuilder();
+			for (int i = 0; i < indent; i++)
+				str.append('\t');
+			str.append(theType).append(": ");
+			boolean first = true;
+			for (Expression component : theComponents) {
+				component.printStructure(str, first ? 0 : indent + 1).append('\n');
+				first = false;
+			}
+			return str;
+		}
+
+		@Override
+		public String toString() {
+			return StringUtils.print(new StringBuilder(), "", theComponents, StringBuilder::append).toString();
+		}
+	}
+
+	/** Translates ANTLR v4 parse trees into {@link Expression}s */
+	static class ExpressoAntlrCompiler implements ParseTreeListener {
+		static class InternalExpressoErrorException extends RuntimeException {
+			final Token token;
+
+			public InternalExpressoErrorException(Token token) {
+				super(token.toString());
+				this.token = token;
+			}
+		}
+
+		private final Parser theParser;
+		private final LinkedList<List<Expression>> theStack;
+		private Expression theRoot;
+
+		public ExpressoAntlrCompiler(Parser parser) {
+			theParser = parser;
+			theStack = new LinkedList<>();
+		}
+
+		public Expression getRoot() {
+			return theRoot;
+		}
+
+		@Override
+		public void enterEveryRule(ParserRuleContext arg0) {
+			String ruleName = theParser.getRuleNames()[arg0.getRuleIndex()];
+			int childCount = arg0.getChildCount();
+			if (childCount == 1)
+				theStack.add(new SingleChildList(ruleName, theStack.isEmpty() ? null : theStack.getLast()));
+			else {
+				List<Expression> children = new ArrayList<>(childCount);
+				Expression ex = new Composite(ruleName, BetterList.of(children));
+				if (!theStack.isEmpty())
+					theStack.getLast().add(ex);
+				theStack.add(children);
+				if (theRoot == null)
+					theRoot = ex;
+			}
+		}
+
+		@Override
+		public void exitEveryRule(ParserRuleContext arg0) {
+		}
+
+		@Override
+		public void visitErrorNode(ErrorNode arg0) {
+			throw new InternalExpressoErrorException(arg0.getSymbol());
+		}
+
+		@Override
+		public void visitTerminal(TerminalNode arg0) {
+			String displayType = theParser.getVocabulary().getDisplayName(arg0.getSymbol().getType());
+			Expression ex = new Terminal(displayType, //
+				arg0.getSymbol().getStartIndex(), arg0.getSymbol().getText());
+			if (!theStack.isEmpty())
+				theStack.getLast().add(ex);
+			if (theRoot == null)
+				theRoot = ex;
+		}
+
+		class SingleChildList extends AbstractList<Expression> {
+			private final String theType;
+			private final List<Expression> parentChildren;
+			private boolean isAdded;
+
+			SingleChildList(String type, List<Expression> parentChildren) {
+				theType = type;
+				this.parentChildren = parentChildren;
+			}
+
+			@Override
+			public Expression get(int index) {
+				if (index < 0 || index > 1 || !isAdded)
+					throw new IndexOutOfBoundsException(index + " of " + size());
+				return parentChildren.get(parentChildren.size() - 1).getComponents().get(index);
+			}
+
+			@Override
+			public int size() {
+				return isAdded ? 1 : 0;
+			}
+
+			@Override
+			public boolean add(Expression e) {
+				if (isAdded)
+					throw new IllegalStateException();
+				isAdded = true;
+				Expression ex = new Composite(theType, BetterList.of(e));
+				if (parentChildren != null)
+					parentChildren.add(ex);
+				else
+					theRoot = ex;
+				return true;
+			}
 		}
 	}
 }
