@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project default="antlr-sources" name="Build tasks for ObServe">
+	<target name="antlr-sources">
+		<java fork="true" dir="${user.dir}/src/main/antlr" classname="org.antlr.v4.Tool">
+			<classpath>
+				<pathelement location="${user.dir}/lib-antlr/antlr4-4.9.2.jar" />
+				<pathelement location="${user.dir}/lib-antlr/ST4-4.3.jar" />
+				<pathelement location="${user.dir}/lib/antlr4-runtime-4.9.2.jar" />
+				<pathelement location="${user.dir}/lib/antlr-runtime-3.5.2.jar" />
+			</classpath>
+			<arg value="-o" />
+			<arg value="${user.dir}/target/generated-sources/antlr4/org/observe/expresso" />
+			<arg value="-package" />
+			<arg value="org.observe.expresso" />
+			<arg value="ExpressoAntlrLexer.g4" />
+		</java>
+		<java fork="true" dir="${user.dir}/src/main/antlr" classname="org.antlr.v4.Tool">
+			<classpath>
+				<pathelement location="${user.dir}/lib-antlr/antlr4-4.9.2.jar" />
+				<pathelement location="${user.dir}/lib-antlr/ST4-4.3.jar" />
+				<pathelement location="${user.dir}/lib/antlr4-runtime-4.9.2.jar" />
+				<pathelement location="${user.dir}/lib/antlr-runtime-3.5.2.jar" />
+			</classpath>
+			<arg value="-o" />
+			<arg value="${user.dir}/target/generated-sources/antlr4/org/observe/expresso" />
+			<arg value="-package" />
+			<arg value="org.observe.expresso" />
+			<arg value="ExpressoAntlrParser.g4" />
+		</java>
+	</target>
+</project>
