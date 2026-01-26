@@ -1,4 +1,4 @@
-package org.observe.expresso;
+package org.observe.expresso.tests;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -7,10 +7,11 @@ import java.util.List;
 import java.util.Map;
 
 import org.observe.ObservableAction;
-import org.observe.expresso.ExpressoTesting.TestAction.TestActionElement;
+import org.observe.expresso.ExpressoInterpretationException;
+import org.observe.expresso.InterpretedExpressoEnv;
+import org.observe.expresso.ModelInstantiationException;
 import org.observe.expresso.ObservableModelSet.ModelSetInstance;
 import org.observe.expresso.ObservableModelSet.ModelValueInstantiator;
-import org.observe.expresso.TestInterpretation.StatefulStruct;
 import org.observe.expresso.qonfig.ExElement;
 import org.observe.expresso.qonfig.ExElementTraceable;
 import org.observe.expresso.qonfig.ExNamed;
@@ -18,6 +19,8 @@ import org.observe.expresso.qonfig.ExpressoQIS;
 import org.observe.expresso.qonfig.ExpressoQonfigValues;
 import org.observe.expresso.qonfig.QonfigAttributeGetter;
 import org.observe.expresso.qonfig.QonfigChildGetter;
+import org.observe.expresso.tests.ExpressoTesting.TestAction.TestActionElement;
+import org.observe.expresso.tests.TestInterpretation.StatefulStruct;
 import org.qommons.BreakpointHere;
 import org.qommons.Named;
 import org.qommons.collect.BetterList;

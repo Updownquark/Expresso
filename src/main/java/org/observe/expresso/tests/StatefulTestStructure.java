@@ -1,4 +1,4 @@
-package org.observe.expresso;
+package org.observe.expresso.tests;
 
 import org.observe.SettableValue;
 

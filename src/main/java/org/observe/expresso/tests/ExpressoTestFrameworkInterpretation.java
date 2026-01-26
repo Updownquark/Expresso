@@ -1,10 +1,16 @@
-package org.observe.expresso;
+package org.observe.expresso.tests;
 
 import java.util.List;
 import java.util.Set;
 
 import org.observe.ObservableValue;
 import org.observe.SettableValue;
+import org.observe.expresso.CompiledExpressoEnv;
+import org.observe.expresso.ExpressoInterpretationException;
+import org.observe.expresso.ModelInstantiationException;
+import org.observe.expresso.ModelType;
+import org.observe.expresso.ModelTypes;
+import org.observe.expresso.ObservableModelSet;
 import org.observe.expresso.ModelType.ModelInstanceType;
 import org.observe.expresso.ObservableModelSet.InterpretedValueSynth;
 import org.observe.expresso.ObservableModelSet.ModelSetInstance;

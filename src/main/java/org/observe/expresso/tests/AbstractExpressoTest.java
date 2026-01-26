@@ -1,10 +1,12 @@
-package org.observe.expresso;
+package org.observe.expresso.tests;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.junit.Before;
 import org.observe.SimpleObservable;
+import org.observe.expresso.ExpressoInterpretationException;
+import org.observe.expresso.InterpretedExpressoEnv;
+import org.observe.expresso.ModelInstantiationException;
 import org.observe.expresso.ObservableModelSet.ModelSetInstance;
 import org.observe.expresso.qonfig.ExpressoHeadSection;
 import org.observe.expresso.qonfig.ExpressoQIS;
@@ -47,8 +49,7 @@ public abstract class AbstractExpressoTest<H extends ExpressoHeadSection> {
 		}
 	}
 
-	/** Parses the test's QML (for the first test only) */
-	@Before
+	/** Parses the test's QML (for the first test only). Should be overridden with the super call and tagged @Before in implementations. */
 	public void compileTesting() {
 		theTesting = TESTING.computeIfAbsent(getClass(), __ -> {
 			System.out.print("Interpreting test files...");

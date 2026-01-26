@@ -8,6 +8,7 @@ import org.observe.SettableValue;
 import org.observe.SimpleObservable;
 import org.observe.expresso.qonfig.ElementModelValue;
 import org.observe.expresso.qonfig.ExpressoHeadSection;
+import org.observe.expresso.tests.AbstractExpressoTest;
 import org.observe.util.TypeTokens;
 import org.qommons.testing.TestUtil;
 
