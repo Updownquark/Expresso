@@ -17,36 +17,46 @@ It builds on the Expresso-Base toolkit and allows specification of persisted con
 ?>
 <qonfig-def name="Expresso-Config" version="0.1" xmlns:base="Expresso-Base v0.1">
 	<add-ons>
-		<?DOC Tag for &lt;model-value> types that may be specified in a &lt;config> model?>
+		<?DOC Tag for <model-value> types that may be specified in a <config> model?>
 		<add-on name="allow-config-model" abstract="true" />
-		<?DOC Tag for &lt;model-value> elements in a &lt;config> model?>
+		<?DOC Tag for <model-value> elements in a <config> model?>
 		<add-on name="config-model-value" requires="model-value" inherits="type-required">
-			<?DOC A path that determines how this value will be persisted in the &lt;config>'s persistence?>
+			<?DOC A path that determines how this value will be persisted in the <config>'s persistence?>
 			<attribute name="config-path" type="string" specify="optional" />
-			<?DOC Determines how this model structure's values will be stored in the &lt;config>'s persistence?>
+			<?DOC Determines how this model structure's values will be stored in the <config>'s persistence?>
 			<attribute name="format" type="expression" specify="optional" />
 		</add-on>
-		<?DOC A &lt;value> in a &lt;config> model?>
+		<?DOC A <value> in a <config> model?>
 		<add-on name="config-value" requires="value" inherits="config-model-value">
 			<?DOC The value for the model value if it does not exist in the &lt;config>'s persistence?>
 			<attribute name="default" type="expression" specify="optional" />
 		</add-on>
-		<?DOC A &lt;map> or &lt;multi-map> in a &lt;config> model?>
+		<?DOC A <map> or <multi-map> in a <config> model?>
 		<add-on name="config-map" requires="map" inherits="config-model-value">
-			<?DOC Determines how this map's keys will be stored in the &lt;config>'s persistence?>
+			<?DOC Determines how this map's keys will be stored in the <config>'s persistence?>
 			<attribute name="key-format" type="expression" specify="optional" />
 		</add-on>
-		<?DOC A field in an &lt;entity-config-format> representing a field of the entity to persist.<br>
+		<?DOC A field in an <entity-config-format> representing a field of the entity to persist.<br>
 			This allows each field in the entity to be customized for its format and location in persistence.?>
 		<add-on name="entity-config-field" requires="config-format">
 			<?DOC The name of the field in the entity?>
 			<attribute name="field-name" type="string" />
-			<?DOC The name of the property to store the field under in the &lt;config>'s persistence?>
+			<?DOC The name of the property to store the field under in the <config>'s persistence?>
 			<attribute name="config-name" type="string" specify="optional" />
 		</add-on>
 		<add-on name="entity-sub-format" requires="entity-config-format">
 			<?DOC The element name to use for entities of this sub-type?>
 			<attribute name="sub-type-name" type="string" specify="optional" />
+		</add-on>
+
+		<?DOC Tag for <model-value> types that may be specified in an <entity-data-set> model?>
+		<add-on name="allow-eds-model" abstract="true" />
+		<?DOC Tag for <model-value> elements in an <entity-data-set> model?>
+		<add-on name="eds-model-value" requires="model-value" inherits="type-required" />
+		<?DOC Ensures that custom sorting is not requested for sorted collections in an <entity-data-set>.
+			Sorting is always by the entity's ID.?>
+		<add-on name="eds-sorted-value" extends="sorted-model-value">
+			<child-mod child="sorted-model-value.sort" max="0" />
 		</add-on>
 	</add-ons>
 
@@ -54,15 +64,7 @@ It builds on the Expresso-Base toolkit and allows specification of persisted con
 		<!-- Config models.  These function similarly to internal models, except that they represent persistent values from
 			 ObservableConfig.  Some of these allow specification of default values, but these are only used if the persistent data
 			 for the value has not been initialized. -->
-		<?DOC An extension of &lt;abst-model> capable of persisting its contents and re-loading them when the application is loaded.<br>
-			This makes it ideal for storing data such as:
-			<ul>
-				<li>The location of the application window and any movable dialogs</li>
-				<li>The location of sliders in split panes</li>
-				<li>Small-scale, non-shared application data</li>
-			</ul>
-			The data format is typically fairly verbose, and all the data is loaded into memory, so large-scale data should not be specified here.?>
-		<element-def name="config" extends="abst-model">
+		<element-def name="abst-config-model" extends="abst-model" abstract="true">
 			<?DOC The config name for the model.<br>
 				This determines the file name in which the data is stored.  E.g. a "config-name" of "application" may result in a persistence file called "application.xml".<br>
 				This property also influences where the persistence file will reside.<br>
@@ -74,17 +76,63 @@ It builds on the Expresso-Base toolkit and allows specification of persisted con
 			<attribute name="config-dir" type="expression" specify="optional" />
 			<?DOC Any "config-name" values that this model may have had in the past.  This can be used to migrate old data if the application is renamed.?>
 			<child-def name="old-config-name" type="old-config-name" min="0" max="inf" />
-			<?DOC Values for the model?>
-			<child-mod child="abst-model.value" requires="allow-config-model" inherits="config-model-value" />
 			<?DOC By default, &lt;config> maintains backup copies of all the data in the model, sampled at varying intervals.<br>
 				In the event that the primary data file cannot be loaded, the user will be prompted to select a backup to load.<br>
-				The corrupt file will be replaced with the backup and the application will be restarted.?>
-			<attribute name="backup" type="boolean" default="true" />
+				The corrupt file will be replaced with the backup and the application will be restarted.<br>
+				This can be disabled by a '<no-backup />' element, or configured using a custom <data-backup> element.?>
+			<child-def name="backup" type="data-backup" min="0" />
+		</element-def>
+		<?DOC An extension of &lt;abst-model> capable of persisting its contents and re-loading them when the application is loaded.<br>
+			This makes it ideal for storing data such as:
+			<ul>
+				<li>The location of the application window and any movable dialogs</li>
+				<li>The location of sliders in split panes</li>
+				<li>Small-scale, non-shared application data</li>
+			</ul>
+			The data format is typically fairly verbose, and all the data is loaded into memory, so large-scale data should not be specified here.?>
+		<element-def name="config" extends="abst-config-model">
+			<?DOC Values for the model?>
+			<child-mod child="abst-model.value" requires="allow-config-model" inherits="config-model-value" />
 		</element-def>
 		<?DOC An old "config-name" that a &lt;config> may have had in the past?>
 		<element-def name="old-config-name">
 			<?DOC The old "config-name"?>
 			<value type="string" />
+		</element-def>
+
+		<?DOC A data model that stores its data in a more efficient form than <config>.<br>
+			Data in this format can also be migrated, so old data can be modified for changes to the schema
+			and used in later versions of the software.<br>
+			Import/Export of data is also supported?>
+		<element-def name="entity-data-set" extends="abst-config-model,with-element-model">
+			<attribute name="migrations" type="expression" />
+			<?DOC When this is expression is specified and the evaluates to a non-null file or output stream,
+				the data in this model will be exported to the given file or stream.?>
+			<attribute name="export-to" type="expression" specify="optional" />
+			<?DOC The <entity-data-set> element determines what types to support based on the types of all variables declared in the model.<br>
+				This includes types referenced by those types, and so on.<br>
+				It may be the case, however, that for some of those types there exist sub-types that also need to be included in the type set,
+				but which are not themselves referenced by any type declared in the model.<br>
+				<entity-sub-type> elements may be declared here whose values are sub-types of entities referred to by variable types in this model
+				that should be included in the type set.?>
+			<child-def name="sub-types" type="entity-sub-type" min="0" max="inf" />
+			<?DOC Values for the model?>
+			<child-mod child="abst-model.value" requires="allow-eds-model" inherits="eds-model-value" />
+		</element-def>
+		<?DOC A sub-type or collection of them declared in an <entity-data-set>.  See <entity-data-set>.sub-types.?>
+		<element-def name="entity-sub-type">
+			<?DOC An expression that may evaluate to a class object or a collection of them to add to the type set?>
+			<attribute name="types" type="expression" specify="optional" />
+			<?DOC The name of the type to add to the type set?>
+			<value type="string" specify="optional" />
+		</element-def>
+
+		<element-def name="data-backup">
+			<?DOC A list of ages to preserve backups for?>
+			<attribute name="ages" type="expression" specify="optional" />
+		</element-def>
+		<element-def name="no-backup" extends="data-backup">
+			<child-mod child="ages" max="0" />
 		</element-def>
 
 		<!-- Elements to support formats -->	
@@ -325,6 +373,13 @@ It builds on the Expresso-Base toolkit and allows specification of persisted con
 		<?DOC Allows specification of the key format for &lt;map>s in &lt;config> models?>
 		<auto-inherit inherits="config-map">
 			<target element="map" role="config.value" />
+		</auto-inherit>
+
+		<auto-inherit inherits="allow-eds-model">
+			<target element="list" />
+		</auto-inherit>
+		<auto-inherit inherits="eds-sorted-value">
+			<target element="sorted-model-value" role="entity-data-set.value" />
 		</auto-inherit>
 	</auto-inheritance>
 </qonfig-def>

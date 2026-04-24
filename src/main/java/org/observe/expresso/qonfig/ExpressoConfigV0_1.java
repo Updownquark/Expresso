@@ -181,6 +181,10 @@ public class ExpressoConfigV0_1 implements QonfigInterpretation {
 	void configureConfigModels(QonfigInterpreterCore.Builder interpreter) {
 		interpreter.createWith("config", ObservableModelElement.ConfigModelElement.Def.class,
 			ExElement.creator(ObservableModelElement.ConfigModelElement.Def::new));
+		interpreter.createWith(EntityDataSet.ENTITY_DATA_SET, EntityDataSet.Def.class, ExElement.creator(EntityDataSet.Def::new));
+		interpreter.createWith(DataBackup.DATA_BACKUP, DataBackup.Def.class, ExElement.creator(DataBackup.Def::new));
+		interpreter.createWith(DataBackup.NoBackup.NO_BACKUP, DataBackup.NoBackup.Def.class,
+			ExElement.creator(DataBackup.NoBackup.Def::new));
 		interpreter.createWith("value", ConfigModelValue.Def.class, ExElement.creator(ConfigValue::new));
 		interpreter.createWith("value-set", ConfigModelValue.Def.class, ExElement.creator(ConfigValueSet::new));
 		// TODO list, sorted-list, set, sorted-set
