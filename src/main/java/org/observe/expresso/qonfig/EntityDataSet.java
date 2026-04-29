@@ -4,11 +4,13 @@ import java.io.IOException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.net.URL;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.observe.SettableValue;
 import org.observe.collect.ObservableCollection;
@@ -55,7 +57,9 @@ import org.qommons.io.ErrorReporting;
 import org.qommons.io.FileUtils;
 import org.qommons.io.LocatedPositionedContent;
 import org.qommons.io.NativeFileSource;
+import org.qommons.io.TemporalBackupScheme;
 import org.qommons.io.TextParseException;
+import org.qommons.tree.BetterTreeSet;
 
 import com.google.common.reflect.TypeToken;
 
@@ -76,6 +80,12 @@ public class EntityDataSet extends AbstractConfigModelElement {
 			theSubTypes = new ArrayList<>();
 		}
 
+		@QonfigAttributeGetter("migrations")
+		public CompiledExpression getMigrations() {
+			return theMigrations;
+		}
+
+		@QonfigChildGetter("sub-types")
 		public List<EntitySubType.Def> getSubTypes() {
 			return Collections.unmodifiableList(theSubTypes);
 		}
@@ -93,6 +103,7 @@ public class EntityDataSet extends AbstractConfigModelElement {
 
 		@Override
 		protected DataSourceValueMaker createValueMaker(ExpressoQIS session) throws QonfigInterpretationException {
+			theMigrations = getAttributeExpression("migrations", session);
 			syncChildren(EntitySubType.Def.class, theSubTypes, session.forChildren("sub-types"));
 
 			return new EntitySetValueMaker(this, getConfigDir(), getConfigName(), getBackup(), //
@@ -133,14 +144,14 @@ public class EntityDataSet extends AbstractConfigModelElement {
 			}
 
 			class Interpreted extends AbstractConfigModelElement.Def.DataSourceValueMaker.Interpreted<ReflectedEntitySet> {
-				private final InterpretedValueSynth<SettableValue<?>, SettableValue<String>> theMigrations;
+				private final InterpretedValueSynth<SettableValue<?>, SettableValue<String>> theInterpretedMigrations;
 				private final LocatedPositionedContent theMigrationsPosition;
 
 				public Interpreted(InterpretedValueSynth<SettableValue<?>, SettableValue<BetterFile>> configDir,
 					DataBackup.Interpreted<?> backup, InterpretedValueSynth<SettableValue<?>, SettableValue<String>> migrations,
 					LocatedPositionedContent migrationsPosition) {
 					super(configDir, backup);
-					theMigrations = migrations;
+					theInterpretedMigrations = migrations;
 					theMigrationsPosition = migrationsPosition;
 				}
 
@@ -150,7 +161,7 @@ public class EntityDataSet extends AbstractConfigModelElement {
 				}
 
 				@Override
-				protected EntityDataSet.Interpreted<?> getInterpretedModel() {
+				public EntityDataSet.Interpreted<?> getInterpretedModel() {
 					return (EntityDataSet.Interpreted<?>) super.getInterpretedModel();
 				}
 
@@ -166,7 +177,7 @@ public class EntityDataSet extends AbstractConfigModelElement {
 					}
 					return new Instantiator(getInterpretedModel().getAddOnValue(ExNamed.Interpreted.class, ExNamed.Interpreted::getName),
 						configDir, configName, backup, oldConfigNames, reporting, entityTypes, //
-						theMigrations.instantiate(), theMigrationsPosition, //
+						theInterpretedMigrations.instantiate(), theMigrationsPosition, //
 						QommonsUtils.map(getInterpretedModel().getSubTypes(), EntitySubType.Interpreted::create, false));
 				}
 			}
@@ -191,7 +202,7 @@ public class EntityDataSet extends AbstractConfigModelElement {
 				}
 
 				@Override
-				protected ReflectedEntitySet create(ModelSetInstance models, BetterFile configFile) throws ModelInstantiationException {
+				protected ReflectedEntitySet create(ModelSetInstance models, BetterFile configDir) throws ModelInstantiationException {
 					String migrations = theMigrations.get(models).get();
 					BetterFile migrationsFile;
 					if (migrations.startsWith("/")) { // Absolute path--assuming in the classpath
@@ -244,13 +255,19 @@ public class EntityDataSet extends AbstractConfigModelElement {
 						VersionedDataScheme.LoadedGenericData loadedData;
 						try {
 							loadedData = dataScheme//
-								.load(configFile, null, persistence);
+								.load(configDir, null, persistence);
 						} catch (CheckedExceptionWrapper wrapper) {
 							wrapper.throwIfType(ModelInstantiationException.class);
 							throw wrapper;
 						}
 						GenericEntitySet.copy(loadedData.entityData, entitySet);
 						VersionedDataScheme.RollingEntitySetPersistence persister = loadedData.createPersister(persistence);
+						TemporalBackupScheme backup;
+						if (getBackup() == null)
+							backup = new TemporalBackupScheme(); // Default
+						else
+							backup = getBackup().createBackup();
+						persister.withBackup(backup);
 						entitySet.onChange(cause -> {
 							long dataSetStamp = entitySet.getStamp();
 							try {

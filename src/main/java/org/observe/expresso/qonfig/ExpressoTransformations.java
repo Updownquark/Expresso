@@ -450,6 +450,7 @@ public class ExpressoTransformations {
 		 */
 		public static class Interpreted<M1, MV1 extends M1, M2, MV2 extends M2>
 		extends AbstractExpressoTransformedElement.Interpreted<M1, MV1, M1, MV1, M2, MV2, M2, MV2> {
+			private ObservableModelElement.Interpreted<?> theInterpretedModel;
 			private InterpretedValueSynth<M1, MV1> theSource;
 
 			Interpreted(ExpressoTransformedElement<M1, M2> definition, ExElement.Interpreted<?> parent) {
@@ -469,6 +470,16 @@ public class ExpressoTransformations {
 			@Override
 			public ModelInstanceType<M2, MV2> getType() {
 				return getInternalType();
+			}
+
+			@Override
+			public ObservableModelElement.Interpreted<?> getInterpretedModel() {
+				return theInterpretedModel;
+			}
+
+			@Override
+			public void setInterpretedModel(ObservableModelElement.Interpreted<?> interpretedModel) {
+				theInterpretedModel = interpretedModel;
 			}
 
 			@Override

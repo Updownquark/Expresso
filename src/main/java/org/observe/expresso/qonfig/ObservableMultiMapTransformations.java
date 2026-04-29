@@ -615,6 +615,7 @@ public class ObservableMultiMapTransformations {
 		KS, VS, KT, VT>
 		extends ExpressoTransformations.AbstractExpressoTransformedElement.Interpreted<M1, MV1, C1, CV1, M2, MV2, C2, CV2>
 		implements Operation.Interpreted<M1, MV1, M2, MV2, ModelValueElement<MV2>> {
+			private ObservableModelElement.Interpreted<?> theInterpretedModel;
 			private ModelInstanceType<ObservableMultiMap<?, ?>, ObservableMultiMap<KT, VT>> theTargetType;
 
 			Interpreted(MapTransform<M1, M2, C1, C2> def, ExElement.Interpreted<?> parent) {
@@ -629,6 +630,16 @@ public class ObservableMultiMapTransformations {
 			@Override
 			public ModelInstanceType<M2, MV2> getType() {
 				throw new IllegalStateException(MAP_TRANSFORM + " cannot be used as a model value");
+			}
+
+			@Override
+			public ObservableModelElement.Interpreted<?> getInterpretedModel() {
+				return theInterpretedModel;
+			}
+
+			@Override
+			public void setInterpretedModel(ObservableModelElement.Interpreted<?> interpretedModel) {
+				theInterpretedModel = interpretedModel;
 			}
 
 			@Override

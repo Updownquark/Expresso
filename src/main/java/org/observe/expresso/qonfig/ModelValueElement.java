@@ -405,11 +405,13 @@ public interface ModelValueElement<MV> extends ExElement, ModelValueInstantiator
 	 * @param <MV> The instance type of the value
 	 * @param <E> The sub-type of {@link ModelValueElement} to create
 	 */
-	public interface Interpreted<M, MV extends M, E extends ModelValueElement<MV>> extends ExElement.Interpreted<E> {
+	public interface Interpreted<M, MV extends M, E extends ModelValueElement<MV>>
+	extends ExElement.Interpreted<E>, ObservableModelElement.InterpretedModelElementComponent<M, MV> {
 		@Override
 		Def<M, ? super E> getDefinition();
 
 		/** @return The type of the value to create */
+		@Override
 		ModelInstanceType<M, MV> getType();
 
 		/** @return The interpreted expression in this element's element value */
@@ -438,6 +440,7 @@ public interface ModelValueElement<MV> extends ExElement, ModelValueInstantiator
 		public abstract class Abstract<M, MV extends M, E extends ModelValueElement<MV>> extends ExElement.Interpreted.Abstract<E>
 		implements Interpreted<M, MV, E> {
 			private InterpretedValueSynth<M, MV> theValue;
+			private ObservableModelElement.Interpreted<?> theInterpretedModel;
 
 			/**
 			 * @param definition The definition to interpret
@@ -466,6 +469,16 @@ public interface ModelValueElement<MV> extends ExElement, ModelValueInstantiator
 					return theValue.getType();
 				else
 					return getTargetType();
+			}
+
+			@Override
+			public ObservableModelElement.Interpreted<?> getInterpretedModel() {
+				return theInterpretedModel;
+			}
+
+			@Override
+			public void setInterpretedModel(ObservableModelElement.Interpreted<?> interpretedModel) {
+				theInterpretedModel = interpretedModel;
 			}
 
 			@Override

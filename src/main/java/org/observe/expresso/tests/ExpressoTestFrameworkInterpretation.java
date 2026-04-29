@@ -9,9 +9,8 @@ import org.observe.expresso.CompiledExpressoEnv;
 import org.observe.expresso.ExpressoInterpretationException;
 import org.observe.expresso.ModelInstantiationException;
 import org.observe.expresso.ModelType;
-import org.observe.expresso.ModelTypes;
-import org.observe.expresso.ObservableModelSet;
 import org.observe.expresso.ModelType.ModelInstanceType;
+import org.observe.expresso.ModelTypes;
 import org.observe.expresso.ObservableModelSet.InterpretedValueSynth;
 import org.observe.expresso.ObservableModelSet.ModelSetInstance;
 import org.observe.expresso.ObservableModelSet.ModelValueInstantiator;
@@ -20,6 +19,7 @@ import org.observe.expresso.qonfig.ExElement;
 import org.observe.expresso.qonfig.ExElementTraceable;
 import org.observe.expresso.qonfig.ExpressoQIS;
 import org.observe.expresso.qonfig.ModelValueElement;
+import org.observe.expresso.qonfig.ObservableModelElement;
 import org.qommons.QommonsUtils;
 import org.qommons.Version;
 import org.qommons.config.QonfigElementOrAddOn;
@@ -111,6 +111,7 @@ public class ExpressoTestFrameworkInterpretation implements QonfigInterpretation
 
 		static class Interpreted<T> extends ExElement.Interpreted.Abstract<ModelValueElement<SettableValue<T>>>
 		implements ModelValueElement.InterpretedSynth<SettableValue<?>, SettableValue<T>, ModelValueElement<SettableValue<T>>> {
+			private ObservableModelElement.Interpreted<?> theInterpretedModel;
 			private InterpretedValueSynth<SettableValue<?>, SettableValue<T>> theValue;
 
 			public Interpreted(WatchedValue definition, ExElement.Interpreted<?> parent) {
@@ -120,6 +121,16 @@ public class ExpressoTestFrameworkInterpretation implements QonfigInterpretation
 			@Override
 			public WatchedValue getDefinition() {
 				return (WatchedValue) super.getDefinition();
+			}
+
+			@Override
+			public ObservableModelElement.Interpreted<?> getInterpretedModel() {
+				return theInterpretedModel;
+			}
+
+			@Override
+			public void setInterpretedModel(ObservableModelElement.Interpreted<?> interpretedModel) {
+				theInterpretedModel = interpretedModel;
 			}
 
 			@Override

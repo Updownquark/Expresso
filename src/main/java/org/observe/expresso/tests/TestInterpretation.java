@@ -27,6 +27,7 @@ import org.observe.expresso.qonfig.ExFlexibleElementModelAddOn;
 import org.observe.expresso.qonfig.ExWithElementModel;
 import org.observe.expresso.qonfig.ExpressoQIS;
 import org.observe.expresso.qonfig.ModelValueElement;
+import org.observe.expresso.qonfig.ObservableModelElement;
 import org.observe.expresso.qonfig.QonfigAttributeGetter;
 import org.qommons.Version;
 import org.qommons.collect.BetterList;
@@ -130,6 +131,7 @@ public class TestInterpretation implements QonfigInterpretation {
 
 		static class Interpreted extends ExElement.Interpreted.Abstract<ModelValueElement<SettableValue<StatefulTestStructure>>> implements
 		ModelValueElement.InterpretedSynth<SettableValue<?>, SettableValue<StatefulTestStructure>, ModelValueElement<SettableValue<StatefulTestStructure>>> {
+			private ObservableModelElement.Interpreted<?> theInterpretedModel;
 			private InterpretedValueSynth<SettableValue<?>, SettableValue<Integer>> theDerivedState;
 
 			Interpreted(StatefulStruct def, ExElement.Interpreted<?> parent) {
@@ -148,6 +150,16 @@ public class TestInterpretation implements QonfigInterpretation {
 			@Override
 			public ModelInstanceType<SettableValue<?>, SettableValue<StatefulTestStructure>> getType() {
 				return ModelTypes.Value.forType(StatefulTestStructure.class);
+			}
+
+			@Override
+			public ObservableModelElement.Interpreted<?> getInterpretedModel() {
+				return theInterpretedModel;
+			}
+
+			@Override
+			public void setInterpretedModel(ObservableModelElement.Interpreted<?> interpretedModel) {
+				theInterpretedModel = interpretedModel;
 			}
 
 			@Override
@@ -277,6 +289,7 @@ public class TestInterpretation implements QonfigInterpretation {
 		static class Interpreted<T>
 		extends ExElement.Interpreted.Abstract<ModelValueElement<SettableValue<DynamicTypeStatefulTestStructure>>> implements
 		ModelValueElement.InterpretedSynth<SettableValue<?>, SettableValue<DynamicTypeStatefulTestStructure>, ModelValueElement<SettableValue<DynamicTypeStatefulTestStructure>>> {
+			private ObservableModelElement.Interpreted<?> theInterpretedModel;
 			private InterpretedValueSynth<SettableValue<?>, SettableValue<T>> theInternalState;
 			private InterpretedValueSynth<SettableValue<?>, SettableValue<T>> theDerivedState;
 
@@ -297,6 +310,16 @@ public class TestInterpretation implements QonfigInterpretation {
 			@Override
 			public ModelInstanceType<SettableValue<?>, SettableValue<DynamicTypeStatefulTestStructure>> getType() {
 				return ModelTypes.Value.forType(DynamicTypeStatefulTestStructure.class);
+			}
+
+			@Override
+			public ObservableModelElement.Interpreted<?> getInterpretedModel() {
+				return theInterpretedModel;
+			}
+
+			@Override
+			public void setInterpretedModel(ObservableModelElement.Interpreted<?> interpretedModel) {
+				theInterpretedModel = interpretedModel;
 			}
 
 			public InterpretedValueSynth<SettableValue<?>, SettableValue<T>> getInternalState() {
@@ -436,6 +459,7 @@ public class TestInterpretation implements QonfigInterpretation {
 		static class Interpreted<T>
 		extends ExElement.Interpreted.Abstract<ModelValueElement<SettableValue<DynamicTypeStatefulTestStructure>>> implements
 		ModelValueElement.InterpretedSynth<SettableValue<?>, SettableValue<DynamicTypeStatefulTestStructure>, ModelValueElement<SettableValue<DynamicTypeStatefulTestStructure>>> {
+			private ObservableModelElement.Interpreted<?> theInterpretedModel;
 			private InterpretedValueSynth<SettableValue<?>, SettableValue<T>> theInternalState;
 			private InterpretedValueSynth<SettableValue<?>, SettableValue<T>> theDerivedState;
 
@@ -456,6 +480,16 @@ public class TestInterpretation implements QonfigInterpretation {
 			@Override
 			public ModelInstanceType<SettableValue<?>, SettableValue<DynamicTypeStatefulTestStructure>> getType() {
 				return ModelTypes.Value.forType(DynamicTypeStatefulTestStructure.class);
+			}
+
+			@Override
+			public ObservableModelElement.Interpreted<?> getInterpretedModel() {
+				return theInterpretedModel;
+			}
+
+			@Override
+			public void setInterpretedModel(ObservableModelElement.Interpreted<?> interpretedModel) {
+				theInterpretedModel = interpretedModel;
 			}
 
 			public InterpretedValueSynth<SettableValue<?>, SettableValue<T>> getInternalState() {

@@ -63,6 +63,7 @@ import org.qommons.io.FileBackups;
 import org.qommons.io.Format;
 import org.qommons.io.NativeFileSource;
 import org.qommons.io.SpinnerFormat;
+import org.qommons.io.TemporalBackupScheme;
 import org.qommons.io.TextParseException;
 import org.qommons.threading.QommonsTimer;
 
@@ -240,9 +241,14 @@ public abstract class ObservableModelElement extends ExElement.Abstract {
 			try (Transaction t = ModelValueElement.INTERPRETING_PARENTS.installParent(this)) {
 				for (String name : env.getModels().getComponentNames()) {
 					InterpretedModelComponentNode<?, ?> mv = env.getModels().getLocalComponent(name).interpret(env);
+					if (mv.getValue() instanceof InterpretedModelElementComponent)
+						((InterpretedModelElementComponent<?, ?>) mv.getValue()).setInterpretedModel(this);
 					ModelValueElement.Interpreted<?, ?, ?> modelValue = findModelValue(mv.getValue());
-					if (modelValue != null && modelValue.getDefinition().getParentElement() == getDefinition())
+					if (modelValue != null && modelValue.getDefinition().getParentElement() == getDefinition()) {
+						if (modelValue != mv.getValue())
+							modelValue.setInterpretedModel(this);
 						theValues.add(modelValue);
+					}
 				}
 				Collections.sort(theValues, (mv1, mv2) -> Integer.compare(mv1.reporting().getPosition().getPosition(),
 					mv2.reporting().getPosition().getPosition()));
@@ -333,6 +339,14 @@ public abstract class ObservableModelElement extends ExElement.Abstract {
 		super.instantiated();
 		for (ModelValueElement<?> value : theValues)
 			value.instantiated();
+	}
+
+	public interface InterpretedModelElementComponent<M, MV extends M> extends InterpretedValueSynth<M, MV> {
+		/** @return The interpreted model element this data set value is for */
+		ObservableModelElement.Interpreted<?> getInterpretedModel();
+
+		/** @param model The interpreted model element this data set value is for */
+		void setInterpretedModel(ObservableModelElement.Interpreted<?> model);
 	}
 
 	/** Represents a &lt;models> element consisting of some number of models */
@@ -1020,7 +1034,8 @@ public abstract class ObservableModelElement extends ExElement.Abstract {
 				 *
 				 * @param <T> The type of the data source
 				 */
-				protected abstract class Interpreted<T> implements InterpretedValueSynth<SettableValue<?>, SettableValue<T>> {
+				protected abstract class Interpreted<T> implements InterpretedValueSynth<SettableValue<?>, SettableValue<T>>,
+				InterpretedModelElementComponent<SettableValue<?>, SettableValue<T>> {
 					private final InterpretedValueSynth<SettableValue<?>, SettableValue<BetterFile>> theInterpretedConfigDir;
 					private final DataBackup.Interpreted<?> theInterpretedBackup;
 					private AbstractConfigModelElement.Interpreted<?> theInterpretedModel;
@@ -1040,14 +1055,14 @@ public abstract class ObservableModelElement extends ExElement.Abstract {
 						return theInterpretedBackup;
 					}
 
-					/** @return The interpreted model element this data set value is for */
-					protected AbstractConfigModelElement.Interpreted<?> getInterpretedModel() {
+					@Override
+					public AbstractConfigModelElement.Interpreted<?> getInterpretedModel() {
 						return theInterpretedModel;
 					}
 
-					/** @param interpretedModel The interpreted model element this data set value is for */
-					protected void setInterpretedModel(AbstractConfigModelElement.Interpreted<?> interpretedModel) {
-						theInterpretedModel = interpretedModel;
+					@Override
+					public void setInterpretedModel(ObservableModelElement.Interpreted<?> interpretedModel) {
+						theInterpretedModel = (AbstractConfigModelElement.Interpreted<?>) interpretedModel;
 					}
 
 					@Override
@@ -1152,62 +1167,18 @@ public abstract class ObservableModelElement extends ExElement.Abstract {
 						} else if (!configDirFile.isDirectory())
 							throw new IllegalStateException("Not a directory: " + configDirFile.getPath());
 
-						BetterFile configFile = configDirFile == null ? null : configDirFile.at(theConfigName + ".xml");
-						if (configFile != null && !configFile.exists()) {
-							BetterFile oldConfigFile = configDirFile.getParent().at(theConfigName + ".config");
-							if (oldConfigFile.exists()) {
-								try {
-									oldConfigFile.move(configFile);
-								} catch (IOException e) {
-									System.err.println(
-										"Could not move old configuration " + oldConfigFile.getPath() + " to " + configFile.getPath());
-									e.printStackTrace();
-								}
-							}
-						}
-
-						if (configFile != null && !configFile.exists() && theOldConfigNames != null) {
-							boolean found = false;
-							for (String oldConfigName : theOldConfigNames) {
-								BetterFile oldConfigFile = configDirFile.at(oldConfigName);
-								if (oldConfigFile.exists()) {
-									try {
-										oldConfigFile.move(configFile);
-									} catch (IOException e) {
-										System.err.println("Could not rename " + oldConfigFile.getPath() + " to " + configFile.getPath());
-										e.printStackTrace();
-									}
-									found = true;
-									break;
-								}
-								if (!found) {
-									oldConfigFile = configDirFile.getParent().at(oldConfigName + "/" + oldConfigName + ".xml");
-									if (oldConfigFile.exists()) {
-										try {
-											oldConfigFile.move(configFile);
-										} catch (IOException e) {
-											System.err
-											.println("Could not rename " + oldConfigFile.getPath() + " to " + configFile.getPath());
-											e.printStackTrace();
-										}
-										found = true;
-										break;
-									}
-								}
-							}
-						}
-						return SettableValue.of(create(models, configFile), "Not Settable");
+						return SettableValue.of(create(models, configDirFile), "Not Settable");
 					}
 
 					/**
 					 * Creates the data source value
 					 *
 					 * @param models The model instance
-					 * @param configFile The configuration file or directory to persist to
+					 * @param configDir The configuration directory to persist to
 					 * @return The data source for model values in this model
 					 * @throws ModelInstantiationException If the data source cannot be created
 					 */
-					protected abstract T create(ModelSetInstance models, BetterFile configFile) throws ModelInstantiationException;
+					protected abstract T create(ModelSetInstance models, BetterFile configDir) throws ModelInstantiationException;
 
 					@Override
 					public SettableValue<T> forModelCopy(SettableValue<T> value, ModelSetInstance sourceModels, ModelSetInstance newModels)
@@ -1407,20 +1378,58 @@ public abstract class ObservableModelElement extends ExElement.Abstract {
 					}
 
 					@Override
-					protected ObservableConfig create(ModelSetInstance models, BetterFile configFile) throws ModelInstantiationException {
+					protected ObservableConfig create(ModelSetInstance models, BetterFile configDir) throws ModelInstantiationException {
+						BetterFile configFile = configDir == null ? null : configDir.at(getConfigName() + ".xml");
+						if (configFile != null && !configFile.exists()) {
+							BetterFile oldConfigFile = configDir.getParent().at(getConfigName() + ".config");
+							if (oldConfigFile.exists()) {
+								try {
+									oldConfigFile.move(configFile);
+								} catch (IOException e) {
+									System.err.println(
+										"Could not move old configuration " + oldConfigFile.getPath() + " to " + configFile.getPath());
+									e.printStackTrace();
+								}
+							}
+						}
+
+						if (configFile != null && !configFile.exists()) {
+							boolean found = false;
+							for (String oldConfigName : getOldConfigNames()) {
+								BetterFile oldConfigFile = configDir.at(oldConfigName);
+								if (oldConfigFile.exists()) {
+									try {
+										oldConfigFile.move(configFile);
+									} catch (IOException e) {
+										System.err.println("Could not rename " + oldConfigFile.getPath() + " to " + configFile.getPath());
+										e.printStackTrace();
+									}
+									found = true;
+									break;
+								}
+								if (!found) {
+									oldConfigFile = configDir.getParent().at(oldConfigName + "/" + oldConfigName + ".xml");
+									if (oldConfigFile.exists()) {
+										try {
+											oldConfigFile.move(configFile);
+										} catch (IOException e) {
+											System.err
+											.println("Could not rename " + oldConfigFile.getPath() + " to " + configFile.getPath());
+											e.printStackTrace();
+										}
+										found = true;
+										break;
+									}
+								}
+							}
+						}
 						FileBackups backups;
 						if (getBackup() == null) {
 							// Use default backup configuration
 							backups = new FileBackups(configFile);
 						} else {
-							// We only support static configuration here
-							BetterSortedSet<Duration> ages = BetterSortedSet.of(Duration::compareTo, getBackup().getBackupAges());
-							if (ages.isEmpty())
-								backups = null;
-							else {
-								backups = new FileBackups(configFile);
-								backups.getBackupScheme().setBackupAges(ages);
-							}
+							TemporalBackupScheme scheme = getBackup().createBackup();
+							backups = scheme == null ? null : new FileBackups(configFile).setBackupScheme(scheme);
 						}
 
 						String rootName = getConfigName().isEmpty() ? "config" : getConfigName();

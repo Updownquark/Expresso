@@ -10,8 +10,11 @@ import org.observe.expresso.ModelTypes;
 import org.observe.expresso.ObservableModelSet.InterpretedValueSynth;
 import org.observe.expresso.ObservableModelSet.ModelSetInstance;
 import org.observe.expresso.ObservableModelSet.ModelValueInstantiator;
+import org.qommons.QommonsUtils;
+import org.qommons.collect.BetterSortedSet;
 import org.qommons.config.QonfigElementOrAddOn;
 import org.qommons.config.QonfigInterpretationException;
+import org.qommons.fn.FunctionUtils;
 import org.qommons.io.TemporalBackupScheme;
 
 public class DataBackup extends ExElement.Abstract {
@@ -90,6 +93,13 @@ public class DataBackup extends ExElement.Abstract {
 		return theBackupAges;
 	}
 
+	public TemporalBackupScheme createBackup() {
+		TemporalBackupScheme backup = new TemporalBackupScheme();
+		if (!getBackupAges().isEmpty())
+			backup.setBackupAges(BetterSortedSet.of(FunctionUtils.COMPARABLE_COMPARE, QommonsUtils.unmodifiableCopy(getBackupAges())));
+		return backup;
+	}
+
 	@Override
 	protected void doUpdate(ExElement.Interpreted<?> interpreted) throws ModelInstantiationException {
 		super.doUpdate(interpreted);
@@ -157,7 +167,7 @@ public class DataBackup extends ExElement.Abstract {
 		}
 
 		@Override
-		protected ObservableCollection<Duration> getDefaultBackupAges() {
+		public TemporalBackupScheme createBackup() {
 			return null;
 		}
 	}

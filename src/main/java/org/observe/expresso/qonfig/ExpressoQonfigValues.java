@@ -1475,6 +1475,7 @@ public class ExpressoQonfigValues {
 		extends ModelValueElement.Interpreted.Abstract<SettableValue<?>, SettableValue<V>, ModelValueElement<SettableValue<V>>> {
 			private InterpretedValueSynth<SettableValue<?>, SettableValue<K>> theKey;
 			private InterpretedValueSynth<SettableValue<?>, SettableValue<V>> theValue;
+			private ObservableModelElement.Interpreted<?> theInterpretedModel;
 
 			Interpreted(MapEntry definition, ExElement.Interpreted<?> parent) {
 				super(definition, parent);
@@ -1483,6 +1484,16 @@ public class ExpressoQonfigValues {
 			@Override
 			public MapEntry getDefinition() {
 				return (MapEntry) super.getDefinition();
+			}
+
+			@Override
+			public ObservableModelElement.Interpreted<?> getInterpretedModel() {
+				return theInterpretedModel;
+			}
+
+			@Override
+			public void setInterpretedModel(ObservableModelElement.Interpreted<?> interpretedModel) {
+				theInterpretedModel = interpretedModel;
 			}
 
 			@Override
@@ -1514,6 +1525,16 @@ public class ExpressoQonfigValues {
 				super.update();
 				theKey = interpret(getDefinition().getKey(), ModelTypes.Value.forType(keyType));
 				theValue = interpret(getDefinition().getElementValue(), ModelTypes.Value.forType(valueType));
+			}
+
+			@Override
+			public List<? extends InterpretedValueSynth<?, ?>> getComponents() {
+				return BetterList.of(theKey, theValue);
+			}
+
+			@Override
+			public ModelValueInstantiator<SettableValue<V>> instantiate() throws ModelInstantiationException {
+				return create();
 			}
 
 			@Override
@@ -2444,6 +2465,7 @@ public class ExpressoQonfigValues {
 		 */
 		public static class Interpreted<T> extends ExElement.Interpreted.Abstract<ModelValueElement<Observable<T>>>
 		implements ModelValueElement.InterpretedSynth<Observable<?>, Observable<T>, ModelValueElement<Observable<T>>> {
+			private ObservableModelElement.Interpreted<?> theInterpretedModel;
 			private TypeToken<T> theEventType;
 			private InterpretedValueSynth<Observable<?>, Observable<T>> theEvent;
 			private InterpretedValueSynth<ObservableAction, ObservableAction> theAction;
@@ -2455,6 +2477,16 @@ public class ExpressoQonfigValues {
 			@Override
 			public Hook getDefinition() {
 				return (Hook) super.getDefinition();
+			}
+
+			@Override
+			public ObservableModelElement.Interpreted<?> getInterpretedModel() {
+				return theInterpretedModel;
+			}
+
+			@Override
+			public void setInterpretedModel(ObservableModelElement.Interpreted<?> interpretedModel) {
+				theInterpretedModel = interpretedModel;
 			}
 
 			@Override

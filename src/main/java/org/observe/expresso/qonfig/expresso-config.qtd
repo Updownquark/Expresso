@@ -53,11 +53,6 @@ It builds on the Expresso-Base toolkit and allows specification of persisted con
 		<add-on name="allow-eds-model" abstract="true" />
 		<?DOC Tag for <model-value> elements in an <entity-data-set> model?>
 		<add-on name="eds-model-value" requires="model-value" inherits="type-required" />
-		<?DOC Ensures that custom sorting is not requested for sorted collections in an <entity-data-set>.
-			Sorting is always by the entity's ID.?>
-		<add-on name="eds-sorted-value" extends="sorted-model-value">
-			<child-mod child="sorted-model-value.sort" max="0" />
-		</add-on>
 	</add-ons>
 
 	<elements>
@@ -104,11 +99,11 @@ It builds on the Expresso-Base toolkit and allows specification of persisted con
 			Data in this format can also be migrated, so old data can be modified for changes to the schema
 			and used in later versions of the software.<br>
 			Import/Export of data is also supported?>
-		<element-def name="entity-data-set" extends="abst-config-model,with-element-model">
+		<element-def name="entity-data-set" extends="abst-config-model" inherits="with-element-model">
 			<attribute name="migrations" type="expression" />
-			<?DOC When this is expression is specified and the evaluates to a non-null file or output stream,
+			<!--<?DOC When this is expression is specified and the evaluates to a non-null file or output stream,
 				the data in this model will be exported to the given file or stream.?>
-			<attribute name="export-to" type="expression" specify="optional" />
+			<attribute name="export-to" type="expression" specify="optional" />-->
 			<?DOC The <entity-data-set> element determines what types to support based on the types of all variables declared in the model.<br>
 				This includes types referenced by those types, and so on.<br>
 				It may be the case, however, that for some of those types there exist sub-types that also need to be included in the type set,
@@ -132,7 +127,7 @@ It builds on the Expresso-Base toolkit and allows specification of persisted con
 			<attribute name="ages" type="expression" specify="optional" />
 		</element-def>
 		<element-def name="no-backup" extends="data-backup">
-			<child-mod child="ages" max="0" />
+			<attr-mod name="data-backup.ages" specify="forbidden" />
 		</element-def>
 
 		<!-- Elements to support formats -->	
@@ -377,9 +372,6 @@ It builds on the Expresso-Base toolkit and allows specification of persisted con
 
 		<auto-inherit inherits="allow-eds-model">
 			<target element="list" />
-		</auto-inherit>
-		<auto-inherit inherits="eds-sorted-value">
-			<target element="sorted-model-value" role="entity-data-set.value" />
 		</auto-inherit>
 	</auto-inheritance>
 </qonfig-def>

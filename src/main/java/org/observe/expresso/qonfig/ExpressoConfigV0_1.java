@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -59,6 +60,7 @@ import org.qommons.Transaction;
 import org.qommons.Version;
 import org.qommons.collect.BetterList;
 import org.qommons.collect.MutableCollectionElement.StdMsg;
+import org.qommons.config.AbstractQIS;
 import org.qommons.config.QonfigAddOn;
 import org.qommons.config.QonfigElementOrAddOn;
 import org.qommons.config.QonfigInterpretation;
@@ -152,6 +154,8 @@ public class ExpressoConfigV0_1 implements QonfigInterpretation {
 		String test(T value, CharSequence text);
 	}
 
+	private QonfigToolkit theToolkit;
+
 	@Override
 	public Set<Class<? extends SpecialSession<?>>> getExpectedAPIs() {
 		return Collections.singleton(ExpressoQIS.class);
@@ -169,6 +173,7 @@ public class ExpressoConfigV0_1 implements QonfigInterpretation {
 
 	@Override
 	public void init(QonfigToolkit toolkit) {
+		theToolkit = toolkit;
 	}
 
 	@Override
@@ -179,18 +184,32 @@ public class ExpressoConfigV0_1 implements QonfigInterpretation {
 	}
 
 	void configureConfigModels(QonfigInterpreterCore.Builder interpreter) {
+		Predicate<AbstractQIS<?>> configValueTest = session -> session.isInstance(theToolkit, "config-model-value") != null;
 		interpreter.createWith("config", ObservableModelElement.ConfigModelElement.Def.class,
 			ExElement.creator(ObservableModelElement.ConfigModelElement.Def::new));
-		interpreter.createWith(EntityDataSet.ENTITY_DATA_SET, EntityDataSet.Def.class, ExElement.creator(EntityDataSet.Def::new));
 		interpreter.createWith(DataBackup.DATA_BACKUP, DataBackup.Def.class, ExElement.creator(DataBackup.Def::new));
 		interpreter.createWith(DataBackup.NoBackup.NO_BACKUP, DataBackup.NoBackup.Def.class,
 			ExElement.creator(DataBackup.NoBackup.Def::new));
-		interpreter.createWith("value", ConfigModelValue.Def.class, ExElement.creator(ConfigValue::new));
-		interpreter.createWith("value-set", ConfigModelValue.Def.class, ExElement.creator(ConfigValueSet::new));
+		interpreter.createWith("value", configValueTest, ConfigModelValue.Def.class, ExElement.creator(ConfigValue::new));
+		interpreter.createWith("value-set", configValueTest, ConfigModelValue.Def.class, ExElement.creator(ConfigValueSet::new));
 		// TODO list, sorted-list, set, sorted-set
 		interpreter.createWith(ConfigMap.CONFIG_MAP, ConfigMap.Def.class, ExAddOn.creator(ConfigMap.Def::new));
-		interpreter.createWith("map", ConfigModelValue.Def.class, ExElement.creator(ExConfigMap::new));
+		interpreter.createWith("map", configValueTest, ConfigModelValue.Def.class, ExElement.creator(ExConfigMap::new));
 		// TODO sorted-map, multi-map, sorted-multi-map
+
+		// <entity-data-set>
+		Predicate<AbstractQIS<?>> edsValueTest = session -> session.isInstance(theToolkit, "eds-model-value") != null;
+		interpreter.createWith(EntityDataSet.ENTITY_DATA_SET, EntityDataSet.Def.class, ExElement.creator(EntityDataSet.Def::new));
+		interpreter.createWith("list", edsValueTest, EntityDataSet.EDSModelValue.Def.class,
+			ExElement.creator((parent, qonfigType) -> new EntityDataSet.EDSModelValue.Def<>(parent, qonfigType, ModelTypes.Collection)));
+		interpreter.createWith("set", edsValueTest, EntityDataSet.EDSModelValue.Def.class,
+			ExElement.creator((parent, qonfigType) -> new EntityDataSet.EDSModelValue.Def<>(parent, qonfigType, ModelTypes.Set)));
+		interpreter.createWith("sorted-list", edsValueTest, EntityDataSet.EDSModelValue.Def.class, ExElement
+			.creator((parent, qonfigType) -> new EntityDataSet.EDSModelValue.Def<>(parent, qonfigType, ModelTypes.SortedCollection)));
+		interpreter.createWith("sorted-set", edsValueTest, EntityDataSet.EDSModelValue.Def.class,
+			ExElement.creator((parent, qonfigType) -> new EntityDataSet.EDSModelValue.Def<>(parent, qonfigType, ModelTypes.SortedSet)));
+		interpreter.createWith("value-set", edsValueTest, EntityDataSet.EDSModelValue.Def.class,
+			ExElement.creator((parent, qonfigType) -> new EntityDataSet.EDSModelValue.Def<>(parent, qonfigType, ModelTypes.ValueSet)));
 	}
 
 	@ExElementTraceable(toolkit = CONFIG,
