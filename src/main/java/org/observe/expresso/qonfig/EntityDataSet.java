@@ -4,13 +4,11 @@ import java.io.IOException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.net.URL;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.observe.SettableValue;
 import org.observe.collect.ObservableCollection;
@@ -59,7 +57,6 @@ import org.qommons.io.LocatedPositionedContent;
 import org.qommons.io.NativeFileSource;
 import org.qommons.io.TemporalBackupScheme;
 import org.qommons.io.TextParseException;
-import org.qommons.tree.BetterTreeSet;
 
 import com.google.common.reflect.TypeToken;
 
@@ -625,6 +622,29 @@ public class EntityDataSet extends AbstractConfigModelElement {
 		@Override
 		public MV forModelCopy(MV value, ModelSetInstance sourceModels, ModelSetInstance newModels) throws ModelInstantiationException {
 			return value; // Same value, because the data source doesn't change with model copy
+		}
+	}
+
+	// This is just to shut up a warning
+	@ExElementTraceable(toolkit = ExpressoBaseV0_1.BASE, qonfigType = "sorted-model-value")
+	public static class EDSSortedModelValueDef<M> extends EDSModelValue.Def<M> {
+		public EDSSortedModelValueDef(ExElement.Def<?> parent, QonfigElementOrAddOn qonfigType, ModelType<M> modelType) {
+			super(parent, qonfigType, modelType);
+		}
+
+		/** @return Stops Expresso from complaining about the sort */
+		@QonfigChildGetter("sort")
+		public ExElement.Def<?> getSort() {
+			return null;
+		}
+
+		@Override
+		protected void doPrepare(ExpressoQIS session) throws QonfigInterpretationException {
+			ExpressoQIS sort = session.children().get("sort").get().peekFirst();
+			if (sort != null)
+				throw new QonfigInterpretationException("Entity sorting is determined by the data set",
+					sort.getElement().getFilePosition());
+			super.doPrepare(session);
 		}
 	}
 

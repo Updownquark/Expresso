@@ -204,10 +204,10 @@ public class ExpressoConfigV0_1 implements QonfigInterpretation {
 			ExElement.creator((parent, qonfigType) -> new EntityDataSet.EDSModelValue.Def<>(parent, qonfigType, ModelTypes.Collection)));
 		interpreter.createWith("set", edsValueTest, EntityDataSet.EDSModelValue.Def.class,
 			ExElement.creator((parent, qonfigType) -> new EntityDataSet.EDSModelValue.Def<>(parent, qonfigType, ModelTypes.Set)));
-		interpreter.createWith("sorted-list", edsValueTest, EntityDataSet.EDSModelValue.Def.class, ExElement
-			.creator((parent, qonfigType) -> new EntityDataSet.EDSModelValue.Def<>(parent, qonfigType, ModelTypes.SortedCollection)));
-		interpreter.createWith("sorted-set", edsValueTest, EntityDataSet.EDSModelValue.Def.class,
-			ExElement.creator((parent, qonfigType) -> new EntityDataSet.EDSModelValue.Def<>(parent, qonfigType, ModelTypes.SortedSet)));
+		interpreter.createWith("sorted-list", edsValueTest, EntityDataSet.EDSSortedModelValueDef.class, ExElement
+			.creator((parent, qonfigType) -> new EntityDataSet.EDSSortedModelValueDef<>(parent, qonfigType, ModelTypes.SortedCollection)));
+		interpreter.createWith("sorted-set", edsValueTest, EntityDataSet.EDSSortedModelValueDef.class, ExElement
+			.creator((parent, qonfigType) -> new EntityDataSet.EDSSortedModelValueDef<>(parent, qonfigType, ModelTypes.SortedSet)));
 		interpreter.createWith("value-set", edsValueTest, EntityDataSet.EDSModelValue.Def.class,
 			ExElement.creator((parent, qonfigType) -> new EntityDataSet.EDSModelValue.Def<>(parent, qonfigType, ModelTypes.ValueSet)));
 	}
