@@ -625,7 +625,7 @@ public class NameExpression implements ObservableExpression, Named {
 
 		@Override
 		public Collection<Cause> getCurrentCauses() {
-			return Collections.emptyList();
+			return theContext == null ? Collections.emptyList() : theContext.getCurrentCauses();
 		}
 
 		@Override

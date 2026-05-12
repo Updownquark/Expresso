@@ -9,7 +9,7 @@ import java.lang.annotation.Target;
 /**
  * Annotation to alert {@link ElementTypeTraceability traceability} that a static method on an {@link ExElement.Def} extension tagged with
  * {@link ExElementTraceable} or {@link ExMultiElementTraceable} accepts a {@link ElementTypeTraceability.SingleTypeTraceabilityBuilder}
- * (for an element-def) or {@link ElementTypeTraceability.AddOnBuilder} (for an add-on) to configure traceability
+ * (for an element-def) or {@link ElementTypeTraceability.AddOnTraceabilityBuilder} (for an add-on) to configure traceability
  */
 @Retention(RUNTIME)
 @Target(METHOD)

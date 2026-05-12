@@ -53,8 +53,8 @@ import com.google.common.reflect.TypeToken;
  * </p>
  * <p>
  * A hybrid method is available by using the {@link TraceabilityConfiguration} annotation, which tags a static method that accepts a
- * traceability builder (either a {@link SingleTypeTraceabilityBuilder} for an element-def or a {@link AddOnBuilder} for an add-on) to
- * configure custom traceability after the reflection has been performed.
+ * traceability builder (either a {@link SingleTypeTraceabilityBuilder} for an element-def or a {@link AddOnTraceabilityBuilder} for an
+ * add-on) to configure custom traceability after the reflection has been performed.
  * </p>
  *
  * @param <E> The type of element instance this object supports traceability for
@@ -724,17 +724,17 @@ public interface ElementTypeTraceability<E extends ExElement, I extends ExElemen
 		D extends ExAddOn.Def<? super E, ? extends AO>> SingleTypeTraceability<E, ExElement.Interpreted<? extends E>, ExElement.Def<? extends E>>//
 		getAddOnTraceability(String toolkitName, int majorVersion, int minorVersion, String typeName, Class<? super D> defType,
 			Class<? super I> interpType, Class<? super AO> addOnType) {
-			AddOnBuilder<E, AO, I, D> builder = buildAddOn(toolkitName, majorVersion, minorVersion, typeName, defType, interpType,
-				addOnType);
+			AddOnTraceabilityBuilder<E, AO, I, D> builder = buildAddOn(toolkitName, majorVersion, minorVersion, typeName, defType,
+				interpType, addOnType);
 			builder.reflectAddOnMethods();
 			return builder.build();
 		}
 
-		private static <E extends ExElement, AO extends ExAddOn<? super E>, I extends ExAddOn.Interpreted<? super E, ? extends AO>, D extends ExAddOn.Def<? super E, ? extends AO>> AddOnBuilder<E, AO, I, D> buildAddOn(
+		private static <E extends ExElement, AO extends ExAddOn<? super E>, I extends ExAddOn.Interpreted<? super E, ? extends AO>, D extends ExAddOn.Def<? super E, ? extends AO>> AddOnTraceabilityBuilder<E, AO, I, D> buildAddOn(
 			String toolkitName, int majorVersion, int minorVersion, String typeName, Class<? super D> defType, Class<? super I> interpType,
 			Class<? super AO> addOnType) {
-			return new AddOnBuilder<>(toolkitName, new QonfigToolkit.ToolkitDefVersion(majorVersion, minorVersion), typeName, defType,
-				interpType, addOnType);
+			return new AddOnTraceabilityBuilder<>(toolkitName, new QonfigToolkit.ToolkitDefVersion(majorVersion, minorVersion), typeName,
+				defType, interpType, addOnType);
 		}
 
 		private final String theToolkitName;
@@ -1034,7 +1034,7 @@ public interface ElementTypeTraceability<E extends ExElement, I extends ExElemen
 						System.err.println("Traceability configuration method " + defMethod + " is not static");
 					else {
 						try {
-							defMethod.invoke(this);
+							defMethod.invoke(null, this);
 						} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
 							System.err.println("Traceability configuration method " + defMethod + " failed");
 							e.printStackTrace();
@@ -1146,13 +1146,13 @@ public interface ElementTypeTraceability<E extends ExElement, I extends ExElemen
 	 * @param <I> The interpretation of the add-on that this builder supports traceability for
 	 * @param <D> The definition of the add-on that this builder supports traceability for
 	 */
-	public static class AddOnBuilder<E extends ExElement, AO extends ExAddOn<? super E>, I extends ExAddOn.Interpreted<? super E, ? extends AO>, D extends ExAddOn.Def<? super E, ? extends AO>>
+	public static class AddOnTraceabilityBuilder<E extends ExElement, AO extends ExAddOn<? super E>, I extends ExAddOn.Interpreted<? super E, ? extends AO>, D extends ExAddOn.Def<? super E, ? extends AO>>
 	extends SingleTypeTraceabilityBuilder<E, ExElement.Interpreted<? extends E>, ExElement.Def<? extends E>> {
 		private final Class<D> theDefClass;
 		private final Class<I> theInterpretedClass;
 		private final Class<AO> theAddOnClass;
 
-		AddOnBuilder(String toolkitName, ToolkitDefVersion toolkitVersion, String elementName, Class<? super D> defClass,
+		AddOnTraceabilityBuilder(String toolkitName, ToolkitDefVersion toolkitVersion, String elementName, Class<? super D> defClass,
 			Class<? super I> interpretedClass, Class<? super AO> addOnClass) {
 			super(toolkitName, toolkitVersion, elementName);
 			theDefClass = (Class<D>) (Class<?>) defClass;
@@ -1160,7 +1160,7 @@ public interface ElementTypeTraceability<E extends ExElement, I extends ExElemen
 			theAddOnClass = (Class<AO>) (Class<?>) addOnClass;
 		}
 
-		AddOnBuilder<E, AO, I, D> reflectAddOnMethods() {
+		AddOnTraceabilityBuilder<E, AO, I, D> reflectAddOnMethods() {
 			for (Method defMethod : theDefClass.getDeclaredMethods()) {
 				if (defMethod.getParameterCount() != 0 || defMethod.getReturnType() == void.class)
 					continue;
@@ -1236,7 +1236,7 @@ public interface ElementTypeTraceability<E extends ExElement, I extends ExElemen
 						System.err.println("Traceability configuration method " + defMethod + " is not static");
 					else {
 						try {
-							defMethod.invoke(this);
+							defMethod.invoke(null, this);
 						} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
 							System.err.println("Traceability configuration method " + defMethod + " failed");
 							e.printStackTrace();
@@ -1255,7 +1255,7 @@ public interface ElementTypeTraceability<E extends ExElement, I extends ExElemen
 		 * @param interpGetter The getter for the attribute on the add-on interpretation
 		 * @return This builder
 		 */
-		public AddOnBuilder<E, AO, I, D> withAddOnAttribute(String attribute, Function<? super D, ?> defGetter,
+		public AddOnTraceabilityBuilder<E, AO, I, D> withAddOnAttribute(String attribute, Function<? super D, ?> defGetter,
 			Function<? super I, ?> interpGetter) {
 			return withAttribute(attribute,
 				AddOnAttributeGetter.<E, AO, I, D> of(theDefClass, defGetter, theInterpretedClass, interpGetter));
@@ -1268,7 +1268,7 @@ public interface ElementTypeTraceability<E extends ExElement, I extends ExElemen
 		 * @param interpGetter The getter for the element value on the add-on interpretation
 		 * @return This builder
 		 */
-		public AddOnBuilder<E, AO, I, D> withAddOnValue(Function<? super D, ?> defGetter, Function<? super I, ?> interpGetter) {
+		public AddOnTraceabilityBuilder<E, AO, I, D> withAddOnValue(Function<? super D, ?> defGetter, Function<? super I, ?> interpGetter) {
 			return withValue(AddOnAttributeGetter.<E, AO, I, D> of(theDefClass, defGetter, theInterpretedClass, interpGetter));
 		}
 
@@ -1281,7 +1281,7 @@ public interface ElementTypeTraceability<E extends ExElement, I extends ExElemen
 		 * @param elementGetter The getter for the children on the add-on instance
 		 * @return This builder
 		 */
-		public AddOnBuilder<E, AO, I, D> withAddOnChild(String child,
+		public AddOnTraceabilityBuilder<E, AO, I, D> withAddOnChild(String child,
 			Function<? super D, ? extends List<? extends ExElement.Def<?>>> defGetter,
 				Function<? super I, ? extends List<? extends ExElement.Interpreted<?>>> interpGetter,
 					Function<? super AO, ? extends List<? extends ExElement>> elementGetter) {
@@ -1290,42 +1290,42 @@ public interface ElementTypeTraceability<E extends ExElement, I extends ExElemen
 		}
 
 		@Override
-		public AddOnBuilder<E, AO, I, D> withAttribute(String attribute,
+		public AddOnTraceabilityBuilder<E, AO, I, D> withAttribute(String attribute,
 			AttributeValueGetter<? super E, ? super ExElement.Interpreted<? extends E>, ? super Def<? extends E>> getter) {
 			super.withAttribute(attribute, getter);
 			return this;
 		}
 
 		@Override
-		public AddOnBuilder<E, AO, I, D> withAttribute(String attribute, Function<? super Def<? extends E>, ?> defGetter,
+		public AddOnTraceabilityBuilder<E, AO, I, D> withAttribute(String attribute, Function<? super Def<? extends E>, ?> defGetter,
 			Function<? super ExElement.Interpreted<? extends E>, ?> interpGetter) {
 			super.withAttribute(attribute, defGetter, interpGetter);
 			return this;
 		}
 
 		@Override
-		public AddOnBuilder<E, AO, I, D> withValue(
+		public AddOnTraceabilityBuilder<E, AO, I, D> withValue(
 			AttributeValueGetter<? super E, ? super ExElement.Interpreted<? extends E>, ? super Def<? extends E>> value) {
 			super.withValue(value);
 			return this;
 		}
 
 		@Override
-		public AddOnBuilder<E, AO, I, D> withValue(Function<? super Def<? extends E>, ?> defGetter,
+		public AddOnTraceabilityBuilder<E, AO, I, D> withValue(Function<? super Def<? extends E>, ?> defGetter,
 			Function<? super ExElement.Interpreted<? extends E>, ?> interpGetter) {
 			super.withValue(defGetter, interpGetter);
 			return this;
 		}
 
 		@Override
-		public AddOnBuilder<E, AO, I, D> withChild(String child,
+		public AddOnTraceabilityBuilder<E, AO, I, D> withChild(String child,
 			ChildElementGetter<? super E, ? super ExElement.Interpreted<? extends E>, ? super Def<? extends E>> getter) {
 			super.withChild(child, getter);
 			return this;
 		}
 
 		@Override
-		public AddOnBuilder<E, AO, I, D> withChild(String child,
+		public AddOnTraceabilityBuilder<E, AO, I, D> withChild(String child,
 			Function<? super Def<? extends E>, ? extends List<? extends ExElement.Def<?>>> defGetter,
 				Function<? super ExElement.Interpreted<? extends E>, ? extends List<? extends Interpreted<?>>> interpGetter,
 					Function<? super E, ? extends List<? extends ExElement>> elementGetter) {

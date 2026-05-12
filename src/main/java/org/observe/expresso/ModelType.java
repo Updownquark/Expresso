@@ -16,6 +16,7 @@ import org.observe.expresso.ObservableModelSet.ModelValueInstantiator;
 import org.observe.util.TypeTokens;
 import org.observe.util.TypeTokens.TypeConverter;
 import org.qommons.Named;
+import org.qommons.ex.ExFunction;
 import org.qommons.ex.ExceptionHandler;
 import org.qommons.ex.NeverThrown;
 import org.qommons.fn.FunctionUtils;
@@ -229,6 +230,45 @@ public abstract class ModelType<M> implements Named {
 					return next.getType();
 				}
 			};
+		}
+
+		/**
+		 * @param <M1> The source model type
+		 * @param <M2> The target model type
+		 * @param type The source model type
+		 * @param converter The function to convert source model values to target model values
+		 * @return The converter
+		 */
+		static <M1, M2> Simple<M1, M2> of(ModelInstanceType<M2, ?> type,
+			ExFunction<? super M1, ? extends M2, ? extends ModelInstantiationException> converter) {
+			return new Simple<>(type, converter);
+		}
+
+		/**
+		 * Implementation of {@link ModelInstanceConverter#of(ModelInstanceType, ExFunction)}
+		 *
+		 * @param <M1> The source model type
+		 * @param <M2> The target model type
+		 */
+		static class Simple<M1, M2> implements ModelInstanceConverter<M1, M2> {
+			private final ModelInstanceType<M2, ?> theType;
+			private final ExFunction<? super M1, ? extends M2, ? extends ModelInstantiationException> theConverter;
+
+			public Simple(ModelInstanceType<M2, ?> type,
+				ExFunction<? super M1, ? extends M2, ? extends ModelInstantiationException> converter) {
+				theType = type;
+				theConverter = converter;
+			}
+
+			@Override
+			public ModelInstanceType<M2, ?> getType() {
+				return theType;
+			}
+
+			@Override
+			public M2 convert(M1 source) throws ModelInstantiationException {
+				return theConverter.apply(source);
+			}
 		}
 	}
 
@@ -613,7 +653,7 @@ public abstract class ModelType<M> implements Named {
 	public final Class<M> modelType;
 	private final int theTypeCount;
 
-	private final Map<ModelType<?>, ModelConverter<?, ?>> conversionTargets;
+	private final Map<ModelType<?>, ModelConverter<?, ?>> conversionTargets = new HashMap<>();
 	private ModelConverter<?, Object> flexConversionToTargets;
 	private ModelConverter<Object, ?> flexConversionFromTargets;
 	private ModelConverter<?, ?> selfConversionTargets;
@@ -637,7 +677,6 @@ public abstract class ModelType<M> implements Named {
 			MODEL_TYPES_BY_TYPE.put(type, this);
 			ALL_MODEL_TYPES.add(this);
 		}
-		conversionTargets = new HashMap<>();
 		setupConversions(new ConversionBuilder<M>() {
 			@Override
 			public <M2> ConversionBuilder<M> convertibleTo(ModelType<M2> targetModelType, ModelConverter<M, M2> converter) {

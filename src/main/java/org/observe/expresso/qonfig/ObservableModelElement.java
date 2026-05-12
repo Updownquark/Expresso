@@ -341,6 +341,12 @@ public abstract class ObservableModelElement extends ExElement.Abstract {
 			value.instantiated();
 	}
 
+	/**
+	 * An interpreted model component that is a member of an {@link ObservableModelElement}
+	 *
+	 * @param <M> The model type of the value
+	 * @param <MV> The type of the value
+	 */
 	public interface InterpretedModelElementComponent<M, MV extends M> extends InterpretedValueSynth<M, MV> {
 		/** @return The interpreted model element this data set value is for */
 		ObservableModelElement.Interpreted<?> getInterpretedModel();
@@ -1034,8 +1040,7 @@ public abstract class ObservableModelElement extends ExElement.Abstract {
 				 *
 				 * @param <T> The type of the data source
 				 */
-				protected abstract class Interpreted<T> implements InterpretedValueSynth<SettableValue<?>, SettableValue<T>>,
-				InterpretedModelElementComponent<SettableValue<?>, SettableValue<T>> {
+				protected abstract class Interpreted<T> implements InterpretedModelElementComponent<SettableValue<?>, SettableValue<T>> {
 					private final InterpretedValueSynth<SettableValue<?>, SettableValue<BetterFile>> theInterpretedConfigDir;
 					private final DataBackup.Interpreted<?> theInterpretedBackup;
 					private AbstractConfigModelElement.Interpreted<?> theInterpretedModel;

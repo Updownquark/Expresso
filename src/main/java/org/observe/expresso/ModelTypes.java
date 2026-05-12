@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -456,6 +457,8 @@ public class ModelTypes {
 		public final ModelInstanceType.SingleTyped<SettableValue<?>, Byte, SettableValue<Byte>> BYTE = forType(byte.class);
 		/** Value&lt;int> type */
 		public final ModelInstanceType.SingleTyped<SettableValue<?>, Integer, SettableValue<Integer>> INT = forType(int.class);
+		/** Value&lt;float> type */
+		public final ModelInstanceType.SingleTyped<SettableValue<?>, Float, SettableValue<Float>> FLOAT = forType(float.class);
 		/** Value&lt;double> type */
 		public final ModelInstanceType.SingleTyped<SettableValue<?>, Double, SettableValue<Double>> DOUBLE = forType(double.class);
 		/** Value&lt;String> type */
@@ -521,6 +524,37 @@ public class ModelTypes {
 
 		@Override
 		protected void setupConversions(ConversionBuilder<SettableValue<?>> builder) {
+			builder.convertibleFrom(Action, new ModelConverter<ObservableAction, SettableValue<?>>() {
+				@Override
+				public ModelInstanceConverter<ObservableAction, SettableValue<?>> convert(ModelInstanceType<ObservableAction, ?> source,
+					ModelInstanceType<SettableValue<?>, ?> target, InterpretedExpressoEnv env) {
+					Class<?> rawTarget = TypeTokens.getRawType(target.getType(0));
+					if (rawTarget == Runnable.class) {
+						return ModelInstanceConverter.of(target,
+							action -> SettableValue.<Runnable> of(() -> action.act(null), "Not settable"));
+					} else if (rawTarget == Consumer.class
+						&& TypeTokens.getRawType(target.getType(0).resolveType(Consumer.class.getTypeParameters()[0])) == Object.class) {
+						return ModelInstanceConverter.of(target,
+							action -> SettableValue.<Consumer<Object>> of(action::act, "Not settable"));
+					} else
+						return null;
+				}
+			}).convertibleTo(ModelTypes.Action, new ModelConverter<SettableValue<?>, ObservableAction>() {
+				@Override
+				public ModelInstanceConverter<SettableValue<?>, ObservableAction> convert(ModelInstanceType<SettableValue<?>, ?> source,
+					ModelInstanceType<ObservableAction, ?> target, InterpretedExpressoEnv env) {
+					Class<?> rawSource = TypeTokens.getRawType(source.getType(0));
+					if (rawSource == Runnable.class)
+						return ModelInstanceConverter.of(target,
+							runnable -> runnable == null ? null : ObservableAction.of(__ -> ((Runnable) runnable).run()));
+					else if (rawSource == Consumer.class
+						&& TypeTokens.getRawType(source.getType(0).resolveType(Consumer.class.getTypeParameters()[0])) == Object.class) {
+						return ModelInstanceConverter.of(target, consumer -> consumer == null ? null
+							: ObservableAction.of(cause -> ((Consumer<Object>) consumer).accept(cause)));
+					} else
+						return null;
+				}
+			});
 			builder.convertibleTo(Event, new ModelConverter.SimpleSingleTyped<SettableValue<?>, Observable<?>>() {
 				@Override
 				public ModelInstanceConverter<SettableValue<?>, Observable<?>> convert(ModelInstanceType<SettableValue<?>, ?> source,
@@ -889,8 +923,8 @@ public class ModelTypes {
 						TypeToken<?> oceType = TypeTokens.get().of(Causable.class);
 						if (TypeTokens.get().isAssignable(dest.getType(0), oceType)) {
 							return ModelType.converter(
-								FunctionUtils.printableFn(src -> src == null ? Observable.empty() : src.simpleChanges(), "collectionChanges",
-									null),
+								FunctionUtils.printableFn(src -> src == null ? Observable.empty() : src.simpleChanges(),
+									"collectionChanges", null),
 								dest.getModelType().forTypes(oceType));
 						} else
 							throw new IllegalArgumentException("Cannot convert from " + source + " to " + dest);
@@ -1053,14 +1087,14 @@ public class ModelTypes {
 					return StringUtils.print("\n", msgs, s -> s).toString();
 				Equivalence<? super S> eq = cv.equivalence();
 				CollectionUtils.synchronize((BetterList<ListElement<S>>) cv.elements(), reversed, (el, v) -> eq.elementEquals(el.get(), v))//
-					.adjust(new CollectionUtils.CollectionSynchronizer<ListElement<S>, S>() {
+				.adjust(new CollectionUtils.CollectionSynchronizer<ListElement<S>, S>() {
 					@Override
-						public boolean getOrder(ElementSyncInput<ListElement<S>, S> element) {
+					public boolean getOrder(ElementSyncInput<ListElement<S>, S> element) {
 						return true;
 					}
 
 					@Override
-						public ElementSyncAction leftOnly(ElementSyncInput<ListElement<S>, S> element) {
+					public ElementSyncAction leftOnly(ElementSyncInput<ListElement<S>, S> element) {
 						String msg = cv.mutableElement(element.getLeftValue().getElementId()).canRemove();
 						if (msg != null)
 							msgs.add(msg);
@@ -1068,7 +1102,7 @@ public class ModelTypes {
 					}
 
 					@Override
-						public ElementSyncAction rightOnly(ElementSyncInput<ListElement<S>, S> element) {
+					public ElementSyncAction rightOnly(ElementSyncInput<ListElement<S>, S> element) {
 						String msg = cv.canAdd(element.getTargetIndex(), element.getRightValue());
 						if (msg != null)
 							msgs.add(msg);
@@ -1076,7 +1110,7 @@ public class ModelTypes {
 					}
 
 					@Override
-						public ElementSyncAction common(ElementSyncInput<ListElement<S>, S> element) {
+					public ElementSyncAction common(ElementSyncInput<ListElement<S>, S> element) {
 						String msg = cv.mutableElement(element.getLeftValue().getElementId()).isAcceptable(element.getRightValue()); // TODO
 						// Auto-generated
 						// method
@@ -1176,7 +1210,8 @@ public class ModelTypes {
 					InterpretedExpressoEnv env) throws IllegalArgumentException {
 					if (dest.getType(0) == TypeTokens.get().VOID || TypeTokens.getRawType(dest.getType(0)) == void.class) {
 						return ModelType.converter(
-							FunctionUtils.printableFn(src -> src.simpleChanges().map(__ -> null), "sortedCollectionChanges", null), dest);
+							FunctionUtils.printableFn(src -> src.simpleChanges().map(__ -> null), "sortedCollectionChanges", null),
+							dest);
 					} else {
 						TypeToken<?> oceType = TypeTokens.get().of(Causable.class);
 						if (TypeTokens.get().isAssignable(dest.getType(0), oceType)) {
@@ -1357,8 +1392,7 @@ public class ModelTypes {
 			}
 
 			@Override
-			public ListElement<T> getOrAdd(T value, ElementId after, ElementId before, boolean first, Runnable preAdd,
-				Runnable postAdd) {
+			public ListElement<T> getOrAdd(T value, ElementId after, ElementId before, boolean first, Runnable preAdd, Runnable postAdd) {
 				ObservableSet<T> set = theContainer.get();
 				if (set == null)
 					throw new UnsupportedOperationException(StdMsg.UNSUPPORTED_OPERATION);
@@ -1699,8 +1733,8 @@ public class ModelTypes {
 				public ModelInstanceConverter<ObservableMap<?, ?>, Observable<?>> convert(ModelInstanceType<ObservableMap<?, ?>, ?> source,
 					ModelInstanceType<Observable<?>, ?> dest, InterpretedExpressoEnv env) throws IllegalArgumentException {
 					if (dest.getType(0) == TypeTokens.get().VOID || TypeTokens.getRawType(dest.getType(0)) == void.class) {
-						return ModelType.converter(FunctionUtils.printableFn(src -> src.simpleChanges().map(__ -> null), "mapChanges", null),
-							dest);
+						return ModelType
+							.converter(FunctionUtils.printableFn(src -> src.simpleChanges().map(__ -> null), "mapChanges", null), dest);
 					} else {
 						TypeToken<?> omeType = TypeTokens.get().of(Causable.class);
 						if (TypeTokens.get().isAssignable(dest.getType(0), omeType))
@@ -1912,8 +1946,8 @@ public class ModelTypes {
 					ModelInstanceType<ObservableMultiMap<?, ?>, ?> source, ModelInstanceType<Observable<?>, ?> dest,
 					InterpretedExpressoEnv env) throws IllegalArgumentException {
 					if (dest.getType(0) == TypeTokens.get().VOID || TypeTokens.getRawType(dest.getType(0)) == void.class) {
-						return ModelType
-							.converter(FunctionUtils.printableFn(src -> src.simpleChanges().map(__ -> null), "multiMapChanges", null), dest);
+						return ModelType.converter(
+							FunctionUtils.printableFn(src -> src.simpleChanges().map(__ -> null), "multiMapChanges", null), dest);
 					} else {
 						TypeToken<?> omeType = TypeTokens.get().of(Causable.class);
 						if (TypeTokens.get().isAssignable(dest.getType(0), omeType))

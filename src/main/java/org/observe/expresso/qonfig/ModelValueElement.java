@@ -553,8 +553,7 @@ public interface ModelValueElement<MV> extends ExElement, ModelValueInstantiator
 	 * @param <MV> The instance type of the value to create
 	 * @param <E> The sub-type of {@link ModelValueElement} to create
 	 */
-	public interface InterpretedSynth<M, MV extends M, E extends ModelValueElement<MV>>
-	extends ModelValueElement.Interpreted<M, MV, E>, InterpretedValueSynth<M, MV> {
+	public interface InterpretedSynth<M, MV extends M, E extends ModelValueElement<MV>> extends ModelValueElement.Interpreted<M, MV, E> {
 		@Override
 		default ModelValueElement<MV> instantiate() throws ModelInstantiationException {
 			return create();

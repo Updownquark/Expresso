@@ -1993,6 +1993,7 @@ public class ExpressoTransformations {
 
 		@Override
 		protected void doUpdate(ExpressoQIS session) throws QonfigInterpretationException {
+			session = session.asElement("abst-map-reverse");
 			super.doUpdate(session);
 			theType = session.getAttribute("type", QonfigAddOn.class);
 			String targetName = session.getAttributeText("target-as");
@@ -2417,7 +2418,7 @@ public class ExpressoTransformations {
 		@Override
 		protected void doUpdate(ExpressoQIS session) throws QonfigInterpretationException {
 			super.doUpdate(session);
-			isInexact = session.getAttribute("inexact", boolean.class);
+			isInexact = session.asElement(getType()).getAttribute("inexact", boolean.class);
 		}
 
 		@Override
