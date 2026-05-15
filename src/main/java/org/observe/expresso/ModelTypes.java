@@ -357,6 +357,16 @@ public class ModelTypes {
 			public CoreChangeSources getChangeSources() {
 				return theFlatObservable.getChangeSources();
 			}
+
+			@Override
+			public HollowModelValue<Observable<?>, Observable<T>> copy() {
+				return new HollowObservable<>(theId.toString());
+			}
+
+			@Override
+			public String toString() {
+				return theId.toString();
+			}
 		}
 
 		@Override
@@ -431,6 +441,11 @@ public class ModelTypes {
 			@Override
 			public boolean isSatisfied() {
 				return theSatisfied != null;
+			}
+
+			@Override
+			public HollowModelValue<ObservableAction, ObservableAction> copy() {
+				return new HollowAction(theName);
 			}
 
 			@Override
@@ -797,7 +812,12 @@ public class ModelTypes {
 			}
 
 			private HollowValue(String name, T defaultValue) {
-				super(SettableValue.<SettableValue<T>> build().build(), () -> defaultValue);
+				this(name, SettableValue.create(), () -> defaultValue);
+			}
+
+			private HollowValue(String name, ObservableValue<? extends ObservableValue<? extends T>> value,
+				Supplier<? extends T> defaultValue) {
+				super(value, defaultValue);
 				theId = new NamedUniqueIdentity(name);
 			}
 
@@ -823,6 +843,11 @@ public class ModelTypes {
 			@Override
 			public boolean isSatisfied() {
 				return getWrapped().get() != null;
+			}
+
+			@Override
+			public HollowModelValue<SettableValue<?>, SettableValue<T>> copy() {
+				return new HollowValue<>(theId.toString(), SettableValue.create(), getDefaultValue());
 			}
 
 			@Override
@@ -1006,7 +1031,7 @@ public class ModelTypes {
 		@Override
 		public <MV extends ObservableCollection<?>> HollowModelValue<ObservableCollection<?>, MV> createHollowValue(String name,
 			ModelInstanceType<ObservableCollection<?>, MV> type) {
-			return (HollowModelValue<ObservableCollection<?>, MV>) new HollowCollection<>(name, (TypeToken<Object>) type.getType(0));
+			return (HollowModelValue<ObservableCollection<?>, MV>) new HollowCollection<>(name);
 		}
 
 		static class HollowCollection<T> extends ObservableCollectionWrapper<T>
@@ -1014,9 +1039,9 @@ public class ModelTypes {
 			private final NamedUniqueIdentity theId;
 			private final SettableValue<ObservableCollection<T>> theContainer;
 
-			public HollowCollection(String name, TypeToken<T> type) {
+			public HollowCollection(String name) {
 				theId = new NamedUniqueIdentity(name);
-				theContainer = SettableValue.<ObservableCollection<T>> build().build();
+				theContainer = SettableValue.create();
 				init(ObservableCollection.flattenValue(theContainer));
 			}
 
@@ -1033,6 +1058,11 @@ public class ModelTypes {
 			@Override
 			public boolean isSatisfied() {
 				return theContainer.get() != null;
+			}
+
+			@Override
+			public HollowModelValue<ObservableCollection<?>, ObservableCollection<T>> copy() {
+				return new HollowCollection<>(theId.toString());
 			}
 		}
 
@@ -1356,7 +1386,7 @@ public class ModelTypes {
 		@Override
 		public <MV extends ObservableSet<?>> HollowModelValue<ObservableSet<?>, MV> createHollowValue(String name,
 			ModelInstanceType<ObservableSet<?>, MV> type) {
-			return (HollowModelValue<ObservableSet<?>, MV>) new HollowSet<>(name, (TypeToken<Object>) type.getType(0));
+			return (HollowModelValue<ObservableSet<?>, MV>) new HollowSet<>(name);
 		}
 
 		static class HollowSet<T> extends ObservableCollectionWrapper<T>
@@ -1364,9 +1394,9 @@ public class ModelTypes {
 			private final NamedUniqueIdentity theId;
 			private final SettableValue<ObservableSet<T>> theContainer;
 
-			public HollowSet(String name, TypeToken<T> type) {
+			public HollowSet(String name) {
 				theId = new NamedUniqueIdentity(name);
-				theContainer = SettableValue.<ObservableSet<T>> build().build();
+				theContainer = SettableValue.create();
 				init(ObservableCollection.flattenValue(theContainer));
 			}
 
@@ -1429,6 +1459,11 @@ public class ModelTypes {
 				if (set == null)
 					return false;
 				return set.repair(listener);
+			}
+
+			@Override
+			public HollowModelValue<ObservableSet<?>, ObservableSet<T>> copy() {
+				return new HollowSet<>(theId.toString());
 			}
 		}
 

@@ -1,5 +1,6 @@
 package org.observe.expresso.qonfig;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -15,12 +16,17 @@ import org.observe.collect.ObservableSortedCollection;
 import org.observe.collect.ObservableSortedSet;
 import org.observe.expresso.ExpressoInterpretationException;
 import org.observe.expresso.ModelInstantiationException;
+import org.observe.expresso.ModelType;
 import org.observe.expresso.ModelType.ModelInstanceType;
 import org.observe.expresso.ModelTypes;
 import org.observe.expresso.ObservableModelSet.InterpretedValueSynth;
+import org.observe.expresso.ObservableModelSet.ModelComponentId;
 import org.observe.expresso.ObservableModelSet.ModelSetInstance;
 import org.observe.expresso.ObservableModelSet.ModelValueInstantiator;
+import org.observe.expresso.qonfig.ElementTypeTraceability.AddOnTraceabilityBuilder;
+import org.observe.expresso.qonfig.ElementTypeTraceability.SingleTypeTraceabilityBuilder;
 import org.observe.util.TypeTokens;
+import org.qommons.QommonsUtils;
 import org.qommons.StringUtils;
 import org.qommons.Version;
 import org.qommons.collect.CircularArrayList;
@@ -35,6 +41,7 @@ import org.qommons.ex.ExBiConsumer;
 import org.qommons.ex.ExBiFunction;
 import org.qommons.ex.ExConsumer;
 import org.qommons.ex.ExFunction;
+import org.qommons.fn.FunctionUtils;
 
 import com.google.common.reflect.TypeToken;
 
@@ -104,16 +111,18 @@ public class ExElementType {
 	private final QuickMap<String, ExElementValue<?, ?, ?, ?, ?>> theAttributes;
 	private final ExElementValue<?, ?, ?, ?, ?> theValue;
 	private final QuickMap<String, ExElementChild<?, ?, ?>> theChildren;
+	private final List<ExElementModelValue<?, ?>> theModelValues;
 
 	ExElementType(ExElementType superType, ToolkitDef toolkit, String elementName,
 		QuickMap<String, ExElementValue<?, ?, ?, ?, ?>> attributes, ExElementValue<?, ?, ?, ?, ?> value,
-		QuickMap<String, ExElementChild<?, ?, ?>> children) {
+		QuickMap<String, ExElementChild<?, ?, ?>> children, List<ExElementModelValue<?, ?>> modelValues) {
 		theSuper = superType;
 		theToolkit = toolkit;
 		theElementName = elementName;
 		theAttributes = attributes;
 		theValue = value;
 		theChildren = children;
+		theModelValues = modelValues;
 
 		for (ExElementValue<?, ?, ?, ?, ?> v : theAttributes.allValues())
 			((AbstractElementValue<?, ?, ?, ?, ?>) v).setOwner(this);
@@ -122,6 +131,9 @@ public class ExElementType {
 
 		for (ExElementChild<?, ?, ?> child : theChildren.allValues())
 			child.setOwner(this);
+
+		for (int mv = 0; mv < theModelValues.size(); mv++)
+			theModelValues.get(mv).setOwner(this, mv);
 	}
 
 	public ExElementType getSuper() {
@@ -146,6 +158,10 @@ public class ExElementType {
 
 	public List<ExElementChild<?, ?, ?>> getChildren() {
 		return theChildren.allValues();
+	}
+
+	public List<ExElementModelValue<?, ?>> getModelValues() {
+		return theModelValues;
 	}
 
 	public int indexOf(ExElementValue<?, ?, ?, ?, ?> value) {
@@ -174,46 +190,23 @@ public class ExElementType {
 			throw new IllegalArgumentException("Child " + child + " is not a member of this element type");
 	}
 
-	public <E extends ExElement, I extends ExElement.Interpreted<E>, D extends ExElement.Def<E>> void configureElementTraceability(//
-		Function<? super D, DefTypeData> defData, Function<? super I, InterpretedTypeData> interpretedData,
-		Function<? super E, InstanceTypeData> instanceData, ElementTypeTraceability.SingleTypeTraceabilityBuilder<E, I, D> traceability) {
-		for (ExElementValue<?, ?, ?, ?, ?> v : theAttributes.allValues()) {
-			((AbstractElementValue<?, ?, ?, ?, ?>) v).setOwner(this);
-			traceability.withAttribute(v.getAttributeName(), def -> defData.apply(def).getValue(v),
-				interp -> interpretedData.apply(interp).getValue(v));
-		}
-		if (theValue != null) {
-			((AbstractElementValue<?, ?, ?, ?, ?>) theValue).setOwner(this);
-			traceability.withValue(def -> defData.apply(def).getValue(theValue),
-				interp -> interpretedData.apply(interp).getValue(theValue));
-		}
-
-		for (ExElementChild<?, ?, ?> child : theChildren.allValues()) {
-			child.setOwner(this);
-			traceability.withChild(child.getRoleName(), def -> defData.apply(def).getChildren(child),
-				interp -> interpretedData.apply(interp).getChildren(child), inst -> instanceData.apply(inst).getChildren(child));
-		}
+	public DefTypeData createDefData() {
+		return new DefTypeData(this);
 	}
 
-	public <E extends ExElement, AO extends ExAddOn<E>, I extends ExAddOn.Interpreted<E, AO>, D extends ExAddOn.Def<E, AO>> void configureAddOnTraceability(//
-		Function<? super D, DefTypeData> defData, Function<? super I, InterpretedTypeData> interpretedData,
-		Function<? super AO, InstanceTypeData> instanceData, ElementTypeTraceability.AddOnTraceabilityBuilder<E, AO, I, D> traceability) {
-		for (ExElementValue<?, ?, ?, ?, ?> v : theAttributes.allValues()) {
-			((AbstractElementValue<?, ?, ?, ?, ?>) v).setOwner(this);
-			traceability.withAddOnAttribute(v.getAttributeName(), def -> defData.apply(def).getValue(v),
-				interp -> interpretedData.apply(interp).getValue(v));
-		}
-		if (theValue != null) {
-			((AbstractElementValue<?, ?, ?, ?, ?>) theValue).setOwner(this);
-			traceability.withAddOnValue(def -> defData.apply(def).getValue(theValue),
-				interp -> interpretedData.apply(interp).getValue(theValue));
-		}
+	public <E extends ExElement, I extends ExElement.Interpreted<? extends E>, D extends ExElement.Def<? extends E>> TraceabilitySatisfier<E, I, D> configureElementTraceability(//
+		ElementTypeTraceability.SingleTypeTraceabilityBuilder<E, I, D> traceability) {
+		return new ElementTraceabilitySatisfier<>(this, traceability);
+	}
 
-		for (ExElementChild<?, ?, ?> child : theChildren.allValues()) {
-			child.setOwner(this);
-			traceability.withAddOnChild(child.getRoleName(), def -> defData.apply(def).getChildren(child),
-				interp -> interpretedData.apply(interp).getChildren(child), inst -> instanceData.apply(inst).getChildren(child));
-		}
+	public <E extends ExElement, AO extends ExAddOn<? super E>, I extends ExAddOn.Interpreted<? super E, ? extends AO>, D extends ExAddOn.Def<? super E, ? extends AO>> TraceabilitySatisfier<AO, I, D> configureAddOnTraceability(//
+		ElementTypeTraceability.AddOnTraceabilityBuilder<E, AO, I, D> traceability) {
+		return new AddOnTraceabilitySatisfier<>(this, traceability);
+	}
+
+	@Override
+	public String toString() {
+		return theToolkit + " " + theElementName;
 	}
 
 	public interface ExElementValue<V, I, D, W, F> {
@@ -287,6 +280,171 @@ public class ExElementType {
 			throws ModelInstantiationException {
 			parent.syncChildren(interpreted.getChildren(this), (List<V>) currentChildren, theInstantiator, ExElement::update);
 		}
+
+		@Override
+		public String toString() {
+			return theRoleName + ":" + theDefType.getName();
+		}
+	}
+
+	public static class ExElementModelValue<M, MV extends M> {
+		private ExElementType theOwner;
+		private int theIndex;
+		private final ModelType<M> theModelType;
+		private final ExFunction<ExpressoQIS, String, QonfigInterpretationException> theName;
+		private final boolean isTypeVariable;
+		private final ExFunction<ExElement.Interpreted<?>, ModelInstanceType<M, MV>, ExpressoInterpretationException> theType;
+
+		public ExElementModelValue(ModelType<M> modelType, ExFunction<ExpressoQIS, String, QonfigInterpretationException> name,
+			boolean typeVariable, ExFunction<ExElement.Interpreted<?>, ModelInstanceType<M, MV>, ExpressoInterpretationException> type) {
+			theModelType = modelType;
+			theName = name;
+			this.isTypeVariable = typeVariable;
+			theType = type;
+		}
+
+		ExElementType getOwner() {
+			return theOwner;
+		}
+
+		int getIndex() {
+			return theIndex;
+		}
+
+		ExElementModelValue<M, MV> setOwner(ExElementType owner, int index) {
+			if (theOwner != null && theOwner != owner)
+				throw new IllegalStateException(
+					"An element attribute or value (" + this + ") cannot be owned by multiple elements: " + theOwner + " and " + owner);
+			theOwner = owner;
+			theIndex = index;
+			return this;
+		}
+
+		public ModelType<M> getModelType() {
+			return theModelType;
+		}
+
+		String getAttributeName() {
+			return theName instanceof AttributeModelValueNaming ? ((AttributeModelValueNaming) theName).getAttributeName() : null;
+		}
+
+		public String getName(ExpressoQIS session) throws QonfigInterpretationException {
+			return theName.apply(session);
+		}
+
+		public boolean isTypeVariable() {
+			return isTypeVariable;
+		}
+
+		public ModelInstanceType<M, MV> getType(ExElement.Interpreted<?> interpreted) throws ExpressoInterpretationException {
+			return theType.apply(interpreted);
+		}
+	}
+
+	static class AttributeModelValueNaming implements ExFunction<ExpressoQIS, String, QonfigInterpretationException> {
+		private final String theAttributeName;
+
+		AttributeModelValueNaming(String attributeName) {
+			theAttributeName = attributeName;
+		}
+
+		String getAttributeName() {
+			return theAttributeName;
+		}
+
+		@Override
+		public String apply(ExpressoQIS value) throws QonfigInterpretationException {
+			return value.getAttributeText(theAttributeName);
+		}
+
+		@Override
+		public int hashCode() {
+			return theAttributeName.hashCode();
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (obj == this)
+				return true;
+			else if (obj instanceof AttributeModelValueNaming)
+				return theAttributeName.equals(((AttributeModelValueNaming) obj).theAttributeName);
+			else
+				return false;
+		}
+
+		@Override
+		public String toString() {
+			return "Attribute:" + theAttributeName;
+		}
+	}
+
+	public interface TraceabilitySatisfier<E, I, D> {
+		void configure(Function<? super D, DefTypeData> defData, Function<? super I, InterpretedTypeData> interpretedData,
+			Function<? super E, InstanceTypeData> instanceData);
+	}
+
+	static class ElementTraceabilitySatisfier<E extends ExElement, I extends ExElement.Interpreted<? extends E>, D extends ExElement.Def<? extends E>>
+	implements TraceabilitySatisfier<E, I, D> {
+		private final ExElementType theType;
+		private final ElementTypeTraceability.SingleTypeTraceabilityBuilder<E, I, D> theTraceability;
+
+		ElementTraceabilitySatisfier(ExElementType type, SingleTypeTraceabilityBuilder<E, I, D> traceability) {
+			theType = type;
+			theTraceability = traceability;
+		}
+
+		@Override
+		public void configure(Function<? super D, DefTypeData> defData, Function<? super I, InterpretedTypeData> interpretedData,
+			Function<? super E, InstanceTypeData> instanceData) {
+			for (ExElementValue<?, ?, ?, ?, ?> v : theType.theAttributes.allValues()) {
+				theTraceability.withAttribute(v.getAttributeName(), def -> defData.apply(def).getValue(v),
+					interp -> interpretedData.apply(interp).getValue(v));
+			}
+			if (theType.theValue != null) {
+				theTraceability.withValue(def -> defData.apply(def).getValue(theType.theValue),
+					interp -> interpretedData.apply(interp).getValue(theType.theValue));
+			}
+
+			for (ExElementChild<?, ?, ?> child : theType.theChildren.allValues()) {
+				theTraceability.withChild(child.getRoleName(), def -> defData.apply(def).getChildren(child),
+					interp -> interpretedData.apply(interp).getChildren(child), inst -> instanceData.apply(inst).getChildren(child));
+			}
+
+			for (ExElementModelValue<?, ?> modelValue : theType.theModelValues) {
+				String attributeName = modelValue.getAttributeName();
+				if (attributeName != null)
+					theTraceability.withAttribute(attributeName, def -> defData.apply(def).getModelValue(modelValue), null);
+			}
+		}
+	}
+
+	static class AddOnTraceabilitySatisfier<E extends ExElement, AO extends ExAddOn<? super E>, I extends ExAddOn.Interpreted<? super E, ? extends AO>, D extends ExAddOn.Def<? super E, ? extends AO>>
+	implements TraceabilitySatisfier<AO, I, D> {
+		private ExElementType theType;
+		private final ElementTypeTraceability.AddOnTraceabilityBuilder<E, AO, I, D> theTraceability;
+
+		AddOnTraceabilitySatisfier(ExElementType type, AddOnTraceabilityBuilder<E, AO, I, D> traceability) {
+			theType = type;
+			theTraceability = traceability;
+		}
+
+		@Override
+		public void configure(Function<? super D, DefTypeData> defData, Function<? super I, InterpretedTypeData> interpretedData,
+			Function<? super AO, InstanceTypeData> instanceData) {
+			for (ExElementValue<?, ?, ?, ?, ?> v : theType.theAttributes.allValues()) {
+				theTraceability.withAddOnAttribute(v.getAttributeName(), def -> defData.apply(def).getValue(v),
+					interp -> interpretedData.apply(interp).getValue(v));
+			}
+			if (theType.theValue != null) {
+				theTraceability.withAddOnValue(def -> defData.apply(def).getValue(theType.theValue),
+					interp -> interpretedData.apply(interp).getValue(theType.theValue));
+			}
+
+			for (ExElementChild<?, ?, ?> child : theType.theChildren.allValues()) {
+				theTraceability.withAddOnChild(child.getRoleName(), def -> defData.apply(def).getChildren(child),
+					interp -> interpretedData.apply(interp).getChildren(child), inst -> instanceData.apply(inst).getChildren(child));
+			}
+		}
 	}
 
 	public static Builder build(String toolkitName, Version toolkitVersion, String elementName) {
@@ -314,7 +472,7 @@ public class ExElementType {
 
 	public static <T, I extends ExElement.Interpreted<?>> ValueExpression<T, I> valueExpression(String attributeName,
 		ModelInstanceType<SettableValue<?>, SettableValue<T>> type, Supplier<? extends T> defaultValue) {
-		return new ValueExpression<>(attributeName, __ -> type, defaultValue);
+		return new ValueExpression<>(attributeName, FunctionUtils.constantExFn(type, type::toString, type), defaultValue);
 	}
 
 	public static <T, I extends ExElement.Interpreted<?>> ValueExpression<T, I> valueExpression(String attributeName,
@@ -331,12 +489,13 @@ public class ExElementType {
 	public static <T, I extends ExElement.Interpreted<?>> CollectionExpression<T, I> collectionExpression(String attributeName,
 		TypeToken<T> type) {
 		ModelInstanceType<ObservableCollection<?>, ObservableCollection<T>> instanceType = ModelTypes.Collection.forType(type);
-		return new CollectionExpression<>(attributeName, el -> instanceType);
+		return new CollectionExpression<>(attributeName, FunctionUtils.constantExFn(instanceType, instanceType::toString, instanceType));
 	}
 
 	public static <T, I extends ExElement.Interpreted<?>> CollectionExpression<T, I> collectionExpression(String attributeName,
 		ExFunction<I, TypeToken<T>, ExpressoInterpretationException> type) {
-		return new CollectionExpression<>(attributeName, el -> ModelTypes.Collection.forType(type.apply(el)));
+		return new CollectionExpression<>(attributeName,
+			FunctionUtils.printableExFn(el -> ModelTypes.Collection.forType(type.apply(el)), () -> "Collection<" + type + ">", null));
 	}
 
 	public static <T, I extends ExElement.Interpreted<?>> SetExpression<T, I> setExpression(String attributeName, Class<T> type) {
@@ -345,12 +504,13 @@ public class ExElementType {
 
 	public static <T, I extends ExElement.Interpreted<?>> SetExpression<T, I> setExpression(String attributeName, TypeToken<T> type) {
 		ModelInstanceType<ObservableSet<?>, ObservableSet<T>> instanceType = ModelTypes.Set.forType(type);
-		return new SetExpression<>(attributeName, el -> instanceType);
+		return new SetExpression<>(attributeName, FunctionUtils.constantExFn(instanceType, instanceType::toString, instanceType));
 	}
 
 	public static <T, I extends ExElement.Interpreted<?>> SetExpression<T, I> setExpression(String attributeName,
 		ExFunction<I, TypeToken<T>, ExpressoInterpretationException> type) {
-		return new SetExpression<>(attributeName, el -> ModelTypes.Set.forType(type.apply(el)));
+		return new SetExpression<>(attributeName,
+			FunctionUtils.printableExFn(el -> ModelTypes.Set.forType(type.apply(el)), () -> "Set<" + type + ">", null));
 	}
 
 	public static <T, I extends ExElement.Interpreted<?>> SortedCollectionExpression<T, I> sortedCollectionExpression(String attributeName,
@@ -362,12 +522,14 @@ public class ExElementType {
 		TypeToken<T> type, Comparator<? super T> sorting) {
 		ModelInstanceType<ObservableSortedCollection<?>, ObservableSortedCollection<T>> instanceType = ModelTypes.SortedCollection
 			.forType(type);
-		return new SortedCollectionExpression<>(attributeName, el -> instanceType, sorting);
+		return new SortedCollectionExpression<>(attributeName,
+			FunctionUtils.constantExFn(instanceType, instanceType::toString, instanceType), sorting);
 	}
 
 	public static <T, I extends ExElement.Interpreted<?>> SortedCollectionExpression<T, I> sortedCollectionExpression(String attributeName,
 		Comparator<? super T> sorting, ExFunction<I, TypeToken<T>, ExpressoInterpretationException> type) {
-		return new SortedCollectionExpression<>(attributeName, el -> ModelTypes.SortedCollection.forType(type.apply(el)), sorting);
+		return new SortedCollectionExpression<>(attributeName, FunctionUtils.printableExFn(
+			el -> ModelTypes.SortedCollection.forType(type.apply(el)), () -> "SortedCollection<" + type + ">", null), sorting);
 	}
 
 	public static <T, I extends ExElement.Interpreted<?>> SortedSetExpression<T, I> sortedSetExpression(String attributeName, Class<T> type,
@@ -378,12 +540,15 @@ public class ExElementType {
 	public static <T, I extends ExElement.Interpreted<?>> SortedSetExpression<T, I> sortedSetExpression(String attributeName,
 		TypeToken<T> type, Comparator<? super T> sorting) {
 		ModelInstanceType<ObservableSortedSet<?>, ObservableSortedSet<T>> instanceType = ModelTypes.SortedSet.forType(type);
-		return new SortedSetExpression<>(attributeName, el -> instanceType, sorting);
+		return new SortedSetExpression<>(attributeName, FunctionUtils.constantExFn(instanceType, instanceType::toString, instanceType),
+			sorting);
 	}
 
 	public static <T, I extends ExElement.Interpreted<?>> SortedSetExpression<T, I> sortedSetExpression(String attributeName,
 		Comparator<? super T> sorting, ExFunction<I, TypeToken<T>, ExpressoInterpretationException> type) {
-		return new SortedSetExpression<>(attributeName, el -> ModelTypes.SortedSet.forType(type.apply(el)), sorting);
+		return new SortedSetExpression<>(attributeName,
+			FunctionUtils.printableExFn(el -> ModelTypes.SortedSet.forType(type.apply(el)), () -> "SortedSet<" + type + ">", null),
+			sorting);
 	}
 
 	public static <E extends ExElement, I extends ExElement.Interpreted<? super E>, D extends ExElement.Def<? super E>> ExElementChild<E, I, D> child(//
@@ -392,6 +557,61 @@ public class ExElementType {
 		ExConsumer<? super I, ExpressoInterpretationException> update, //
 		ExFunction<? super I, E, ModelInstantiationException> instantiator) {
 		return new ExElementChild<>(roleName, (Class<D>) (Class<?>) defType, interpreter, update, instantiator);
+	}
+
+	public static <M, MV extends M> ExElementModelValue<M, MV> modelValue(String valueName, ModelInstanceType<M, MV> type) {
+		return new ExElementModelValue<>(type.getModelType(), ExFunction.constant(valueName), false, ExFunction.constant(type));
+	}
+
+	public static <M, MV extends M> ExElementModelValue<M, MV> modelAttributeValue(String attributeName, ModelInstanceType<M, MV> type) {
+		return new ExElementModelValue<>(type.getModelType(), new AttributeModelValueNaming(attributeName), false,
+			ExFunction.constant(type));
+	}
+
+	public static <M, MV extends M, I extends ExElement.Interpreted<?>> ExElementModelValue<M, MV> modelValue(String valueName,
+		ModelType<M> modelType, ExFunction<I, ModelInstanceType<M, MV>, ExpressoInterpretationException> type) {
+		return new ExElementModelValue<>(modelType, ExFunction.constant(valueName), true, //
+			(ExFunction<ExElement.Interpreted<?>, ModelInstanceType<M, MV>, ExpressoInterpretationException>) type);
+	}
+
+	public static <M, MV extends M, I extends ExElement.Interpreted<?>> ExElementModelValue<M, MV> modelAttributeValue(String attributeName,
+		ModelType<M> modelType, ExFunction<I, ModelInstanceType<M, MV>, ExpressoInterpretationException> type) {
+		return new ExElementModelValue<>(modelType, new AttributeModelValueNaming(attributeName), true, //
+			(ExFunction<ExElement.Interpreted<?>, ModelInstanceType<M, MV>, ExpressoInterpretationException>) type);
+	}
+
+	public static <T> ExElementModelValue<SettableValue<?>, SettableValue<T>> modelValue(String valueName, Class<T> type) {
+		return modelValue(valueName, TypeTokens.get().of(type));
+	}
+
+	public static <T> ExElementModelValue<SettableValue<?>, SettableValue<T>> modelValue(String valueName, TypeToken<T> type) {
+		return modelValue(valueName, ModelTypes.Value.forType(type));
+	}
+
+	public static <T> ExElementModelValue<SettableValue<?>, SettableValue<T>> modelAttributeValue(String attributeName, Class<T> type) {
+		return modelAttributeValue(attributeName, TypeTokens.get().of(type));
+	}
+
+	public static <T> ExElementModelValue<SettableValue<?>, SettableValue<T>> modelAttributeValue(String attributeName, TypeToken<T> type) {
+		return modelAttributeValue(attributeName, ModelTypes.Value.forType(type));
+	}
+
+	public static <M, MV extends M, I extends ExElement.Interpreted<?>> ExElementModelValue<M, MV> singleTypedModelValue(String valueName,
+		ModelType.SingleTyped<M> modelType, ExFunction<I, ? extends TypeToken<?>, ExpressoInterpretationException> type) {
+		return ExElementType.<M, MV, I> modelValue(valueName, modelType,
+			interpreted -> (ModelInstanceType<M, MV>) modelType.forType(type.apply(interpreted)));
+	}
+
+	public static <M, MV extends M, I extends ExElement.Interpreted<?>> ExElementModelValue<M, MV> singleTypedModelAttributeValue(
+		String attributeName, ModelType.SingleTyped<M> modelType,
+		ExFunction<I, ? extends TypeToken<?>, ExpressoInterpretationException> type) {
+		return ExElementType.<M, MV, I> modelAttributeValue(attributeName, modelType,
+			interpreted -> (ModelInstanceType<M, MV>) modelType.forType(type.apply(interpreted)));
+	}
+
+	public static <T, I extends ExElement.Interpreted<?>> ExElementModelValue<SettableValue<?>, SettableValue<T>> modelAttributeValue(
+		String attributeName, ExFunction<I, TypeToken<T>, ExpressoInterpretationException> type) {
+		return ExElementType.<SettableValue<?>, SettableValue<T>, I> singleTypedModelAttributeValue(attributeName, ModelTypes.Value, type);
 	}
 
 	static abstract class AbstractElementValue<V, I, D, W, F> implements ExElementValue<V, I, D, W, F> {
@@ -523,6 +743,14 @@ public class ExElementType {
 			throws ModelInstantiationException {
 			wrapper.set(instance == null ? null : instance.get(models));
 		}
+
+		@Override
+		public String toString() {
+			if (theAttributeName == null)
+				return "(value):" + theType;
+			else
+				return theAttributeName + ":" + theType;
+		}
 	}
 
 	public static class ValueExpression<T, I extends ExElement.Interpreted<?>>
@@ -539,17 +767,6 @@ public class ExElementType {
 		@Override
 		public SettableValue<T> flattenWrapper(SettableValue<SettableValue<T>> wrapper) {
 			return SettableValue.flatten(wrapper, theDefault);
-		}
-
-		@Override
-		public void instantiated(ModelValueInstantiator<SettableValue<T>> value) throws ModelInstantiationException {
-			value.instantiate();
-		}
-
-		@Override
-		public void wrap(SettableValue<SettableValue<T>> wrapper, ModelValueInstantiator<SettableValue<T>> instance, ExElement element,
-			ModelSetInstance models) throws ModelInstantiationException {
-			wrapper.set(instance.get(models));
 		}
 	}
 
@@ -689,7 +906,7 @@ public class ExElementType {
 		}
 	}
 
-	public static class TypeChildData<T> {
+	static class TypeChildData<T> {
 		private final TypeChildData<T> theSuperData;
 		private final DequeList<T>[] theChildren;
 
@@ -724,15 +941,65 @@ public class ExElementType {
 		}
 	}
 
+	static class TypeModelValueData<T> {
+		private final TypeModelValueData<T> theSuperData;
+		private final Object[] theValues;
+
+		TypeModelValueData(ExElementType type) {
+			theSuperData = type.getSuper() == null ? null : new TypeModelValueData<>(type.getSuper());
+			theValues = new Object[type.getModelValues().size()];
+		}
+
+		T get(ExElementModelValue<?, ?> value, ExElementType type) {
+			if (theSuperData != null && value.getOwner() != type)
+				return theSuperData.get(value, type.getSuper());
+			return (T) theValues[value.getIndex()];
+		}
+
+		void set(ExElementModelValue<?, ?> modelValue, ExElementType type, T value) {
+			if (theSuperData != null && modelValue.getOwner() != type)
+				theSuperData.set(modelValue, type.getSuper(), value);
+			else
+				theValues[modelValue.getIndex()] = value;
+		}
+
+		void setAll(T value) {
+			if (theSuperData != null)
+				theSuperData.setAll(value);
+			Arrays.fill(theValues, value);
+		}
+
+		<X extends Throwable> T modify(ExElementModelValue<?, ?> valueType, ExElementType type,
+			ExFunction<? super T, ? extends T, X> modify) throws X {
+			if (theSuperData != null && valueType.getOwner() != type)
+				return theSuperData.modify(valueType, type.getSuper(), modify);
+			T value = modify.apply((T) theValues[valueType.getIndex()]);
+			theValues[valueType.getIndex()] = value;
+			return value;
+		}
+
+		<X extends Throwable> void forEach(ExElementType type, ExBiFunction<? super T, ExElementModelValue<?, ?>, ? extends T, X> modify)
+			throws X {
+			if (theSuperData != null)
+				theSuperData.forEach(type.getSuper(), modify);
+			for (int a = 0; a < theValues.length; a++) {
+				T newValue = modify.apply((T) theValues[a], type.getModelValues().get(a));
+				theValues[a] = newValue;
+			}
+		}
+	}
+
 	public static class DefTypeData {
 		private final ExElementType theType;
 		private final TypeValueData<Object> theValues;
 		private final TypeChildData<? extends ExElement.Def<?>> theChildren;
+		private final TypeModelValueData<ModelComponentId> theModelElementIds;
 
 		public DefTypeData(ExElementType type) {
 			theType = type;
 			theValues = new TypeValueData<>(type);
 			theChildren = new TypeChildData<>(type);
+			theModelElementIds = new TypeModelValueData<>(type);
 		}
 
 		public ExElementType getType() {
@@ -757,6 +1024,10 @@ public class ExElementType {
 				throw new IllegalArgumentException("Multiple children for " + childDef);
 		}
 
+		public ModelComponentId getModelValue(ExElementModelValue<?, ?> value) {
+			return theModelElementIds.get(value, theType);
+		}
+
 		public void update(ExElement.Def<?> element, ExpressoQIS session) throws QonfigInterpretationException {
 			compileTypeData(theType, theValues, theChildren, element, session);
 		}
@@ -768,6 +1039,21 @@ public class ExElementType {
 				compileTypeData(type.getSuper(), valueData.getSuperData(), childData.getSuperData(), element,
 					session.asElement(type.getSuper().getToolkit(), type.getSuper().getElementName()));
 
+			if (!theType.getModelValues().isEmpty()) {
+				ExWithElementModel.Def elementModels = element.getAddOn(ExWithElementModel.Def.class);
+				for (int i = 0; i < theType.getModelValues().size(); i++) {
+					ExElementModelValue<?, ?> value = theType.getModelValues().get(i);
+					String name = value.getName(session);
+					if (name != null) {
+						ModelComponentId valueId = elementModels.getElementValueModelId(name);
+						theModelElementIds.set(value, theType, valueId);
+						if (value.isTypeVariable())
+							satisfyType(value, valueId, elementModels);
+					} else
+						theModelElementIds.set(value, theType, null);
+				}
+			}
+
 			for (int a = 0; a < type.getAttributes().size(); a++)
 				valueData.set(a, type.getAttributes().get(a).compile(element, session));
 			if (type.getValue() != null)
@@ -775,6 +1061,11 @@ public class ExElementType {
 
 			for (int c = 0; c < type.getChildren().size(); c++)
 				type.getChildren().get(c).compile(element, childData.get(c), session);
+		}
+
+		private static <M, MV extends M> void satisfyType(ExElementModelValue<M, MV> value, ModelComponentId valueId,
+			ExWithElementModel.Def elementModels) throws QonfigInterpretationException {
+			elementModels.satisfyElementValueType(valueId, value.getModelType(), value::getType);
 		}
 
 		public InterpretedTypeData interpret() {
@@ -786,11 +1077,17 @@ public class ExElementType {
 		private final DefTypeData theDefinition;
 		private final TypeValueData<Object> theValues;
 		private final TypeChildData<? extends ExElement.Interpreted<?>> theChildren;
+		private final TypeModelValueData<ModelInstanceType<?, ?>> theModelValueTypes;
 
 		public InterpretedTypeData(DefTypeData definition) {
 			theDefinition = definition;
 			theValues = new TypeValueData<>(theDefinition.getType());
 			theChildren = new TypeChildData<>(theDefinition.getType());
+			theModelValueTypes = new TypeModelValueData<>(theDefinition.getType());
+		}
+
+		public DefTypeData getDefinition() {
+			return theDefinition;
 		}
 
 		public <I> I getValue(ExElementValue<?, I, ?, ?, ?> valueDef) {
@@ -820,12 +1117,34 @@ public class ExElementType {
 				throw new IllegalArgumentException("Multiple children for " + childDef);
 		}
 
+		public <M, MV extends M> ModelInstanceType<M, MV> getModelValueType(ExElementModelValue<M, MV> valueDef) {
+			return (ModelInstanceType<M, MV>) theModelValueTypes.get(valueDef, theDefinition.getType());
+		}
+
+		public <M, MV extends M> ModelInstanceType<M, MV> getOrInterpretModelValueType(ExElementModelValue<M, MV> valueDef,
+			ExElement.Interpreted<?> element) throws ExpressoInterpretationException {
+			return (ModelInstanceType<M, MV>) theModelValueTypes.modify(valueDef, theDefinition.getType(), old -> {
+				if (old == null)
+					return valueDef.getType(element);
+				else
+					return old;
+			});
+		}
+
 		public void clearValues() {
+			theModelValueTypes.setAll(null);
 			theValues.setAll(null);
 		}
 
 		public void update(ExElement.Interpreted<?> element) throws ExpressoInterpretationException {
 			ExElementType type = theDefinition.getType();
+
+			theModelValueTypes.forEach(type, (old, valueType) -> {
+				if (old == null)
+					return valueType.getType(element);
+				else
+					return old;
+			});
 			theValues.forEach(type, (value, valueType) -> {
 				if (value == null)
 					value = ((ExElementValue<?, ?, Object, ?, ?>) valueType).interpret(theDefinition.getValue(valueType), this, element);
@@ -874,15 +1193,40 @@ public class ExElementType {
 			}
 		}
 
+		static class InstantiatedModelValueData<M, MV extends M> {
+			ModelComponentId valueId;
+			ModelType.HollowModelValue<M, MV> hollowValue;
+
+			InstantiatedModelValueData<M, MV> instantiate(InterpretedTypeData interpreted, ExElementModelValue<?, ?> valueDef) {
+				valueId = interpreted.getDefinition().getModelValue(valueDef);
+				if (valueId != null) {
+					ExElementModelValue<M, MV> myValueDef = (ExElementModelValue<M, MV>) valueDef;
+					hollowValue = myValueDef.getModelType().createHollowValue(valueId.getName(), interpreted.getModelValueType(myValueDef));
+				} else
+					hollowValue = null;
+				return this;
+			}
+
+			InstantiatedModelValueData<M, MV> copyFrom(InstantiatedModelValueData<?, ?> other) {
+				valueId = other.valueId;
+				if (other.hollowValue != null)
+					hollowValue = ((InstantiatedModelValueData<M, MV>) other).hollowValue.copy();
+				return this;
+			}
+		}
+
 		private final ExElementType theType;
-		private TypeValueData<InstantiatedValueData<?, ?, ?>> theValues;
-		private TypeChildData<? extends ExElement> theChildren;
+		private final TypeValueData<InstantiatedValueData<?, ?, ?>> theValues;
+		private final TypeChildData<? extends ExElement> theChildren;
+		private final TypeModelValueData<InstantiatedModelValueData<?, ?>> theModelValues;
 
 		InstanceTypeData(ExElementType type) {
 			theType = type;
 			theValues = new TypeValueData<>(theType);
 			theValues.forEach(theType, (old, valueType) -> new InstantiatedValueData<>(valueType));
 			theChildren = new TypeChildData<>(theType);
+			theModelValues = new TypeModelValueData<>(theType);
+			theModelValues.forEach(theType, (old, valueType) -> new InstantiatedModelValueData<>());
 		}
 
 		public ExElementType getType() {
@@ -907,7 +1251,19 @@ public class ExElementType {
 				throw new IllegalArgumentException("Multiple children for " + childDef);
 		}
 
+		public <MV> MV satisfyModelValue(ExElementModelValue<?, MV> modelValue, Supplier<MV> value) {
+			InstantiatedModelValueData<?, MV> valueData = (InstantiatedModelValueData<?, MV>) theModelValues.get(modelValue, theType);
+			if (valueData.hollowValue != null && !valueData.hollowValue.isSatisfied())
+				valueData.hollowValue.satisfy(value.get());
+			return (MV) valueData.hollowValue;
+		}
+
+		public <MV> MV getModelValue(ExElementModelValue<?, MV> value) {
+			return (MV) theModelValues.get(value, theType);
+		}
+
 		void update(InterpretedTypeData interpreted, ExElement element) throws ModelInstantiationException {
+			theModelValues.forEach(theType, (old, valueType) -> old.instantiate(interpreted, valueType));
 			theValues.forEach(theType, (old, valueType) -> old.instantiate(valueType, interpreted, element));
 			theChildren.forEach(theType, (old, childType) -> childType.instantiate(element, interpreted, old));
 		}
@@ -921,6 +1277,11 @@ public class ExElementType {
 		}
 
 		public void instantiate(ModelSetInstance models, ExElement element) throws ModelInstantiationException {
+			theModelValues.forEach(theType, (old, valueType) -> {
+				if (old.valueId != null)
+					ExFlexibleElementModelAddOn.satisfyElementValue(old.valueId, models, old.hollowValue);
+				return old;
+			});
 			theValues.forEach(theType, (old, valueType) -> old.instantiate(valueType, element, models));
 			theChildren.forEach(theType, (old, childType) -> {
 				for (ExElement child : old)
@@ -930,6 +1291,11 @@ public class ExElementType {
 
 		public InstanceTypeData copy(ExElement newOwner) {
 			InstanceTypeData copy = new InstanceTypeData(theType);
+			copy.theModelValues.forEach(theType, (copyV, valueType) -> copyV.copyFrom(theModelValues.get(valueType, theType)));
+			copy.theValues.forEach(theType, (old, valueType) -> {
+				((InstantiatedValueData<Object, ?, ?>) old).instantiator = theValues.get(valueType, theType).instantiator;
+				return old;
+			});
 			copy.theChildren.forEach(theType, (old, childType) -> {
 				for (ExElement child : theChildren.get(childType, theType))
 					((DequeList<ExElement>) old).add(child.copy(newOwner));
@@ -941,6 +1307,7 @@ public class ExElementType {
 			theChildren.forEach(theType, (old, childType) -> {
 				for (ExElement child : old)
 					child.destroy();
+				old.clear();
 			});
 		}
 	}
@@ -951,12 +1318,14 @@ public class ExElementType {
 		private final Map<String, ExElementValue<?, ?, ?, ?, ?>> theAttributes;
 		private ExElementValue<?, ?, ?, ?, ?> theValue;
 		private final Map<String, ExElementChild<?, ?, ?>> theChildren;
+		private final List<ExElementModelValue<?, ?>> theModelValues;
 
 		Builder(ToolkitDef toolkit, String elementName) {
 			theToolkit = toolkit;
 			theElementName = elementName;
 			theAttributes = new HashMap<>();
 			theChildren = new HashMap<>();
+			theModelValues = new ArrayList<>();
 		}
 
 		public Builder withValue(ExElementValue<?, ?, ?, ?, ?> value) {
@@ -981,18 +1350,24 @@ public class ExElementType {
 			return this;
 		}
 
+		public Builder withModelValue(ExElementModelValue<?, ?> modelValue) {
+			theModelValues.add(modelValue);
+			return this;
+		}
+
 		public ExElementType build(ExElementType superType) {
 			QuickMap<String, ExElementValue<?, ?, ?, ?, ?>> attrs = QuickMap.of(theAttributes, StringUtils.DISTINCT_NUMBER_TOLERANT);
 			QuickMap<String, ExElementChild<?, ?, ?>> children = QuickMap.of(theChildren, StringUtils.DISTINCT_NUMBER_TOLERANT);
-			return new ExElementType(superType, theToolkit, theElementName, attrs.unmodifiable(), theValue, children.unmodifiable());
+			return new ExElementType(superType, theToolkit, theElementName, attrs.unmodifiable(), theValue, children.unmodifiable(),
+				QommonsUtils.unmodifiableCopy(theModelValues));
 		}
 	}
 
 	public static abstract class AbstractElement extends ExElement.Abstract {
-		public static <E extends AbstractElement, I extends Interpreted<E>, D extends Def<E>> void configureTraceability(
-			ElementTypeTraceability.SingleTypeTraceabilityBuilder<E, ?, ?> traceability, ExElementType type) {
-			type.configureElementTraceability(Def::getTypeData, Interpreted::getTypeData, AbstractElement::getTypeData,
-				(ElementTypeTraceability.SingleTypeTraceabilityBuilder<E, I, D>) traceability);
+		public static <E extends AbstractElement, I extends ExElement.Interpreted<? extends E>, D extends Def<? extends E>> void configureTraceability(
+			ElementTypeTraceability.SingleTypeTraceabilityBuilder<E, I, D> traceability, ExElementType type) {
+			type.configureElementTraceability(traceability).configure(Def::getTypeData, interp -> ((Interpreted<?>) interp).getTypeData(),
+				AbstractElement::getTypeData);
 		}
 
 		public static abstract class Def<E extends AbstractElement> extends ExElement.Def.Abstract<E> {
@@ -1017,6 +1392,10 @@ public class ExElementType {
 
 			public <D extends ExElement.Def<?>> D getChild(ExElementChild<?, ?, D> childDef) {
 				return theTypeData.getChild(childDef);
+			}
+
+			public ModelComponentId getModelValue(ExElementModelValue<?, ?> value) {
+				return theTypeData.getModelValue(value);
 			}
 
 			@Override
@@ -1062,8 +1441,18 @@ public class ExElementType {
 				return theTypeData.getChild(childDef);
 			}
 
+			public <M, MV extends M> ModelInstanceType<M, MV> getModelValueType(ExElementModelValue<M, MV> value) {
+				return theTypeData.getModelValueType(value);
+			}
+
+			public <M, MV extends M> ModelInstanceType<M, MV> getOrInterpretModelValueType(ExElementModelValue<M, MV> value)
+				throws ExpressoInterpretationException {
+				return theTypeData.getOrInterpretModelValueType(value, this);
+			}
+
 			@Override
 			protected void doUpdate() throws ExpressoInterpretationException {
+				theTypeData.clearValues();
 				super.doUpdate();
 
 				theTypeData.update(this);
@@ -1092,6 +1481,14 @@ public class ExElementType {
 
 		public <E extends ExElement> E getChild(ExElementChild<E, ?, ?> childDef) {
 			return theTypeData.getChild(childDef);
+		}
+
+		public <MV> MV satisfyModelValue(ExElementModelValue<?, MV> modelValue, Supplier<MV> value) {
+			return theTypeData.satisfyModelValue(modelValue, value);
+		}
+
+		public <MV> MV getModelValue(ExElementModelValue<?, MV> value) {
+			return theTypeData.getModelValue(value);
 		}
 
 		@Override
@@ -1135,10 +1532,10 @@ public class ExElementType {
 	}
 
 	public static abstract class AbstractAddOn<E extends ExElement> extends ExAddOn.Abstract<E> {
-		public static <E extends ExElement, AO extends AbstractAddOn<E>, I extends Interpreted<E, AO>, D extends Def<E, AO>> void configureTraceability(
-			ElementTypeTraceability.AddOnTraceabilityBuilder<E, AO, ?, ?> traceability, ExElementType type) {
-			type.configureAddOnTraceability(Def::getTypeData, Interpreted::getTypeData, AbstractAddOn::getTypeData,
-				(ElementTypeTraceability.AddOnTraceabilityBuilder<E, AO, I, D>) traceability);
+		public static <E extends ExElement, AO extends AbstractAddOn<? super E>, I extends Interpreted<? super E, ? extends AO>, D extends Def<? super E, ? extends AO>> void configureTraceability(
+			ElementTypeTraceability.AddOnTraceabilityBuilder<E, AO, I, D> traceability, ExElementType type) {
+			type.configureAddOnTraceability(traceability).configure(Def::getTypeData, interp -> ((Interpreted<?, ?>) interp).getTypeData(),
+				AbstractAddOn::getTypeData);
 		}
 
 		public static abstract class Def<E extends ExElement, AO extends AbstractAddOn<E>> extends ExAddOn.Def.Abstract<E, AO> {
@@ -1207,6 +1604,7 @@ public class ExElementType {
 
 			@Override
 			public void update(ExElement.Interpreted<? extends E> element) throws ExpressoInterpretationException {
+				theTypeData.clearValues();
 				super.update(element);
 
 				theTypeData.update(element);

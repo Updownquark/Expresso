@@ -961,71 +961,71 @@ public interface ElementTypeTraceability<E extends ExElement, I extends ExElemen
 
 		SingleTypeTraceabilityBuilder<E, I, D> reflectMethods(Class<?> defClass, Class<?> interpClass, Class<?> elementClass) {
 			for (Method defMethod : defClass.getDeclaredMethods()) {
-				if (defMethod.getParameterCount() != 0 || defMethod.getReturnType() == void.class)
-					continue;
-				QonfigAttributeGetter attr = defMethod.getAnnotation(QonfigAttributeGetter.class);
-				if (attr != null && !checkAsType(defMethod, attr.asType()))
-					attr = null;
-				if (attr != null) {
-					Method interpMethod;
-					try {
-						interpMethod = interpClass == null ? null : interpClass.getDeclaredMethod(defMethod.getName());
-					} catch (NoSuchMethodException | SecurityException e) {
-						interpMethod = null;
-					}
-
-					if (attr.value().isEmpty())
-						withValue(new Internal.ReflectedAttributeGetter<>(defMethod, interpMethod));
-					else
-						withAttribute(attr.value(), new Internal.ReflectedAttributeGetter<>(defMethod, interpMethod));
-				}
-				QonfigChildGetter child = defMethod.getAnnotation(QonfigChildGetter.class);
-				if (child != null && !checkAsType(defMethod, child.asType())) {
-					child = null;
-				}
-				if (child != null) {
-					Internal.ChildGetterReturn childGetterType = Internal.checkReturnType(defMethod, ExElement.Def.class);
-					if (childGetterType != null) {
+				if (defMethod.getParameterCount() == 0 && defMethod.getReturnType() != void.class) {
+					QonfigAttributeGetter attr = defMethod.getAnnotation(QonfigAttributeGetter.class);
+					if (attr != null && !checkAsType(defMethod, attr.asType()))
+						attr = null;
+					if (attr != null) {
 						Method interpMethod;
 						try {
-							if (interpClass != null) {
-								interpMethod = interpClass.getDeclaredMethod(defMethod.getName());
-								Internal.ChildGetterReturn interpGetterType = Internal.checkReturnType(interpMethod,
-									ExElement.Interpreted.class);
-								if (interpGetterType == null)
-									interpMethod = null;
-								else if (interpGetterType != childGetterType) {
-									System.err.println("If the definition method (" + defClass.getName() + "." + defMethod.getName()
-									+ "()) returns a " + childGetterType + ", the interpreted method (" + interpClass.getName() + "."
-									+ defMethod.getName() + "()) must also return a " + childGetterType);
-									interpMethod = null;
-								}
-							} else
-								interpMethod = null;
+							interpMethod = interpClass == null ? null : interpClass.getDeclaredMethod(defMethod.getName());
 						} catch (NoSuchMethodException | SecurityException e) {
 							interpMethod = null;
 						}
-						Method elementMethod;
-						try {
-							if (elementClass != null) {
-								elementMethod = elementClass.getDeclaredMethod(defMethod.getName());
-								Internal.ChildGetterReturn elementListReturn = Internal.checkReturnType(elementMethod, ExElement.class);
-								if (elementListReturn == null)
-									elementMethod = null;
-								else if (elementListReturn != childGetterType) {
-									System.err.println("If the definition method (" + defClass.getName() + "." + defMethod.getName()
-									+ "()) returns a " + childGetterType + ", the element method (" + elementClass.getName() + "."
-									+ defMethod.getName() + "()) must also return a " + childGetterType);
-									elementMethod = null;
-								}
-							} else
-								elementMethod = null;
-						} catch (NoSuchMethodException | SecurityException e) {
-							elementMethod = null;
-						}
 
-						withChild(child.value(),
-							new Internal.ReflectedChildGetter<>(defMethod, interpMethod, elementMethod, childGetterType));
+						if (attr.value().isEmpty())
+							withValue(new Internal.ReflectedAttributeGetter<>(defMethod, interpMethod));
+						else
+							withAttribute(attr.value(), new Internal.ReflectedAttributeGetter<>(defMethod, interpMethod));
+					}
+					QonfigChildGetter child = defMethod.getAnnotation(QonfigChildGetter.class);
+					if (child != null && !checkAsType(defMethod, child.asType())) {
+						child = null;
+					}
+					if (child != null) {
+						Internal.ChildGetterReturn childGetterType = Internal.checkReturnType(defMethod, ExElement.Def.class);
+						if (childGetterType != null) {
+							Method interpMethod;
+							try {
+								if (interpClass != null) {
+									interpMethod = interpClass.getDeclaredMethod(defMethod.getName());
+									Internal.ChildGetterReturn interpGetterType = Internal.checkReturnType(interpMethod,
+										ExElement.Interpreted.class);
+									if (interpGetterType == null)
+										interpMethod = null;
+									else if (interpGetterType != childGetterType) {
+										System.err.println("If the definition method (" + defClass.getName() + "." + defMethod.getName()
+											+ "()) returns a " + childGetterType + ", the interpreted method (" + interpClass.getName()
+											+ "." + defMethod.getName() + "()) must also return a " + childGetterType);
+										interpMethod = null;
+									}
+								} else
+									interpMethod = null;
+							} catch (NoSuchMethodException | SecurityException e) {
+								interpMethod = null;
+							}
+							Method elementMethod;
+							try {
+								if (elementClass != null) {
+									elementMethod = elementClass.getDeclaredMethod(defMethod.getName());
+									Internal.ChildGetterReturn elementListReturn = Internal.checkReturnType(elementMethod, ExElement.class);
+									if (elementListReturn == null)
+										elementMethod = null;
+									else if (elementListReturn != childGetterType) {
+										System.err.println("If the definition method (" + defClass.getName() + "." + defMethod.getName()
+											+ "()) returns a " + childGetterType + ", the element method (" + elementClass.getName() + "."
+											+ defMethod.getName() + "()) must also return a " + childGetterType);
+										elementMethod = null;
+									}
+								} else
+									elementMethod = null;
+							} catch (NoSuchMethodException | SecurityException e) {
+								elementMethod = null;
+							}
+
+							withChild(child.value(),
+								new Internal.ReflectedChildGetter<>(defMethod, interpMethod, elementMethod, childGetterType));
+						}
 					}
 				}
 				TraceabilityConfiguration config = defMethod.getDeclaredAnnotation(TraceabilityConfiguration.class);
@@ -1162,72 +1162,74 @@ public interface ElementTypeTraceability<E extends ExElement, I extends ExElemen
 
 		AddOnTraceabilityBuilder<E, AO, I, D> reflectAddOnMethods() {
 			for (Method defMethod : theDefClass.getDeclaredMethods()) {
-				if (defMethod.getParameterCount() != 0 || defMethod.getReturnType() == void.class)
-					continue;
-				QonfigAttributeGetter attr = defMethod.getAnnotation(QonfigAttributeGetter.class);
-				if (attr != null && !checkAsType(defMethod, attr.asType()))
-					attr = null;
-				if (attr != null) {
-					Method interpMethod;
-					try {
-						interpMethod = theInterpretedClass == null ? null : theInterpretedClass.getDeclaredMethod(defMethod.getName());
-					} catch (NoSuchMethodException | SecurityException e) {
-						interpMethod = null;
-					}
-
-					if (attr.value().isEmpty())
-						withValue(new Internal.ReflectedAddOnAttributeGetter<>(theDefClass, defMethod, theInterpretedClass, interpMethod));
-					else
-						withAttribute(attr.value(),
-							new Internal.ReflectedAddOnAttributeGetter<>(theDefClass, defMethod, theInterpretedClass, interpMethod));
-				}
-				QonfigChildGetter child = defMethod.getAnnotation(QonfigChildGetter.class);
-				if (child != null && !checkAsType(defMethod, child.asType())) {
-					child = null;
-				}
-				if (child != null) {
-					Internal.ChildGetterReturn childGetterType = Internal.checkReturnType(defMethod, ExElement.Def.class);
-					if (childGetterType != null) {
+				if (defMethod.getParameterCount() == 0 && defMethod.getReturnType() != void.class) {
+					QonfigAttributeGetter attr = defMethod.getAnnotation(QonfigAttributeGetter.class);
+					if (attr != null && !checkAsType(defMethod, attr.asType()))
+						attr = null;
+					if (attr != null) {
 						Method interpMethod;
 						try {
-							if (theInterpretedClass != null) {
-								interpMethod = theInterpretedClass.getDeclaredMethod(defMethod.getName());
-								Internal.ChildGetterReturn interpGetterType = Internal.checkReturnType(interpMethod,
-									ExElement.Interpreted.class);
-								if (interpGetterType == null)
-									interpMethod = null;
-								else if (interpGetterType != childGetterType) {
-									System.err.println("If the definition method (" + theDefClass.getName() + "." + defMethod.getName()
-									+ "()) returns a " + childGetterType + ", the interpreted method (" + theInterpretedClass.getName()
-									+ "." + defMethod.getName() + "()) must also return a " + childGetterType);
-									interpMethod = null;
-								}
-							} else
-								interpMethod = null;
+							interpMethod = theInterpretedClass == null ? null : theInterpretedClass.getDeclaredMethod(defMethod.getName());
 						} catch (NoSuchMethodException | SecurityException e) {
 							interpMethod = null;
 						}
-						Method elementMethod;
-						try {
-							if (theAddOnClass != null) {
-								elementMethod = theAddOnClass.getDeclaredMethod(defMethod.getName());
-								Internal.ChildGetterReturn elementListReturn = Internal.checkReturnType(elementMethod, ExElement.class);
-								if (elementListReturn == null)
-									elementMethod = null;
-								else if (elementListReturn != childGetterType) {
-									System.err.println("If the definition method (" + theDefClass.getName() + "." + defMethod.getName()
-									+ "()) returns a " + childGetterType + ", the element method (" + theAddOnClass.getName() + "."
-									+ defMethod.getName() + "()) must also return a " + childGetterType);
-									elementMethod = null;
-								}
-							} else
-								elementMethod = null;
-						} catch (NoSuchMethodException | SecurityException e) {
-							elementMethod = null;
-						}
 
-						withChild(child.value(), new Internal.ReflectedAddOnChildGetter<>(theDefClass, defMethod, theInterpretedClass,
-							interpMethod, theAddOnClass, elementMethod, childGetterType));
+						if (attr.value().isEmpty())
+							withValue(
+								new Internal.ReflectedAddOnAttributeGetter<>(theDefClass, defMethod, theInterpretedClass, interpMethod));
+						else
+							withAttribute(attr.value(),
+								new Internal.ReflectedAddOnAttributeGetter<>(theDefClass, defMethod, theInterpretedClass, interpMethod));
+					}
+					QonfigChildGetter child = defMethod.getAnnotation(QonfigChildGetter.class);
+					if (child != null && !checkAsType(defMethod, child.asType())) {
+						child = null;
+					}
+					if (child != null) {
+						Internal.ChildGetterReturn childGetterType = Internal.checkReturnType(defMethod, ExElement.Def.class);
+						if (childGetterType != null) {
+							Method interpMethod;
+							try {
+								if (theInterpretedClass != null) {
+									interpMethod = theInterpretedClass.getDeclaredMethod(defMethod.getName());
+									Internal.ChildGetterReturn interpGetterType = Internal.checkReturnType(interpMethod,
+										ExElement.Interpreted.class);
+									if (interpGetterType == null)
+										interpMethod = null;
+									else if (interpGetterType != childGetterType) {
+										System.err.println("If the definition method (" + theDefClass.getName() + "." + defMethod.getName()
+											+ "()) returns a " + childGetterType + ", the interpreted method ("
+											+ theInterpretedClass.getName() + "." + defMethod.getName() + "()) must also return a "
+											+ childGetterType);
+										interpMethod = null;
+									}
+								} else
+									interpMethod = null;
+							} catch (NoSuchMethodException | SecurityException e) {
+								interpMethod = null;
+							}
+							Method elementMethod;
+							try {
+								if (theAddOnClass != null) {
+									elementMethod = theAddOnClass.getDeclaredMethod(defMethod.getName());
+									Internal.ChildGetterReturn elementListReturn = Internal.checkReturnType(elementMethod, ExElement.class);
+									if (elementListReturn == null)
+										elementMethod = null;
+									else if (elementListReturn != childGetterType) {
+										System.err.println("If the definition method (" + theDefClass.getName() + "." + defMethod.getName()
+											+ "()) returns a " + childGetterType + ", the element method (" + theAddOnClass.getName() + "."
+											+ defMethod.getName() + "()) must also return a " + childGetterType);
+										elementMethod = null;
+									}
+								} else
+									elementMethod = null;
+							} catch (NoSuchMethodException | SecurityException e) {
+								elementMethod = null;
+							}
+
+							withChild(child.value(), new Internal.ReflectedAddOnChildGetter<>(theDefClass, defMethod, theInterpretedClass,
+								interpMethod, theAddOnClass, elementMethod, childGetterType));
+						}
 					}
 				}
 				TraceabilityConfiguration config = defMethod.getDeclaredAnnotation(TraceabilityConfiguration.class);

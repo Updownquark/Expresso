@@ -1229,5 +1229,8 @@ public abstract class ModelType<M> implements Named {
 
 		/** @return If this value has been {@link #satisfy(Object) satisfied} */
 		boolean isSatisfied();
+
+		/** @return A new, unsatisfied hollow model value for the same model type as this value */
+		HollowModelValue<M, MV> copy();
 	}
 }
