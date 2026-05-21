@@ -46,14 +46,13 @@ import org.observe.expresso.qonfig.ObservableActionTransformations.DisabledActio
 import org.observe.util.TypeTokens;
 import org.qommons.QommonsUtils;
 import org.qommons.ThreadConstraint;
-import org.qommons.Transaction;
 import org.qommons.collect.BetterList;
 import org.qommons.collect.MutableCollectionElement.StdMsg;
 import org.qommons.config.QonfigElement.QonfigValue;
-import org.qommons.fn.FunctionUtils;
 import org.qommons.config.QonfigElementOrAddOn;
 import org.qommons.config.QonfigInterpretationException;
 import org.qommons.config.QonfigInterpreterCore;
+import org.qommons.fn.FunctionUtils;
 import org.qommons.io.LocatedPositionedContent;
 import org.qommons.io.PositionedContent;
 
@@ -684,13 +683,11 @@ public class ObservableValueTransformations {
 			}
 
 			@Override
-			public Transaction lock(boolean write, Object cause) {
-				return getSource().lock();
-			}
-
-			@Override
-			public Transaction tryLock(boolean write, Object cause) {
-				return getSource().tryLock();
+			public Setter<T> lockWrite(boolean tryOnly, Object cause) {
+				Getter<T> getter = lock(tryOnly);
+				if (getter == null)
+					return null;
+				return new Setter.Unsettable<>(getter, getter, StdMsg.UNSUPPORTED_OPERATION);
 			}
 
 			@Override
@@ -1122,6 +1119,44 @@ public class ObservableValueTransformations {
 			}
 
 			@Override
+			public Setter<T> lockWrite(boolean tryOnly, Object cause) {
+				Setter<T> setter = getWrapped().lockWrite(tryOnly, cause);
+				if (setter == null)
+					return null;
+				return new Setter<T>() {
+					@Override
+					public T get() {
+						return setter.get();
+					}
+
+					@Override
+					public String isEnabled() {
+						return setter.isAcceptable(setter.get());
+					}
+
+					@Override
+					public String isAcceptable(T value) {
+						if (value == get())
+							return setter.isAcceptable(value);
+						return StdMsg.ILLEGAL_ELEMENT;
+					}
+
+					@Override
+					public T set(T value) {
+						if (value == get())
+							return setter.set(value);
+						else
+							throw new IllegalArgumentException(StdMsg.ILLEGAL_ELEMENT);
+					}
+
+					@Override
+					public void close() {
+						setter.close();
+					}
+				};
+			}
+
+			@Override
 			public String isAcceptable(T value) {
 				if (value == get())
 					return null;
@@ -1451,6 +1486,16 @@ public class ObservableValueTransformations {
 
 				public SettableValue<? extends ObservableValue<? extends T>> getSourceValue() {
 					return theSourceValue;
+				}
+
+				@Override
+				public T set(T value) throws IllegalArgumentException, UnsupportedOperationException {
+					return getWrapped().set(value);
+				}
+
+				@Override
+				public Setter<T> lockWrite(boolean tryOnly, Object cause) {
+					return getWrapped().lockWrite(tryOnly, cause);
 				}
 
 				@Override

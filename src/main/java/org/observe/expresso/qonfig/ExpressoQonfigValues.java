@@ -211,18 +211,13 @@ public class ExpressoQonfigValues {
 			}
 
 			@Override
-			public boolean isLockSupported() {
-				return true;
+			public Getter<T> lock(boolean tryOnly) {
+				return Getter.of(this, Transaction.NONE);
 			}
 
 			@Override
-			public Transaction lock(boolean write, Object cause) {
-				return Transaction.NONE;
-			}
-
-			@Override
-			public Transaction tryLock(boolean write, Object cause) {
-				return Transaction.NONE;
+			public Setter<T> lockWrite(boolean tryOnly, Object cause) {
+				return new Setter.Unsettable<>(this, Transaction.NONE, "Constant value");
 			}
 
 			@Override
@@ -4147,6 +4142,19 @@ public class ExpressoQonfigValues {
 					isActive.set(false, null);
 				else
 					theHandle.setActive(false);
+			}
+
+			@Override
+			public Instant set(Instant value) throws IllegalArgumentException, UnsupportedOperationException {
+				throw new UnsupportedOperationException(StdMsg.UNSUPPORTED_OPERATION);
+			}
+
+			@Override
+			public Setter<Instant> lockWrite(boolean tryOnly, Object cause) {
+				Getter<Instant> getter = lock(tryOnly);
+				if (getter == null)
+					return null;
+				return new Setter.Unsettable<>(getter, getter, StdMsg.UNSUPPORTED_OPERATION);
 			}
 
 			@Override

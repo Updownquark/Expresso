@@ -22,6 +22,7 @@ import org.observe.expresso.ObservableModelSet.ModelSetInstance;
 import org.observe.expresso.ObservableModelSet.ModelValueInstantiator;
 import org.observe.expresso.TypeConversionException;
 import org.observe.util.TypeTokens;
+import org.qommons.Lockable;
 import org.qommons.QommonsUtils;
 import org.qommons.StringUtils;
 import org.qommons.ThreadConstrained;
@@ -315,8 +316,8 @@ public class AssignmentExpression implements ObservableExpression {
 					theReporting.error("Cannot synchronize with null target collection");
 				else {
 					C source = theSource.get();
-					try (Transaction targetT = Transactable.lock(target, true, null); //
-						Transaction sourceT = Transactable.lock(source, false, null)) {
+					try (Transaction targetT = Transactable.lockWrite(target, false, null); //
+						Transaction sourceT = Lockable.lockLockable(source, false)) {
 						if (source == null)
 							target.clear();
 						else {
@@ -380,8 +381,8 @@ public class AssignmentExpression implements ObservableExpression {
 				// We could compile a huge message of every error that we get (they could be different),
 				// but I think it's sufficient (and better) to just use one error. Most of the time they'll all be the same anyway.
 				String[] message = new String[1];
-				try (Transaction targetT = Transactable.lock(target, false, null); //
-					Transaction sourceT = Transactable.lock(source, false, null)) {
+				try (Transaction targetT = Lockable.lockLockable(target, false); //
+					Transaction sourceT = Lockable.lockLockable(source, false)) {
 					CollectionUtils
 					.synchronize((BetterList<ListElement<T>>) betterTarget.elements(), source, (el, s) -> Objects.equals(el.get(), s))//
 					.adjust(new CollectionUtils.CollectionSynchronizer<ListElement<T>, T>() {
@@ -404,7 +405,7 @@ public class AssignmentExpression implements ObservableExpression {
 									CollectionElement<T> after = element.getTargetIndex() == betterTarget.size() ? null
 										: betterTarget.getElement(element.getTargetIndex());
 									CollectionElement<T> before = after == null ? betterTarget.getTerminalElement(false)
-											: after.getAdjacent(false);
+										: after.getAdjacent(false);
 									message[0] = betterTarget.canAdd(element.getRightValue(), CollectionElement.getElementId(after),
 										CollectionElement.getElementId(before));
 								} else

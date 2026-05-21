@@ -1445,7 +1445,7 @@ public abstract class ObservableModelElement extends ExElement.Abstract {
 						if (configFile != null && configFile.exists()) {
 							try {
 								try (InputStream configStream = new BufferedInputStream(configFile.read());
-									Transaction t = config.lock(true, null)) {
+									Transaction t = config.lockWrite(false, null)) {
 									ObservableConfig.readXml(config, configStream, encoding);
 								}
 								loaded = true;

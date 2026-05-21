@@ -32,12 +32,10 @@ import org.observe.expresso.ObservableModelSet.ModelValueInstantiator;
 import org.observe.expresso.TypeConversionException;
 import org.observe.util.TypeTokens;
 import org.qommons.Identifiable;
-import org.qommons.Lockable;
 import org.qommons.QommonsUtils;
 import org.qommons.Stamped;
 import org.qommons.ThreadConstrained;
 import org.qommons.ThreadConstraint;
-import org.qommons.Transaction;
 import org.qommons.collect.CollectionUtils;
 import org.qommons.ex.ExceptionHandler;
 import org.qommons.ex.NeverThrown;
@@ -839,18 +837,99 @@ public class BinaryOperator implements ObservableExpression {
 		}
 
 		@Override
-		public Transaction lock(boolean write, Object cause) {
-			return Lockable.lockAll(Lockable.lockable(theValue1, write, cause), Lockable.lockable(theValue2, write, cause));
+		public Getter<V> lock(boolean tryOnly) {
+			Getter<S> v1 = theValue1.lock(tryOnly);
+			if (v1 == null)
+				return null;
+			Getter<T> v2 = theValue2.lock(true);
+			if (v2 == null) {
+				if (tryOnly) {
+					v1.close();
+					return null;
+				}
+				do {
+					v1.close();
+					v1 = theValue1.lock(false);
+					v2 = theValue2.lock(true);
+				} while (v2 == null);
+			}
+			Getter<S> fv1 = v1;
+			Getter<T> fv2 = v2;
+			return new Getter<V>() {
+				@Override
+				public V get() {
+					S sv = fv1.get();
+					V result = theOp.getFirstArgDecisiveValue(sv);
+					if (result != null)
+						return result;
+					return theOp.apply(sv, fv2.get());
+				}
+
+				@Override
+				public void close() {
+					fv2.close();
+					fv1.close();
+				}
+			};
 		}
 
 		@Override
-		public Transaction tryLock(boolean write, Object cause) {
-			return Lockable.tryLockAll(Lockable.lockable(theValue1, write, cause), Lockable.lockable(theValue2, write, cause));
-		}
+		public Setter<V> lockWrite(boolean tryOnly, Object cause) {
+			Setter<S> v1 = theValue1.lockWrite(tryOnly, cause);
+			if (v1 == null)
+				return null;
+			Getter<T> v2 = theValue2.lock(true);
+			if (v2 == null) {
+				if (tryOnly) {
+					v1.close();
+					return null;
+				}
+				do {
+					v1.close();
+					v1 = theValue1.lockWrite(false, cause);
+					v2 = theValue2.lock(true);
+				} while (v2 == null);
+			}
+			Setter<S> fv1 = v1;
+			Getter<T> fv2 = v2;
+			return new Setter<V>() {
+				@Override
+				public V get() {
+					S sv = fv1.get();
+					V result = theOp.getFirstArgDecisiveValue(sv);
+					if (result != null)
+						return result;
+					return theOp.apply(sv, fv2.get());
+				}
 
-		@Override
-		public boolean isLockSupported() {
-			return theValue1.isLockSupported() || theValue2.isLockSupported();
+				@Override
+				public String isEnabled() {
+					return null; // No generalized enablement supported
+				}
+
+				@Override
+				public String isAcceptable(V value) {
+					S sv = fv1.get();
+					T tv = fv2.get();
+					return theOp.canReverse(sv, tv, value);
+				}
+
+				@Override
+				public V set(V value) {
+					S sv = fv1.get();
+					T tv = fv2.get();
+					S newSource = theOp.reverse(sv, tv, value);
+					V oldV = theOp.apply(sv, tv);
+					fv1.set(newSource);
+					return oldV;
+				}
+
+				@Override
+				public void close() {
+					fv2.close();
+					fv1.close();
+				}
+			};
 		}
 
 		@Override

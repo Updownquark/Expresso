@@ -334,18 +334,8 @@ public class ModelTypes {
 			}
 
 			@Override
-			public boolean isSafe() {
-				return false;
-			}
-
-			@Override
-			public Transaction lock() {
-				return theFlatObservable.lock();
-			}
-
-			@Override
-			public Transaction tryLock() {
-				return theFlatObservable.tryLock();
+			public Transaction lock(boolean tryOnly) {
+				return theFlatObservable.lock(tryOnly);
 			}
 
 			@Override

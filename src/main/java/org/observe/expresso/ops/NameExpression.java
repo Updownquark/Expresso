@@ -36,7 +36,6 @@ import org.qommons.Identifiable;
 import org.qommons.Named;
 import org.qommons.QommonsUtils;
 import org.qommons.StringUtils;
-import org.qommons.Transaction;
 import org.qommons.collect.BetterList;
 import org.qommons.ex.ExceptionHandler;
 import org.qommons.ex.NeverThrown;
@@ -609,18 +608,96 @@ public class NameExpression implements ObservableExpression, Named {
 		}
 
 		@Override
-		public boolean isLockSupported() {
-			return false;
+		public Getter<F> lock(boolean tryOnly) {
+			Getter<?> ctx;
+			if (theContext != null) {
+				ctx = theContext.lock(tryOnly);
+				if (ctx == null)
+					return null;
+			} else
+				ctx = null;
+			return new Getter<F>() {
+				@Override
+				public F get() {
+					if (ctx == null)
+						return getStatic();
+					else
+						return getFromContext(ctx.get());
+				}
+
+				@Override
+				public void close() {
+					if (ctx != null)
+						ctx.close();
+				}
+			};
 		}
 
 		@Override
-		public Transaction lock(boolean write, Object cause) {
-			return Transaction.NONE;
-		}
+		public Setter<F> lockWrite(boolean tryOnly, Object cause) {
+			Setter<?> ctx;
+			if (theContext != null) {
+				ctx = theContext.lockWrite(tryOnly, cause);
+				if (ctx == null)
+					return null;
+			} else
+				ctx = null;
+			return new Setter<F>() {
+				@Override
+				public F get() {
+					if (ctx == null)
+						return getStatic();
+					else
+						return getFromContext(ctx.get());
+				}
 
-		@Override
-		public Transaction tryLock(boolean write, Object cause) {
-			return Transaction.NONE;
+				@Override
+				public String isEnabled() {
+					if (isFinal)
+						return "Final field cannot be assigned";
+					else if (ctx != null && ctx.get() == null)
+						return "Cannot assign the field of a null value";
+					else
+						return null;
+				}
+
+				@Override
+				public String isAcceptable(F value) {
+					return isEnabled();
+				}
+
+				@Override
+				public F set(F value) {
+					if (isFinal)
+						throw new UnsupportedOperationException("Final field cannot be assigned");
+					Object ctxV = ctx == null ? null : ctx.get();
+					if (ctx != null && ctxV == null) {
+						theReporting.error("Cannot assign the field of a null value");
+						return value;
+					}
+					F previous;
+					try {
+						previous = (F) theField.get(ctxV);
+						theField.set(ctxV, value);
+					} catch (IllegalAccessException e) {
+						theReporting.error("Could not access field " + theField.getName(), e);
+						return value;
+					}
+					if (ctx != null && ((Setter<Object>) ctx).isAcceptable(ctxV) == null)
+						((Setter<Object>) ctx).set(ctxV);
+					else {
+						theStamp++;
+						theChanges.onNext(null);
+					}
+					return previous;
+				}
+
+				@Override
+				public void close() {
+					if (ctx != null)
+						ctx.close();
+				}
+			};
 		}
 
 		@Override
@@ -633,7 +710,7 @@ public class NameExpression implements ObservableExpression, Named {
 			return theMappedValue.get();
 		}
 
-		private F getStatic() {
+		F getStatic() {
 			try {
 				return (F) theField.get(null);
 			} catch (IllegalArgumentException | IllegalAccessException e) {
@@ -642,7 +719,7 @@ public class NameExpression implements ObservableExpression, Named {
 			}
 		}
 
-		private F getFromContext(Object context) {
+		F getFromContext(Object context) {
 			if (context == null)
 				return theDefaultValue;
 			try {

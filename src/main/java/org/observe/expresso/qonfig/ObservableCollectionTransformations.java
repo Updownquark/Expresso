@@ -817,6 +817,16 @@ public class ObservableCollectionTransformations {
 					public void onCompleted(Supplier<Causable> cause) {
 						observer.onCompleted(cause);
 					}
+
+					@Override
+					public boolean tryLock() {
+						return observer.tryLock();
+					}
+
+					@Override
+					public void unlock() {
+						observer.unlock();
+					}
 				});
 			}
 		}

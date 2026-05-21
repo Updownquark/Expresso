@@ -271,7 +271,7 @@ public class EntityDataSet extends AbstractConfigModelElement {
 								persister.save(entitySet, entitySet.getAffectedEntities(), new VersionedDataScheme.PersistenceMonitor() {
 									@Override
 									public void persistenceSucceeded(long stamp) {
-										try (Transaction t = entitySet.lock(true, null)) {
+										try (Transaction t = entitySet.lockWrite(false, null)) {
 											if (dataSetStamp == entitySet.getStamp())
 												entitySet.getAffectedEntities().clear();
 										}

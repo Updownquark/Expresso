@@ -1169,10 +1169,14 @@ public class ExpressoConfigV0_1 implements QonfigInterpretation {
 
 			@Override
 			public ValidatedFormat<T> get() {
+				return get(theSourceFormat);
+			}
+
+			protected ValidatedFormat<T> get(Supplier<Format<T>> sourceFormat) {
 				if (theStamp != theSourceFormat.getStamp()) {
 					thePreviousFormat = theValidatedFormat;
 					theStamp = theSourceFormat.getStamp();
-					Format<T> f = theSourceFormat.get();
+					Format<T> f = sourceFormat.get();
 					theValidatedFormat = f == null ? null : new ValidatedFormat<>(f, theValidation);
 				}
 				return theValidatedFormat;
@@ -1223,22 +1227,22 @@ public class ExpressoConfigV0_1 implements QonfigInterpretation {
 							public void onCompleted(Supplier<Causable> cause) {
 								observer.onCompleted(cause);
 							}
+
+							@Override
+							public boolean tryLock() {
+								return observer.tryLock();
+							}
+
+							@Override
+							public void unlock() {
+								observer.unlock();
+							}
 						});
 					}
 
 					@Override
-					public boolean isSafe() {
-						return sourceChanges.isSafe();
-					}
-
-					@Override
-					public Transaction lock() {
-						return sourceChanges.lock();
-					}
-
-					@Override
-					public Transaction tryLock() {
-						return sourceChanges.tryLock();
+					public Transaction lock(boolean tryOnly) {
+						return sourceChanges.lock(tryOnly);
 					}
 
 					@Override
@@ -1266,13 +1270,27 @@ public class ExpressoConfigV0_1 implements QonfigInterpretation {
 			}
 
 			@Override
-			public Transaction lock(boolean write, Object cause) {
-				return theSourceFormat.lock(write, cause);
+			public Getter<Format<T>> lock(boolean tryOnly) {
+				Getter<Format<T>> source = theSourceFormat.lock(tryOnly);
+				if (source == null)
+					return null;
+				return new Getter<Format<T>>() {
+					@Override
+					public Format<T> get() {
+						return ValidatedFormatValue.this.get(source);
+					}
+
+					@Override
+					public void close() {
+						source.close();
+					}
+				};
 			}
 
 			@Override
-			public Transaction tryLock(boolean write, Object cause) {
-				return theSourceFormat.tryLock(write, cause);
+			public Setter<Format<T>> lockWrite(boolean tryOnly, Object cause) {
+				Getter<Format<T>> source = theSourceFormat.lock(tryOnly);
+				return new Setter.Unsettable<>(() -> get(source), source, StdMsg.UNSUPPORTED_OPERATION);
 			}
 
 			@Override
@@ -1283,11 +1301,6 @@ public class ExpressoConfigV0_1 implements QonfigInterpretation {
 			@Override
 			public long getStamp() {
 				return theSourceFormat.getStamp();
-			}
-
-			@Override
-			public boolean isLockSupported() {
-				return theSourceFormat.isLockSupported();
 			}
 
 			@Override
@@ -2992,6 +3005,16 @@ public class ExpressoConfigV0_1 implements QonfigInterpretation {
 				this.isDistinct = distinct;
 				theDelimiter = delimiter;
 				thePostDelimiter = postDelimiter;
+			}
+
+			@Override
+			public Format<Collection<T>> set(Format<Collection<T>> value) throws IllegalArgumentException, UnsupportedOperationException {
+				return getWrapped().set(value);
+			}
+
+			@Override
+			public Setter<Format<Collection<T>>> lockWrite(boolean tryOnly, Object cause) {
+				return getWrapped().lockWrite(tryOnly, cause);
 			}
 		}
 	}

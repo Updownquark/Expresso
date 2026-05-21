@@ -1032,6 +1032,16 @@ public abstract class Invocation implements ObservableExpression {
 			return thePublishedStamp;
 		}
 
+		@Override
+		public T set(T value) throws IllegalArgumentException, UnsupportedOperationException {
+			return getWrapped().set(value);
+		}
+
+		@Override
+		public Setter<T> lockWrite(boolean tryOnly, Object cause) {
+			return getWrapped().lockWrite(tryOnly, cause);
+		}
+
 		private void syncCache() {
 			long wrappedStamp = super.getStamp();
 			if (theCachedContainerStamp != -1 && wrappedStamp == theCachedContainerStamp)

@@ -40,6 +40,7 @@ import org.observe.expresso.qonfig.ElementTypeTraceability.SingleTypeTraceabilit
 import org.qommons.BreakpointHere;
 import org.qommons.ClassMap;
 import org.qommons.Identifiable;
+import org.qommons.Lockable;
 import org.qommons.StringUtils;
 import org.qommons.Transactable;
 import org.qommons.Transaction;
@@ -1797,7 +1798,7 @@ public interface ExElement extends Identifiable {
 	default <I extends ExElement.Interpreted<?>, E extends ExElement> void syncChildren(List<? extends I> definitions, List<E> existing,
 		ExFunction<? super I, ? extends E, ModelInstantiationException> interpret,
 		ExTriConsumer<? super E, ? super I, ExElement, ModelInstantiationException> update) throws ModelInstantiationException {
-		try (Transaction t = Transactable.lock(definitions, false, null); Transaction t2 = Transactable.lock(existing, true, null)) {
+		try (Transaction t = Lockable.lockLockable(definitions, false); Transaction t2 = Transactable.lockWrite(existing, false, null)) {
 			CollectionUtils.synchronize(existing, definitions, (inst, interp) -> inst.getIdentity() == interp.getIdentity())//
 			.<ModelInstantiationException> simpleX(interpret)//
 			.onLeftX(el -> el.getLeftValue().destroy())//

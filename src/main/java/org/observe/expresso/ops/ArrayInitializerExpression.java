@@ -33,12 +33,12 @@ import org.observe.util.TypeTokens;
 import org.qommons.Identifiable;
 import org.qommons.Identifiable.AbstractIdentifiable;
 import org.qommons.Lockable;
-import org.qommons.Lockable.CoreId;
 import org.qommons.QommonsUtils;
 import org.qommons.Stamped;
 import org.qommons.Subscription;
 import org.qommons.ThreadConstrained;
 import org.qommons.ThreadConstraint;
+import org.qommons.Transactable;
 import org.qommons.Transaction;
 import org.qommons.collect.BetterCollection;
 import org.qommons.collect.BetterList;
@@ -497,15 +497,14 @@ public class ArrayInitializerExpression implements ObservableExpression {
 		}
 
 		@Override
-		public Transaction lock(boolean write, Object cause) {
-			return Lockable.lockAll(null, () -> theValues, //
-				v -> Lockable.lockable(v, write, cause));
+		public Transaction lock(boolean tryOnly) {
+			return Lockable.lockAll(theValues, tryOnly);
 		}
 
 		@Override
-		public Transaction tryLock(boolean write, Object cause) {
-			return Lockable.tryLockAll(null, () -> theValues, //
-				v -> Lockable.lockable(v, write, cause));
+		public Transaction lockWrite(boolean tryOnly, Object cause) {
+			return Lockable.lockAll(null, () -> theValues, //
+				v -> Transactable.asWriteLockable(v, cause), tryOnly);
 		}
 
 		@Override
@@ -529,15 +528,6 @@ public class ArrayInitializerExpression implements ObservableExpression {
 		@Override
 		public ThreadConstraint getThreadConstraint() {
 			return ThreadConstrained.getThreadConstraint(theValues);
-		}
-
-		@Override
-		public boolean isLockSupported() {
-			for (SettableValue<T> value : theValues) {
-				if (value.isLockSupported())
-					return true;
-			}
-			return false;
 		}
 
 		@Override

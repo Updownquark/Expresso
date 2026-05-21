@@ -25,10 +25,10 @@ import org.qommons.Identifiable;
 import org.qommons.Subscription;
 import org.qommons.collect.BetterList;
 import org.qommons.config.QonfigElement.QonfigValue;
-import org.qommons.fn.FunctionUtils;
 import org.qommons.config.QonfigElementOrAddOn;
 import org.qommons.config.QonfigInterpretationException;
 import org.qommons.config.QonfigInterpreterCore;
+import org.qommons.fn.FunctionUtils;
 import org.qommons.io.LocatedFilePosition;
 import org.qommons.io.LocatedPositionedContent;
 
@@ -645,6 +645,16 @@ public class ObservableTransformations {
 					public void onCompleted(Supplier<Causable> cause) {
 						observer.onCompleted(cause);
 					}
+
+					@Override
+					public boolean tryLock() {
+						return observer.tryLock();
+					}
+
+					@Override
+					public void unlock() {
+						observer.unlock();
+					}
 				});
 			}
 		}
@@ -814,6 +824,16 @@ public class ObservableTransformations {
 					public void onCompleted(Supplier<Causable> cause) {
 						observer.onCompleted(cause);
 					}
+
+					@Override
+					public boolean tryLock() {
+						return observer.tryLock();
+					}
+
+					@Override
+					public void unlock() {
+						observer.unlock();
+					}
 				});
 			}
 		}
@@ -956,6 +976,16 @@ public class ObservableTransformations {
 					@Override
 					public void onCompleted(Supplier<Causable> cause) {
 						observer.onCompleted(cause);
+					}
+
+					@Override
+					public boolean tryLock() {
+						return observer.tryLock();
+					}
+
+					@Override
+					public void unlock() {
+						observer.unlock();
 					}
 				});
 			}
