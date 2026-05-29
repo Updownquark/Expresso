@@ -88,6 +88,8 @@ public class ExpressoBaseV0_1 implements QonfigInterpretation {
 		interpreter.createWith(ExMapModelValue.MAP_MODEL_VALUE, ExMapModelValue.Def.class, ExAddOn.creator(ExMapModelValue.Def::new));
 		interpreter.createWith(ExIntValue.INT_VALUE, ExIntValue.Def.class, ExAddOn.creator(ExIntValue.Def::new));
 		interpreter.createWith(ExpressoQonfigValues.FieldValueDef.FIELD_VALUE, FieldValueDef.class, ExElement.creator(FieldValueDef::new));
+		interpreter.createWith(ExpressoQonfigValues.SlowValueDef.SLOW_VALUE, ExpressoQonfigValues.SlowValueDef.class,
+			ExElement.creator((parent, type) -> new ExpressoQonfigValues.SlowValueDef(parent, type)));
 		interpreter.createWith(ExComplexOperation.COMPLEX_OPERATION, ExComplexOperation.class, ExAddOn.creator(ExComplexOperation::new));
 		interpreter.createWith(ExSort.SORT, ExSort.ExRootSort.class, ExElement.creator(ExSort.ExRootSort::new));
 		interpreter.createWith(ExSort.SORT_BY, ExSort.ExSortBy.class, ExElement.creator(ExSort.ExSortBy::new));

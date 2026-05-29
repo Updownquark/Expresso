@@ -2,13 +2,18 @@ package org.observe.expresso.qonfig;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
+import org.observe.Observable;
+import org.observe.ObservableAction;
+import org.observe.ObservableValue;
 import org.observe.SettableValue;
 import org.observe.collect.ObservableCollection;
 import org.observe.collect.ObservableSet;
@@ -26,9 +31,11 @@ import org.observe.expresso.ObservableModelSet.ModelValueInstantiator;
 import org.observe.expresso.qonfig.ElementTypeTraceability.AddOnTraceabilityBuilder;
 import org.observe.expresso.qonfig.ElementTypeTraceability.SingleTypeTraceabilityBuilder;
 import org.observe.util.TypeTokens;
+import org.qommons.IterableUtils;
 import org.qommons.QommonsUtils;
 import org.qommons.StringUtils;
 import org.qommons.Version;
+import org.qommons.collect.BetterList;
 import org.qommons.collect.CircularArrayList;
 import org.qommons.collect.DequeList;
 import org.qommons.collect.QuickSet.QuickMap;
@@ -462,21 +469,16 @@ public class ExElementType {
 
 	public static <T, I extends ExElement.Interpreted<?>> ValueExpression<T, I> valueExpression(String attributeName, Class<T> type,
 		Supplier<? extends T> defaultValue) {
-		return valueExpression(attributeName, ModelTypes.Value.forType(type), defaultValue);
+		return valueExpression(attributeName, TypeTokens.get().of(type), defaultValue);
 	}
 
 	public static <T, I extends ExElement.Interpreted<?>> ValueExpression<T, I> valueExpression(String attributeName, TypeToken<T> type,
 		Supplier<? extends T> defaultValue) {
-		return valueExpression(attributeName, ModelTypes.Value.forType(type), defaultValue);
+		return valueExpression(attributeName, ExFunction.constant(type), defaultValue);
 	}
 
 	public static <T, I extends ExElement.Interpreted<?>> ValueExpression<T, I> valueExpression(String attributeName,
-		ModelInstanceType<SettableValue<?>, SettableValue<T>> type, Supplier<? extends T> defaultValue) {
-		return new ValueExpression<>(attributeName, FunctionUtils.constantExFn(type, type::toString, type), defaultValue);
-	}
-
-	public static <T, I extends ExElement.Interpreted<?>> ValueExpression<T, I> valueExpression(String attributeName,
-		ExFunction<I, ModelInstanceType<SettableValue<?>, SettableValue<T>>, ExpressoInterpretationException> type,
+		ExFunction<I, TypeToken<T>, ExpressoInterpretationException> type,
 		Supplier<? extends T> defaultValue) {
 		return new ValueExpression<>(attributeName, type, defaultValue);
 	}
@@ -549,6 +551,23 @@ public class ExElementType {
 		return new SortedSetExpression<>(attributeName,
 			FunctionUtils.printableExFn(el -> ModelTypes.SortedSet.forType(type.apply(el)), () -> "SortedSet<" + type + ">", null),
 			sorting);
+	}
+
+	public static <T> EventExpression<T, ExElement.Interpreted<?>> eventExpression(String attributeName, Class<T> type) {
+		return new EventExpression<>(attributeName, ExFunction.constant(ModelTypes.Event.forType(type)));
+	}
+
+	public static <T> EventExpression<T, ExElement.Interpreted<?>> eventExpression(String attributeName, TypeToken<T> type) {
+		return new EventExpression<>(attributeName, ExFunction.constant(ModelTypes.Event.forType(type)));
+	}
+
+	public static <T, I extends ExElement.Interpreted<?>> EventExpression<T, I> eventExpression(String attributeName,
+		ExFunction<I, ? extends TypeToken<T>, ExpressoInterpretationException> type) {
+		return new EventExpression<>(attributeName, interpreted -> ModelTypes.Event.forType(type.apply(interpreted)));
+	}
+
+	public static <T> ActionExpression ActionExpression(String attributeName) {
+		return new ActionExpression(attributeName);
 	}
 
 	public static <E extends ExElement, I extends ExElement.Interpreted<? super E>, D extends ExElement.Def<? super E>> ExElementChild<E, I, D> child(//
@@ -693,13 +712,13 @@ public class ExElementType {
 		}
 	}
 
-	public static abstract class AbstractValueExpression<M, MV extends M, E extends ExElement.Interpreted<?>> extends AbstractElementValue<//
+	public static abstract class AbstractValueExpression<M, MV extends M, I extends ExElement.Interpreted<?>> extends AbstractElementValue<//
 	ModelValueInstantiator<MV>, InterpretedValueSynth<M, MV>, CompiledExpression, SettableValue<MV>, MV> {
 		private final String theAttributeName;
-		private final ExFunction<E, ModelInstanceType<M, MV>, ExpressoInterpretationException> theType;
+		private final ExFunction<I, ? extends ModelInstanceType<M, MV>, ExpressoInterpretationException> theType;
 
 		protected AbstractValueExpression(String attributeName,
-			ExFunction<E, ModelInstanceType<M, MV>, ExpressoInterpretationException> type) {
+			ExFunction<I, ? extends ModelInstanceType<M, MV>, ExpressoInterpretationException> type) {
 			theAttributeName = attributeName;
 			theType = type;
 		}
@@ -718,7 +737,7 @@ public class ExElementType {
 		@Override
 		public InterpretedValueSynth<M, MV> interpret(CompiledExpression definition, InterpretedTypeData interpretedType,
 			ExElement.Interpreted<?> element) throws ExpressoInterpretationException {
-			ModelInstanceType<M, MV> type = theType.apply((E) element);
+			ModelInstanceType<M, MV> type = theType.apply((I) element);
 			return element.interpret(definition, type);
 		}
 
@@ -757,10 +776,9 @@ public class ExElementType {
 	extends AbstractValueExpression<SettableValue<?>, SettableValue<T>, I> {
 		private final Supplier<? extends T> theDefault;
 
-		public ValueExpression(String attributeName,
-			ExFunction<I, ModelInstanceType<SettableValue<?>, SettableValue<T>>, ExpressoInterpretationException> type,
+		public ValueExpression(String attributeName, ExFunction<I, TypeToken<T>, ExpressoInterpretationException> type,
 			Supplier<? extends T> defaultValue) {
-			super(attributeName, type);
+			super(attributeName, interpreted -> ModelTypes.Value.forType(type.apply(interpreted)));
 			theDefault = defaultValue;
 		}
 
@@ -827,6 +845,30 @@ public class ExElementType {
 		@Override
 		public ObservableSortedSet<T> flattenWrapper(SettableValue<ObservableSortedSet<T>> wrapper) {
 			return ObservableSortedSet.flattenValue(wrapper, theSorting);
+		}
+	}
+
+	public static class EventExpression<T, I extends ExElement.Interpreted<?>>
+	extends AbstractValueExpression<Observable<?>, Observable<T>, I> {
+		public EventExpression(String attributeName,
+			ExFunction<I, ? extends ModelInstanceType<Observable<?>, Observable<T>>, ExpressoInterpretationException> type) {
+			super(attributeName, type);
+		}
+
+		@Override
+		public Observable<T> flattenWrapper(SettableValue<Observable<T>> wrapper) {
+			return ObservableValue.flattenObservableValue(wrapper);
+		}
+	}
+
+	public static class ActionExpression extends AbstractValueExpression<ObservableAction, ObservableAction, ExElement.Interpreted<?>> {
+		public ActionExpression(String attributeName) {
+			super(attributeName, ExFunction.constant(ModelTypes.Action.instance()));
+		}
+
+		@Override
+		public ObservableAction flattenWrapper(SettableValue<ObservableAction> wrapper) {
+			return ObservableAction.flatten(wrapper);
 		}
 	}
 
@@ -904,6 +946,14 @@ public class ExElementType {
 			if (type.getValue() != null)
 				theValue = modify.apply(theValue, type.getValue());
 		}
+
+		Collection<T> getAll() {
+			Collection<T> myValues;
+			if (theSuperData != null)
+				return IterableUtils.concat(theSuperData.getAll(), (List<T>) BetterList.of(theAttributes), BetterList.of(theValue));
+			else
+				return IterableUtils.concat((List<T>) BetterList.of(theAttributes), BetterList.of(theValue));
+		}
 	}
 
 	static class TypeChildData<T> {
@@ -938,6 +988,13 @@ public class ExElementType {
 			for (int c = 0; c < theChildren.length; c++) {
 				action.accept(theChildren[c], type.getChildren().get(c));
 			}
+		}
+
+		Collection<T> getAll() {
+			if (theSuperData != null)
+				return IterableUtils.concat(theSuperData.getAll(), IterableUtils.concat(theChildren));
+			else
+				return IterableUtils.concat(theChildren);
 		}
 	}
 
@@ -1103,6 +1160,12 @@ public class ExElementType {
 			});
 		}
 
+		public List<? extends InterpretedValueSynth<?, ?>> getComponents() {
+			return BetterList.of(Stream.concat(//
+				theValues.getAll().stream().filter(InterpretedValueSynth.class::isInstance).map(v -> (InterpretedValueSynth<?, ?>) v), //
+				theChildren.getAll().stream().filter(InterpretedValueSynth.class::isInstance).map(v -> (InterpretedValueSynth<?, ?>) v)));
+		}
+
 		public <I extends ExElement.Interpreted<?>> DequeList<I> getChildren(ExElementChild<?, I, ?> childDef) {
 			return (DequeList<I>) theChildren.get(childDef, theDefinition.getType());
 		}
@@ -1237,6 +1300,10 @@ public class ExElementType {
 			return (V) theValues.get(valueDef, theType).flatWrapper;
 		}
 
+		public <I> I getInstantiator(ExElementValue<I, ?, ?, ?, ?> valueDef) {
+			return (I) theValues.get(valueDef, theType).instantiator;
+		}
+
 		public <E extends ExElement> DequeList<E> getChildren(ExElementChild<E, ?, ?> childDef) {
 			return (DequeList<E>) theChildren.get(childDef, theType);
 		}
@@ -1258,8 +1325,8 @@ public class ExElementType {
 			return (MV) valueData.hollowValue;
 		}
 
-		public <MV> MV getModelValue(ExElementModelValue<?, MV> value) {
-			return (MV) theModelValues.get(value, theType);
+		public ModelComponentId getValueId(ExElementModelValue<?, ?> modelValue) {
+			return theModelValues.get(modelValue, theType).valueId;
 		}
 
 		void update(InterpretedTypeData interpreted, ExElement element) throws ModelInstantiationException {
@@ -1485,10 +1552,6 @@ public class ExElementType {
 
 		public <MV> MV satisfyModelValue(ExElementModelValue<?, MV> modelValue, Supplier<MV> value) {
 			return theTypeData.satisfyModelValue(modelValue, value);
-		}
-
-		public <MV> MV getModelValue(ExElementModelValue<?, MV> value) {
-			return theTypeData.getModelValue(value);
 		}
 
 		@Override

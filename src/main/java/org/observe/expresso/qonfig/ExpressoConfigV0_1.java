@@ -604,7 +604,9 @@ public class ExpressoConfigV0_1 implements QonfigInterpretation {
 			ExElement.creator(FilterValidation.Def::new));
 
 		// File sources
-		// TODO native-file-source, sftp-file-source
+		// TODO sftp-file-source
+		interpreter.createWith(ExNativeFileSource.NATIVE_FILE_SOURCE, ModelValueElement.CompiledSynth.class,
+			ExElement.creator(ExNativeFileSource::new));
 		interpreter.createWith(ExArchiveEnabledFileSource.ARCHIVE_ENABLED_FILE_SOURCE, ModelValueElement.CompiledSynth.class,
 			ExElement.creator(ExArchiveEnabledFileSource::new));
 		interpreter.createWith(ZipCompression.ZIP_ARCHIVAL, ModelValueElement.CompiledSynth.class, ExElement.creator(ZipCompression::new));
@@ -618,6 +620,69 @@ public class ExpressoConfigV0_1 implements QonfigInterpretation {
 			ExElement.creator(EntityConfigFormat::new));
 		interpreter.createWith(EntitySubFormat.ENTITY_SUB_FORMAT, EntitySubFormat.class, ExAddOn.creator(EntitySubFormat::new));
 		interpreter.createWith(EntityConfigField.ENTITY_CONFIG_FIELD, EntityConfigField.class, ExAddOn.creator(EntityConfigField::new));
+	}
+
+	@ExElementTraceable(toolkit = CONFIG,
+		qonfigType = ExNativeFileSource.NATIVE_FILE_SOURCE,
+		interpretation = ExNativeFileSource.Interpreted.class)
+	static class ExNativeFileSource
+	extends ModelValueElement.Def.SingleTyped<SettableValue<?>, ModelValueElement<SettableValue<NativeFileSource>>>
+	implements ModelValueElement.CompiledSynth<SettableValue<?>, ModelValueElement<SettableValue<NativeFileSource>>> {
+		public static final String NATIVE_FILE_SOURCE = "native-file-source";
+
+		public ExNativeFileSource(ExElement.Def<?> parent, QonfigElementOrAddOn qonfigType) {
+			super(parent, qonfigType, ModelTypes.Value);
+		}
+
+		@Override
+		protected void doPrepare(ExpressoQIS session) throws QonfigInterpretationException {
+		}
+
+		@Override
+		public Interpreted interpretValue(ExElement.Interpreted<?> parent) {
+			return new Interpreted(this, parent);
+		}
+
+		static class Interpreted extends
+		ModelValueElement.Def.SingleTyped.Interpreted<SettableValue<?>, SettableValue<NativeFileSource>, ModelValueElement<SettableValue<NativeFileSource>>>
+		implements
+		ModelValueElement.InterpretedSynth<SettableValue<?>, SettableValue<NativeFileSource>, ModelValueElement<SettableValue<NativeFileSource>>> {
+			Interpreted(ExNativeFileSource definition, ExElement.Interpreted<?> parent) {
+				super(definition, parent);
+			}
+
+			@Override
+			protected ModelInstanceType<SettableValue<?>, SettableValue<NativeFileSource>> getTargetType() {
+				return ModelTypes.Value.forType(NativeFileSource.class);
+			}
+
+			@Override
+			public List<? extends InterpretedValueSynth<?, ?>> getComponents() {
+				return Collections.emptyList();
+			}
+
+			@Override
+			public ModelValueElement<SettableValue<NativeFileSource>> create() throws ModelInstantiationException {
+				return new Instantiator(this);
+			}
+		}
+
+		static class Instantiator extends ModelValueElement.Abstract<SettableValue<NativeFileSource>> {
+			public Instantiator(ExNativeFileSource.Interpreted interpreted) throws ModelInstantiationException {
+				super(interpreted);
+			}
+
+			@Override
+			protected SettableValue<NativeFileSource> evaluate(ModelSetInstance models) throws ModelInstantiationException {
+				return SettableValue.of(new NativeFileSource(), "Not Settable");
+			}
+
+			@Override
+			public SettableValue<NativeFileSource> forModelCopy(SettableValue<NativeFileSource> value, ModelSetInstance sourceModels,
+				ModelSetInstance newModels) throws ModelInstantiationException {
+				return value;
+			}
+		}
 	}
 
 	@ExElementTraceable(toolkit = CONFIG,

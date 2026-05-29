@@ -224,6 +224,20 @@ It builds on the Expresso-Core specification and contains everything needed for 
 			<child-def name="post-action" type="action" min="0" max="inf" />
 		</element-def>
 
+		<?DOC A value that loads in the background?>
+		<element-def name="slow-value" extends="model-value" inherits="with-element-model">
+			<element-model>
+				<value name-attribute="load-id-as" type="int" />
+				<value name-attribute="previous-value-as" />
+			</element-model>
+			<attribute name="load-id-as" type="identifier" default="loadId" />
+			<attribute name="previous-value-as" type="identifier" specify="optional" />
+			<attribute name="on-thread" type="expression" />
+			<attribute name="refresh" type="expression" />
+			<attribute name="value" type="expression" />
+			<attribute name="while-loading" type="expression" />
+		</element-def>
+
 		<?DOC An ordered collection of values.  For internal models, this may be initialized with elements.?>
 		<element-def name="list" extends="model-value" inherits="allow-ext-model" />
 		<?DOC May be used to initialize collections in internal models?>

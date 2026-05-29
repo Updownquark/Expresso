@@ -474,8 +474,6 @@ public interface ObservableExpression {
 					InterpretedValueSynth.literal((ModelInstanceType<M, MV>) ModelTypes.Value.forType(targetType), value, theText), this);
 			} else {
 				// Don't throw this. Maybe the type architecture can convert it.
-				// throw new ExpressoEvaluationException(expressionOffset, getExpressionLength(),
-				// "'" + theText + "' cannot be evaluated as a " + type);
 				MV value = (MV) createValue(TypeTokens.get().of(theValue.getClass()), theValue);
 				return ObservableExpression.evEx(expressionOffset, getExpressionLength(),
 					InterpretedValueSynth.literal((ModelInstanceType<M, MV>) ModelTypes.Value.forType(theValue.getClass()), value, theText),

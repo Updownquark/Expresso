@@ -222,7 +222,7 @@ public class NameExpression implements ObservableExpression, Named {
 				field = clazz.getField(theNames.get(i).getName());
 			} catch (NoSuchFieldException e) {
 				exHandler.handle1(() -> new ExpressoInterpretationException(
-					"'" + fClass + "." + theNames.get(1).getName() + "' cannot be resolved or is not a field",
+					"'" + fClass.getName() + "." + theNames.get(fI).getName() + "' cannot be resolved or is not a field",
 					env.reporting().at(getDivisionOffset(fI)).getPosition(), theNames.get(0).length(), e));
 				return null;
 			} catch (SecurityException e) {
