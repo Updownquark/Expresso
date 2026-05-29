@@ -16,9 +16,9 @@ import org.observe.expresso.qonfig.ExElement;
 import org.observe.expresso.qonfig.ExElementTraceable;
 import org.observe.expresso.qonfig.ExNamed;
 import org.observe.expresso.qonfig.ExpressoQIS;
-import org.observe.expresso.qonfig.ExpressoQonfigValues;
 import org.observe.expresso.qonfig.QonfigAttributeGetter;
 import org.observe.expresso.qonfig.QonfigChildGetter;
+import org.observe.expresso.qonfig.values.Action;
 import org.observe.expresso.tests.ExpressoTesting.TestAction.TestActionElement;
 import org.observe.expresso.tests.TestInterpretation.StatefulStruct;
 import org.qommons.BreakpointHere;
@@ -200,7 +200,7 @@ public class ExpressoTesting extends ExElement.Abstract {
 		qonfigType = "test-action",
 		interpretation = TestAction.Interpreted.class,
 		instance = TestAction.TestActionElement.class)
-	public static class TestAction extends ExpressoQonfigValues.Action {
+	public static class TestAction extends Action {
 		private String theExpectedException;
 		private boolean isBreakpoint;
 
@@ -242,7 +242,7 @@ public class ExpressoTesting extends ExElement.Abstract {
 		}
 
 		/** Interpretation of a {@link TestAction} */
-		public static class Interpreted extends ExpressoQonfigValues.Action.Interpreted {
+		public static class Interpreted extends Action.Interpreted {
 			private Class<? extends Throwable> theExpectedException;
 
 			Interpreted(TestAction def, ExElement.Interpreted<?> parent) {

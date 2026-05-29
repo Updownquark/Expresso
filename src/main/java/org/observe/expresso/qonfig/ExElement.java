@@ -1544,7 +1544,7 @@ public interface ExElement extends Identifiable {
 			 *
 			 * @throws ExpressoInterpretationException If any model values in this element or any of its content fail to be interpreted
 			 */
-			protected final void update() throws ExpressoInterpretationException {
+			public final void update() throws ExpressoInterpretationException {
 				if (isInterpreting)
 					return;
 				isInterpreting = true;
