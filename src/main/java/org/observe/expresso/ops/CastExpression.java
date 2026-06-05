@@ -194,7 +194,8 @@ public class CastExpression implements ObservableExpression {
 
 		private SettableValue<T> transform(SettableValue<S> value) {
 			return value.transformReversible(tx -> tx//
-				.map(theConverter).replaceSource(theConverter::reverse, rev -> rev.rejectWith(theConverter::isReversible)));
+				.map(theConverter).replaceSource(theConverter::reverse,
+					rev -> rev.rejectWith(theConverter::isReversible).allowInexactReverse(!theConverter.isExact())));
 		}
 
 		@Override

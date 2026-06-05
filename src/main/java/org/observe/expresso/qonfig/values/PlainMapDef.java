@@ -7,10 +7,8 @@ import org.observe.expresso.ModelInstantiationException;
 import org.observe.expresso.ModelTypes;
 import org.observe.expresso.ObservableModelSet.ModelSetInstance;
 import org.observe.expresso.qonfig.ExElement;
-import org.observe.expresso.qonfig.ModelValueElement;
 import org.observe.expresso.qonfig.ExElement.Def;
-import org.observe.expresso.qonfig.values.AbstractMapDef.Instantiator;
-import org.observe.expresso.qonfig.values.MapEntry.MapPopulator;
+import org.observe.expresso.qonfig.ModelValueElement;
 import org.qommons.config.QonfigElementOrAddOn;
 
 /** ExElement definition for the Expresso &lt;map>. */

@@ -2118,6 +2118,8 @@ public class ModelTypes {
 		TypeConverter<Object, Object, Object, Object> cast) {
 		TypeConverter<Object, Object, Object, Object> reverse = cast.reverse();
 		return tx -> tx.cache(false).map(cast.getConverter()).replaceSource(reverse.getConverter(), rev -> {
+			if (!cast.isExact())
+				rev = rev.allowInexactReverse(true);
 			if (reverse.getApplicability() == null)
 				return rev;
 			else

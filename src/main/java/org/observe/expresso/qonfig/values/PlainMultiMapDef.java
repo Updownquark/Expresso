@@ -8,8 +8,6 @@ import org.observe.expresso.ModelTypes;
 import org.observe.expresso.ObservableModelSet.ModelSetInstance;
 import org.observe.expresso.qonfig.ExElement;
 import org.observe.expresso.qonfig.ModelValueElement;
-import org.observe.expresso.qonfig.values.AbstractMultiMapDef.Instantiator;
-import org.observe.expresso.qonfig.values.MapEntry.MapPopulator;
 import org.qommons.config.QonfigElementOrAddOn;
 
 /** ExElement definition for the Expresso &lt;multi-map>. */

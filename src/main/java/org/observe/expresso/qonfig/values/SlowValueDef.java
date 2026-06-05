@@ -8,13 +8,10 @@ import org.observe.ObservableValue;
 import org.observe.ObservableValueEvent;
 import org.observe.Observer;
 import org.observe.SettableValue;
-import org.observe.Observable.CoreChangeSources;
-import org.observe.ObservableValue.Getter;
-import org.observe.SettableValue.Setter;
 import org.observe.expresso.ExpressoInterpretationException;
 import org.observe.expresso.ModelInstantiationException;
-import org.observe.expresso.ModelTypes;
 import org.observe.expresso.ModelType.ModelInstanceType;
+import org.observe.expresso.ModelTypes;
 import org.observe.expresso.ObservableModelSet.InterpretedValueSynth;
 import org.observe.expresso.ObservableModelSet.ModelInstantiator;
 import org.observe.expresso.ObservableModelSet.ModelSetInstance;
@@ -24,25 +21,22 @@ import org.observe.expresso.qonfig.ElementTypeTraceability;
 import org.observe.expresso.qonfig.ExElement;
 import org.observe.expresso.qonfig.ExElementTraceable;
 import org.observe.expresso.qonfig.ExElementType;
+import org.observe.expresso.qonfig.ExFlexibleElementModelAddOn.ActionIfSatisfied;
 import org.observe.expresso.qonfig.ExWithElementModel;
 import org.observe.expresso.qonfig.ExpressoBaseV0_1;
 import org.observe.expresso.qonfig.ExpressoQIS;
 import org.observe.expresso.qonfig.ModelValueElement;
-import org.observe.expresso.qonfig.TraceabilityConfiguration;
-import org.observe.expresso.qonfig.ExFlexibleElementModelAddOn.ActionIfSatisfied;
 import org.observe.expresso.qonfig.ModelValueElement.InterpretedSynth;
+import org.observe.expresso.qonfig.TraceabilityConfiguration;
 import org.qommons.CausalLock;
 import org.qommons.DefaultCausalLock;
 import org.qommons.Identifiable;
 import org.qommons.Subscription;
 import org.qommons.ThreadConstraint;
 import org.qommons.Transaction;
-import org.qommons.CausalLock.Cause;
-import org.qommons.Identifiable.AbstractIdentifiable;
-import org.qommons.Lockable.CoreId;
 import org.qommons.collect.ListenerList;
-import org.qommons.collect.ThreadConstrainedLockingStrategy;
 import org.qommons.collect.MutableCollectionElement.StdMsg;
+import org.qommons.collect.ThreadConstrainedLockingStrategy;
 import org.qommons.config.QonfigElementOrAddOn;
 import org.qommons.config.QonfigInterpretationException;
 import org.qommons.io.ErrorReporting;
@@ -52,9 +46,9 @@ import com.google.common.reflect.TypeToken;
 
 /** &lt;slow-value> element */
 @ExElementTraceable(toolkit = ExpressoBaseV0_1.BASE,
-	qonfigType = SlowValueDef.SLOW_VALUE,
-	interpretation = FieldValueDef.Interpreted.class,
-	instance = FieldValueDef.Instantiator.class)
+qonfigType = SlowValueDef.SLOW_VALUE,
+interpretation = FieldValueDef.Interpreted.class,
+instance = FieldValueDef.Instantiator.class)
 public class SlowValueDef extends AbstractCompiledValue {
 	/** The XML name of this element */
 	public static final String SLOW_VALUE = "slow-value";
@@ -233,7 +227,6 @@ public class SlowValueDef extends AbstractCompiledValue {
 
 		private T theCurrentValue;
 		private long theRefreshingStamp;
-		private long thePublishedRefreshStamp;
 		private long theValueStamp;
 		private final CausalLock theLock;
 		private final ListenerList<Observer<? super ObservableValueEvent<T>>> theListeners;
@@ -249,7 +242,6 @@ public class SlowValueDef extends AbstractCompiledValue {
 
 			initIdentity(Identifiable.baseId(reporting.toString(), this));
 			theLock = new DefaultCausalLock(ThreadConstrainedLockingStrategy.get(threading));
-			thePublishedRefreshStamp = 0;
 			theRefreshingStamp = -1;
 			theListeners = ListenerList.build().skipAddByDefault(true).withInUse(new ListenerList.InUseListener() {
 				private Subscription theRefreshSub;
@@ -262,12 +254,6 @@ public class SlowValueDef extends AbstractCompiledValue {
 							if (stamp != theRefreshingStamp)
 								refresh(stamp, null);
 							theRefreshSub = theRefresh.act(cause -> refresh(theRefresh.getStamp(), cause));
-							if (theWhileLoading != null) {
-								synchronized (SlowValue.this) {
-									if (theRefreshingStamp != thePublishedRefreshStamp)
-										theWhileLoadingSub = theWhileLoading.noInitChanges().act(SlowValue.this::whileLoading);
-								}
-							}
 						}
 					} else {
 						theRefreshSub.unsubscribe();
@@ -296,8 +282,8 @@ public class SlowValueDef extends AbstractCompiledValue {
 					if (thisLoadId != theLoadId.get())
 						return;
 					oldValue = theCurrentValue;
+					theValueStamp = refreshStamp;
 					theCurrentValue = newValue;
-					thePublishedRefreshStamp = refreshStamp;
 					if (theWhileLoadingSub != null) {
 						theWhileLoadingSub.unsubscribe();
 						theWhileLoadingSub = null;

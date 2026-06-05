@@ -201,7 +201,7 @@ public class NameExpression implements ObservableExpression, Named {
 		if (field != null) {
 			fieldValue = evaluateField(field, TypeTokens.get().of(field.getGenericType()), null, 0, type, expressionOffset, env.reporting(),
 				divisions, env, exHandler);
-		} else {
+		} else if (theNames.size() > 1) {
 			StringBuilder typeName = new StringBuilder().append(theNames.get(0).getName());
 			Class<?> clazz = env.getClassView().getType(typeName.toString());
 			int i;
@@ -237,6 +237,11 @@ public class NameExpression implements ObservableExpression, Named {
 				.literalValue(TypeTokens.get().keyFor(Class.class).<Class<?>> parameterized(clazz), clazz, typeName.toString()), clazz);
 			for (int d = 0; d < i; d++)
 				divisions[d] = classValue;
+		} else {
+			exHandler
+				.handle1(() -> new ExpressoInterpretationException("'" + theNames.get(0).getName() + "' cannot be resolved to a variable",
+					env.reporting().getPosition(), theNames.get(0).length()));
+			return null;
 		}
 		return ObservableExpression.evEx2(expressionOffset, getExpressionLength(), fieldValue, null, Collections.emptyList(),
 			QommonsUtils.unmodifiableCopy(divisions));
