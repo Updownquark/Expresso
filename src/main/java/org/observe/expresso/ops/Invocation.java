@@ -112,7 +112,7 @@ public abstract class Invocation implements ObservableExpression {
 
 	/**
 	 * Represents an argument option supplied to
-	 * {@link Invocation#findMethod(Executable[], String, TypeToken, boolean, List, ModelInstanceType, InterpretedExpressoEnv, ExecutableImpl, ObservableExpression, int, org.qommons.ex.ExceptionHandler.Single)}
+	 * {@link Invocation#findMethod(Iterable, TypeToken, boolean, List, ModelInstanceType, InterpretedExpressoEnv, ExecutableImpl, ObservableExpression, int, org.qommons.ex.ExceptionHandler.Single)}
 	 */
 	public interface Args {
 		/** @return The number of arguments in the option */
@@ -363,7 +363,6 @@ public abstract class Invocation implements ObservableExpression {
 	 * @param <MV> The type of the target result
 	 * @param <EX> If the handler throws it
 	 * @param methods The invokables to search through
-	 * @param methodName The name of the invokable to find
 	 * @param contextType The type that the invocation's context was evaluated to
 	 * @param arg0Context Whether the first argument of the method should be its context
 	 * @param argOptions The list of parameter options available for invocation
@@ -378,22 +377,21 @@ public abstract class Invocation implements ObservableExpression {
 	 * @throws EX If the handler throws it in response to an error that occurred from a {@link TypeConversionException} in the argument
 	 *         evaluation
 	 */
-	public static <X extends Executable, M, MV extends M, EX extends Throwable> MethodResult<X, MV> findMethod(X[] methods,
-		String methodName, TypeToken<?> contextType, boolean arg0Context, List<? extends Args> argOptions,
+	public static <X extends Executable, M, MV extends M, EX extends Throwable> MethodResult<X, MV> findMethod(Iterable<X> methods,
+		TypeToken<?> contextType, boolean arg0Context, List<? extends Args> argOptions,
 		ModelInstanceType<M, MV> targetType, InterpretedExpressoEnv env, ExecutableImpl<X> impl, ObservableExpression invocation,
 		int expressionOffset, ExceptionHandler.Single<ExpressoInterpretationException, EX> exHandler)
 			throws ExpressoInterpretationException, EX {
-		MethodResult<X, MV> result = _findMethod(methods, methodName, contextType, arg0Context, argOptions, targetType, env, impl,
-			invocation, expressionOffset, exHandler, false);
+		MethodResult<X, MV> result = _findMethod(methods, contextType, arg0Context, argOptions, targetType, env, impl, invocation,
+			expressionOffset, exHandler, false);
 		if (result != null)
 			return result;
-		_findMethod(methods, methodName, contextType, arg0Context, argOptions, targetType, env, impl, invocation, expressionOffset,
-			exHandler, true);
+		_findMethod(methods, contextType, arg0Context, argOptions, targetType, env, impl, invocation, expressionOffset, exHandler, true);
 		return null;
 	}
 
-	private static <X extends Executable, M, MV extends M, EX extends Throwable> MethodResult<X, MV> _findMethod(X[] methods,
-		String methodName, TypeToken<?> contextType, boolean arg0Context, List<? extends Args> argOptions,
+	private static <X extends Executable, M, MV extends M, EX extends Throwable> MethodResult<X, MV> _findMethod(Iterable<X> methods,
+		TypeToken<?> contextType, boolean arg0Context, List<? extends Args> argOptions,
 		ModelInstanceType<M, MV> targetType, InterpretedExpressoEnv env, ExecutableImpl<X> impl, ObservableExpression invocation,
 		int expressionOffset, ExceptionHandler.Single<ExpressoInterpretationException, EX> exHandler, boolean secondPass)
 			throws ExpressoInterpretationException, EX {
@@ -401,8 +399,6 @@ public abstract class Invocation implements ObservableExpression {
 		MethodResult<X, MV> bestResult = null;
 		ExceptionHandler.Single<ExpressoInterpretationException, NeverThrown> typeHandler = ExceptionHandler.holder(secondPass);
 		for (X m : methods) {
-			if (methodName != null && !m.getName().equals(methodName))
-				continue;
 			boolean isStatic = impl.isStatic(m);
 			int specificity = -1;
 			TypeToken<?>[] paramTypes = null;
@@ -420,9 +416,6 @@ public abstract class Invocation implements ObservableExpression {
 			for (int o = 0; o < argOptions.size(); o++) {
 				TypeTokens.TypeVariableAccumulation tva;
 				Args option = argOptions.get(o);
-				int methodArgCount = (!isStatic && arg0Context) ? option.size() - 1 : option.size();
-				if (methodArgCount < 0 || !Invocation.checkArgCount(m.getParameterTypes().length, methodArgCount, m.isVarArgs()))
-					continue;
 				TypeToken<?> tvaResolver;
 				int methodArgStart;
 				if (isStatic) {
@@ -1306,7 +1299,7 @@ public abstract class Invocation implements ObservableExpression {
 		public final M method;
 		/**
 		 * The index of the option passed to
-		 * {@link Invocation#findMethod(Executable[], String, TypeToken, boolean, List, ModelInstanceType, InterpretedExpressoEnv, ExecutableImpl, ObservableExpression, int, org.qommons.ex.ExceptionHandler.Single)}
+		 * {@link Invocation#findMethod(Iterable, TypeToken, boolean, List, ModelInstanceType, InterpretedExpressoEnv, ExecutableImpl, ObservableExpression, int, org.qommons.ex.ExceptionHandler.Single)}
 		 * whose arguments match this invocation
 		 */
 		public final int argListOption;

@@ -103,7 +103,7 @@ public class EntityDataSet extends AbstractConfigModelElement {
 			theMigrations = getAttributeExpression("migrations", session);
 			syncChildren(EntitySubType.Def.class, theSubTypes, session.forChildren("sub-types"));
 
-			return new EntitySetValueMaker(this, getConfigDir(), getConfigName(), getBackup(), //
+			return new EntitySetValueMaker(getConfigDir(), getConfigName(), getBackup(), //
 				QommonsUtils.map(getOldConfigNames(), ocn -> ocn.getOldConfigName(), true), reporting(), theMigrations);
 		}
 
@@ -120,15 +120,10 @@ public class EntityDataSet extends AbstractConfigModelElement {
 		static class EntitySetValueMaker extends AbstractConfigModelElement.Def.DataSourceValueMaker {
 			private final CompiledExpression theMigrations;
 
-			public EntitySetValueMaker(Def<?> configModel, CompiledExpression configDir, String configName, DataBackup.Def<?> backup,
+			public EntitySetValueMaker(CompiledExpression configDir, String configName, DataBackup.Def<?> backup,
 				List<String> oldConfigNames, ErrorReporting reporting, CompiledExpression migrations) {
-				super(configModel, configDir, configName, backup, oldConfigNames, reporting);
+				super(configDir, configName, backup, oldConfigNames, reporting);
 				theMigrations = migrations;
-			}
-
-			@Override
-			protected Def<?> getConfigModel() {
-				return (Def<?>) super.getConfigModel();
 			}
 
 			@Override
@@ -179,7 +174,7 @@ public class EntityDataSet extends AbstractConfigModelElement {
 				}
 			}
 
-			class Instantiator extends AbstractConfigModelElement.Def.DataSourceValueMaker.Instantiator<ReflectedEntitySet> {
+			static class Instantiator extends AbstractConfigModelElement.Def.DataSourceValueMaker.Instantiator<ReflectedEntitySet> {
 				private final String theName;
 				private final Set<Class<?>> theEntityTypes;
 				private final ModelValueInstantiator<SettableValue<String>> theMigrations;

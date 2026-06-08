@@ -37,7 +37,7 @@ public class ClassView implements TypeParser {
 
 	private Map<String, Class<?>> theTypeCache;
 	private Map<String, ValueHolder<Field>> theFieldCache;
-	private Map<String, List<Method>> theMethodCache;
+	private Map<String, CachedClassReflection.ClassExecutableInfo<Method>> theMethodCache;
 
 	private ClassView(List<ClassLoader> classLoaders, Map<String, String> importedTypes, Map<String, ErrorReporting> importTypeErrors,
 		Set<String> wildcardImports) {
@@ -109,19 +109,22 @@ public class ClassView implements TypeParser {
 
 	/**
 	 * @param methodName The name of the methods to get
-	 * @return All statically-imported methods with the given name in this class view
+	 * @param argCount The number of arguments in the invocation
+	 * @return All statically-imported methods in this class view with the given name that can be invoked with the given number of arguments
 	 */
-	public List<Method> getImportedStaticMethods(String methodName) {
-		List<Method> methods = theMethodCache.computeIfAbsent(methodName, __ -> {
-			List<Method> m = new ArrayList<>();
+	public Iterable<Method> getImportedStaticMethods(String methodName, int argCount) {
+		CachedClassReflection.ClassExecutableInfo<Method> methods = theMethodCache.computeIfAbsent(methodName, __ -> {
+			CachedClassReflection.ClassExecutableInfo<Method> m = new CachedClassReflection.ClassExecutableInfo<>();
 			List<Method> staticImports = theStaticMethodImports.get(methodName);
-			if (staticImports != null)
-				m.addAll(staticImports);
+			if (staticImports != null) {
+				for (Method si : staticImports)
+					m.add(si);
+			}
 			for (String wildcard : theWildcardImports) {
 				Class<?> type = getType(wildcard);
 				if (type == null)
 					continue;
-				for (Method method : type.getDeclaredMethods()) {
+				for (Method method : type.getMethods()) {
 					int mod = method.getModifiers();
 					if (Modifier.isPublic(mod) && Modifier.isStatic(mod) && method.getName().equals(methodName))
 						m.add(method);
@@ -129,7 +132,7 @@ public class ClassView implements TypeParser {
 			}
 			return m;
 		});
-		return Collections.unmodifiableList(methods);
+		return methods.get(argCount);
 	}
 
 	/**

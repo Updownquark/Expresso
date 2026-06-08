@@ -966,7 +966,6 @@ public abstract class ObservableModelElement extends ExElement.Abstract {
 
 			/** Compiled value for the data set that model values for a config model will be sourced from */
 			protected static abstract class DataSourceValueMaker implements CompiledModelValue<SettableValue<?>> {
-				private final Def<?, ?> theConfigModel;
 				private final CompiledExpression theConfigDir;
 				private final String theConfigName;
 				private final DataBackup.Def<?> theBackup;
@@ -974,26 +973,19 @@ public abstract class ObservableModelElement extends ExElement.Abstract {
 				private final ErrorReporting theReporting;
 
 				/**
-				 * @param configModel The config model
 				 * @param configDir The expression pointing to the directory to persist the data to
 				 * @param configName The config-name of the model
 				 * @param backup Backup configuration for the model
 				 * @param oldConfigNames Previous config-names this model has been renamed from
 				 * @param reporting Error reporting for the model
 				 */
-				protected DataSourceValueMaker(Def<?, ?> configModel, CompiledExpression configDir, String configName,
-					DataBackup.Def<?> backup, List<String> oldConfigNames, ErrorReporting reporting) {
-					theConfigModel = configModel;
+				protected DataSourceValueMaker(CompiledExpression configDir, String configName, DataBackup.Def<?> backup,
+					List<String> oldConfigNames, ErrorReporting reporting) {
 					theConfigDir = configDir;
 					theBackup = backup;
 					theConfigName = configName;
 					theOldConfigNames = oldConfigNames;
 					theReporting = reporting;
-				}
-
-				/** @return The config model */
-				protected Def<?, ?> getConfigModel() {
-					return theConfigModel;
 				}
 
 				@Override
@@ -1008,16 +1000,17 @@ public abstract class ObservableModelElement extends ExElement.Abstract {
 					if (theConfigDir != null)
 						configDir = theConfigDir.interpret(ModelTypes.Value.forType(BetterFile.class), env);
 					else {
+						String configName = theConfigName;
 						configDir = InterpretedValueSynth.simple(ModelTypes.Value.forType(BetterFile.class),
 							ModelValueInstantiator.of(msi -> {
-								if (theConfigName.isEmpty())
+								if (configName.isEmpty())
 									return ObservableModelSet.literal(TypeTokens.get().of(BetterFile.class), null, "(no config file)");
-								String prop = System.getProperty(theConfigName + ".config");
+								String prop = System.getProperty(configName + ".config");
 								if (prop != null)
 									return ObservableModelSet.literal(BetterFile.at(new NativeFileSource(), prop), prop);
 								else
-									return ObservableModelSet.literal(BetterFile.at(new NativeFileSource(), "./" + theConfigName),
-										"./" + theConfigName);
+									return ObservableModelSet.literal(BetterFile.at(new NativeFileSource(), "./" + configName),
+										"./" + configName);
 							}));
 					}
 					DataBackup.Interpreted<?> backup = theBackup == null ? null : theBackup.interpret(null);
@@ -1317,31 +1310,25 @@ public abstract class ObservableModelElement extends ExElement.Abstract {
 			}
 
 			private static class ConfigValueMaker extends AbstractConfigModelElement.Def.DataSourceValueMaker {
+				private ExBiConsumer<ObservableConfig, ModelSetInstance, ModelInstantiationException> theModelInitializer;
+
 				ConfigValueMaker(Def<?> configModel, CompiledExpression configDir, String configName, DataBackup.Def<?> backup,
 					List<String> oldConfigNames, ErrorReporting reporting) {
-					super(configModel, configDir, configName, backup, oldConfigNames, reporting);
-				}
-
-				@Override
-				protected Def<?> getConfigModel() {
-					return (Def<?>) super.getConfigModel();
+					super(configDir, configName, backup, oldConfigNames, reporting);
+					theModelInitializer = configModel.getModelInitializer();
 				}
 
 				@Override
 				protected InterpretedValueSynth<SettableValue<?>, ?> interpret(
 					InterpretedValueSynth<SettableValue<?>, SettableValue<BetterFile>> configDir, DataBackup.Interpreted<?> backup,
 					InterpretedExpressoEnv env) throws ExpressoInterpretationException {
-					return new Interpreted(configDir, getConfigModel().getModelInitializer(), backup);
+					return new Interpreted(configDir, backup);
 				}
 
 				class Interpreted extends AbstractConfigModelElement.Def.DataSourceValueMaker.Interpreted<ObservableConfig> {
-					private final ExBiConsumer<ObservableConfig, ModelSetInstance, ModelInstantiationException> theModelInitializer;
-
 					Interpreted(InterpretedValueSynth<SettableValue<?>, SettableValue<BetterFile>> configDir,
-						ExBiConsumer<ObservableConfig, ModelSetInstance, ModelInstantiationException> modelInitializer,
 						DataBackup.Interpreted<?> backup) {
 						super(configDir, backup);
-						theModelInitializer = modelInitializer;
 					}
 
 					@Override
@@ -1353,8 +1340,7 @@ public abstract class ObservableModelElement extends ExElement.Abstract {
 					protected ModelValueInstantiator<SettableValue<ObservableConfig>> instantiate(
 						ModelValueInstantiator<SettableValue<BetterFile>> configDir, String configName, DataBackup backup,
 						List<String> oldConfigNames, ErrorReporting reporting) {
-						return new Instantiator(configDir, //
-							configName, backup, oldConfigNames, reporting, theModelInitializer);
+						return new Instantiator(configDir, configName, backup, oldConfigNames, reporting, theModelInitializer);
 					}
 				}
 

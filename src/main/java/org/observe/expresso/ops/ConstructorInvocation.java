@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.function.Function;
 
 import org.observe.SettableValue;
+import org.observe.expresso.CachedClassReflection;
 import org.observe.expresso.ExpressoInterpretationException;
 import org.observe.expresso.InterpretedExpressoEnv;
 import org.observe.expresso.ModelType.ModelInstanceType;
@@ -99,8 +100,9 @@ public class ConstructorInvocation extends Invocation {
 				theType.getFullLength());
 		ExceptionHandler.Single<ExpressoInterpretationException, NeverThrown> tce = ExceptionHandler
 			.<ExpressoInterpretationException> holder(exHandler.isInstantiating());
-		Invocation.MethodResult<Constructor<?>, MV> result = Invocation.findMethod(constructorType.getConstructors(), null, null, true,
-			Arrays.asList(args), type, env, Invocation.ExecutableImpl.CONSTRUCTOR, this, expressionOffset, tce);
+		Iterable<Constructor<?>> constructors = CachedClassReflection.get(constructorType).getConstructors(args.size());
+		Invocation.MethodResult<Constructor<?>, MV> result = Invocation.findMethod(constructors, null, true, Arrays.asList(args), type, env,
+			Invocation.ExecutableImpl.CONSTRUCTOR, this, expressionOffset, tce);
 		if (result != null) {
 			EvaluatedExpression<SettableValue<?>, SettableValue<?>>[] realArgs = new EvaluatedExpression[getArguments().size()];
 			for (int a = 0; a < realArgs.length; a++)

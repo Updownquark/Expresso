@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.function.Function;
 
 import org.observe.SettableValue;
+import org.observe.expresso.CachedClassReflection;
 import org.observe.expresso.ExpressoInterpretationException;
 import org.observe.expresso.InterpretedExpressoEnv;
 import org.observe.expresso.ModelType.ModelInstanceType;
@@ -16,7 +17,6 @@ import org.observe.expresso.ObservableExpression;
 import org.observe.expresso.ObservableModelSet.InterpretedValueSynth;
 import org.observe.expresso.TypeConversionException;
 import org.observe.util.TypeTokens;
-import org.qommons.ArrayUtils;
 import org.qommons.ex.ExceptionHandler;
 import org.qommons.ex.NeverThrown;
 
@@ -138,9 +138,10 @@ public class MethodInvocation extends Invocation {
 			if (theContext instanceof NameExpression) {
 				Class<?> clazz = env.getClassView().getType(((NameExpression) theContext).getName());
 				if (clazz != null) {
-					Invocation.MethodResult<Method, MV> result = Invocation.findMethod(clazz.getMethods(), theMethodName.getName(),
-						TypeTokens.get().of(clazz), true, Arrays.asList(args), type, env, Invocation.ExecutableImpl.METHOD, this,
-						expressionOffset, exHandler);
+					CachedClassReflection<?> reflector = CachedClassReflection.get(clazz);
+					Iterable<Method> methods = reflector.getMethods(theMethodName.getName(), true, args.size());
+					Invocation.MethodResult<Method, MV> result = Invocation.findMethod(methods, reflector.type, true, Arrays.asList(args),
+						type, env, Invocation.ExecutableImpl.METHOD, this, expressionOffset, exHandler);
 					if (result != null) {
 						EvaluatedExpression<SettableValue<?>, SettableValue<?>>[] realArgs = new EvaluatedExpression[getArguments().size()];
 						for (int a = 0; a < realArgs.length; a++)
@@ -168,11 +169,9 @@ public class MethodInvocation extends Invocation {
 				return null;
 			TypeToken<?> ctxType = ctx.getType().getType(0);
 			Class<?> rawCtxType = TypeTokens.getRawType(ctxType);
-			Method[] methods = rawCtxType.getMethods();
-			if (rawCtxType.isInterface())
-				methods = ArrayUtils.addAll(methods, Object.class.getMethods());
-			Invocation.MethodResult<Method, MV> result = Invocation.findMethod(methods, theMethodName.getName(), ctxType, false,
-				Arrays.asList(args), type, env, Invocation.ExecutableImpl.METHOD, this, expressionOffset, exHandler);
+			Iterable<Method> methods = CachedClassReflection.get(rawCtxType).getMethods(theMethodName.getName(), false, args.size());
+			Invocation.MethodResult<Method, MV> result = Invocation.findMethod(methods, ctxType, false, Arrays.asList(args), type, env,
+				Invocation.ExecutableImpl.METHOD, this, expressionOffset, exHandler);
 			if (result != null) {
 				EvaluatedExpression<SettableValue<?>, SettableValue<?>>[] realArgs = new EvaluatedExpression[getArguments().size()];
 				for (int a = 0; a < realArgs.length; a++)
@@ -187,10 +186,9 @@ public class MethodInvocation extends Invocation {
 				return null;
 			}
 		} else {
-			List<Method> methods = env.getClassView().getImportedStaticMethods(theMethodName.getName());
-			Invocation.MethodResult<Method, MV> result = Invocation.findMethod(methods.toArray(new Method[methods.size()]),
-				theMethodName.getName(), null, true, Arrays.asList(args), type, env, Invocation.ExecutableImpl.METHOD, this,
-				expressionOffset, exHandler);
+			Iterable<Method> methods = env.getClassView().getImportedStaticMethods(theMethodName.getName(), args.size());
+			Invocation.MethodResult<Method, MV> result = Invocation.findMethod(methods, null, true, Arrays.asList(args), type, env,
+				Invocation.ExecutableImpl.METHOD, this, expressionOffset, exHandler);
 			if (result != null) {
 				EvaluatedExpression<SettableValue<?>, SettableValue<?>>[] realArgs = new EvaluatedExpression[getArguments().size()];
 				for (int a = 0; a < realArgs.length; a++)
