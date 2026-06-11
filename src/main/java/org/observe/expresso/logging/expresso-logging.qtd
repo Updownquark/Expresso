@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?DOC The Expresso-Logging toolkit.  Contains definitions for configuring the ability to log events in an application to various
+	persistent or temporary media.<br>
+	If this toolkit is declared as a dependency, any <expresso-document> instance will automatically be a <logged-document>,
+	whose <head> section may contain a <logging> element.<br>
+	<logging> allows specification of one or more <logger> elements of various types, each of which may contain <logger> children.<br>
+	So <logging> also allows specification of one or more <log-capture> elements, which may define a filter for log events and specify
+	a target logger to log events to. <log-capture>s are also hierarchical, allowing any number of <log-capture> children.<br>
+	<logged-document> requires specification of the log-to attribute, which references a <log-capture> by name.
+	Any events that happen in the document will be processed by that capture.<br>
+	If the capture is conditionless or the event passes the filter, the event will be processed by the capture's target logger (if any)
+	and all of the capture's children.<br>
+	When a capture passes an event to its target logger, the event will be logged to that logger and all its descendants.<br>
+	Several different types of loggers are provided, as well as the ability to define custom loggers with or without extending this toolkit.<br>
+	Custom log events may be created using a <log-event> element, which will create a log event in response to a generic event expression.
+?>
+<qonfig-def name="Expresso-Logging" version="0.1" xmlns:expresso="Expresso-Base v0.1">
+	<add-ons>
+		<add-on name="logged-document" inherits="expresso-document,logged-element">
+			<attr-mod name="logged-element.log-to" specify="required" />
+			<child-mod child="expresso-document.head" inherits="logged-document-head" />
+		</add-on>
+		<add-on name="logged-document-head" requires="head">
+			<child-def name="logging" type="logging" min="0" />
+		</add-on>
+		<add-on name="logged-element">
+			<attribute name="log-to" type="identifier-path" specify="optional" />
+			<attribute name="dont-log-to" type="identifier-path" specify="optional" />
+			<attribute name="log-exclusively-to" type="identifier-path" specify="optional" />
+		</add-on>
+		<add-on name="log-file-type" requires="log-file" abstract="true" />
+		<add-on name="log-file-element" requires="log-element" abstract="true">
+			<attribute name="print" type="expression" specify="optional" />
+		</add-on>
+		<add-on name="csv-log" inherits="log-file-type">
+			<attribute name="separator" type="string" default="," />
+			<child-mod child="log-file.element" inherits="csv-log-element" />
+		</add-on>
+		<add-on name="csv-log-element" inherits="log-file-element" abstract="true">
+			<attribute name="column" type="string" specify="optional" />
+		</add-on>
+		<add-on name="xml-log" inherits="log-file-type">
+			<child-mod child="log-file.element" inherits="xml-log-element" />
+		</add-on>
+		<add-on name="xml-log-element" inherits="log-file-element" abstract="true">
+			<attribute name="attribute" type="string" specify="optional" />
+			<attribute name="child" type="string" specify="optional" />
+			<attribute name="as-text" type="boolean" specify="optional" />
+			<attribute name="as-cdata" type="boolean" specify="optional" />
+		</add-on>
+		<add-on name="log-archive-type" abstract="true" />
+		<add-on name="zip-archive" inherits="log-archive-type">
+			<attribute name="aggregate-file" type="string" specify="optional" />
+			<attribute name="level" type="int" default="9" />
+		</add-on>
+		<add-on name="gzip-archive" inherits="log-archive-type" />
+	</add-ons>
+	<elements>
+		<element-def name="logging" inherits="with-local-model">
+			<child-def name="logger" type="logger" max="inf" />
+			<child-def name="capture" type="log-capture" max="inf" />
+		</element-def>
+		<element-def name="logger" inherits="named,with-element-model" abstract="true">
+			<element-model>
+				<sorted-map name="severity" key-type="LogSeverity" />
+				<event name="log" />
+			</element-model>
+			<child-def name="child" type="logger" min="0" max="inf" />
+		</element-def>
+		<element-def name="log-capture" inherits="named">
+			<child-def name="element" type="log-element" min="0" max="inf" />
+			<attribute name="if" type="expression" default="true" />
+			<attribute name="logger" type="identifier-path" specify="optional" />
+			<child-def name="child" type="log-capture" min="0" max="inf" />
+		</element-def>
+		<element-def name="log-element" inherits="with-element-model">
+			<element-model>
+				<value name-attribute="as" />
+			</element-model>
+			<attribute name="as" type="identifier" />
+		</element-def>
+		<element-def name="log-id" extends="log-element" />
+		<element-def name="log-time" extends="log-element" />
+		<element-def name="log-capture-name" extends="log-element" />
+		<element-def name="log-source" extends="log-element" />
+		<element-def name="log-message" extends="log-element" />
+		<element-def name="log-exception" extends="log-element" />
+		<element-def name="log-stack-trace" extends="log-element" />
+
+		<?DOC Creates a log event in response to some general event?>
+		<element-def name="log-event" extends="model-value">
+			<?DOC The event upon which to create a log event?>
+			<attribute name="on" type="expression" />
+			<?DOC The severity level for the event?>
+			<attribute name="level" type="expression" default="Info" />
+			<?DOC The source string for the event?>
+			<attribute name="source" type="expression" />
+			<?DOC The message string for the event?>
+			<attribute name="message" type="expression" />
+			<?DOC The exception for the event?>
+			<attribute name="exception" type="expression" specify="optional" />
+		</element-def>
+
+		<element-def name="null-logger" extends="logger" />
+		<element-def name="logger-reference" extends="logger">
+			<value type="identifier-path" />
+		</element-def>
+		<element-def name="stream-logger" extends="logger">
+			<attribute name="stream" type="expression" />
+		</element-def>
+		<element-def name="log-file" extends="logger" abstract="true">
+			<attribute name="file-type" type="log-file-type" default="csv-log" />
+			<child-def name="element" type="log-file-element" min="0" max="inf" />
+		</element-def>
+		
+		<element-def name="rolling-log-file" extends="log-file" inherits="with-element-model">
+			<element-model>
+				<value name-attribute="time-as" />
+			</element-model>
+			<attribute name="time-as" type="identifier" default="time" />
+			<attribute name="file-path" type="expression" />
+			<attribute name="new-file-on-restart" type="expression" default="false" />
+			<attribute name="max-file-size" type="expression" specify="optional" />
+			<attribute name="max-file-duration" type="expression" specify="optional" />
+			<attribute name="max-total-size" type="expression" specify="optional" />
+			<attribute name="max-total-duration" type="expression" specify="optional" />
+			<child-def name="archive" type="rolling-log-archive" min="0" />
+		</element-def>
+		<element-def name="rolling-log-archive">
+			<attribute name="archive-type" type="log-archive-type" default="zip-archive" />
+			<attribute name="min-file-age" type="expression" />
+		</element-def>
+		
+		<element-def name="custom-logging" extends="logger" inherits="with-element-model">
+			<element-model>
+				<value name-attribute="element/as" />
+			</element-model>
+			<child-def name="element" type="log-element" min="0" max="inf" />
+			<attribute name="log" type="expression" />
+		</element-def>
+	</elements>
+	<auto-inheritance>
+		<?DOC If logging is included, everything is logged?>
+		<auto-inherit inherits="logged-document">
+			<target element="expresso-document" />
+		</auto-inherit>
+		<?DOC Logging can be directed on every element?>
+		<auto-inherit inherits="logged-element">
+			<target element="element" />
+		</auto-inherit>
+	</auto-inheritance>
+</qonfig-def>

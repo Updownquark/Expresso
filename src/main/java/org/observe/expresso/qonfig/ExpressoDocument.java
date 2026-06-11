@@ -39,6 +39,7 @@ public class ExpressoDocument<B> extends ExModelAugmentation<ExElement> {
 		private ExpressoHeadSection.Def theHead;
 		private ModelComponentId theModelLoadValue;
 		private ModelComponentId theBodyLoadValue;
+		private ModelComponentId theShutdownEventId;
 
 		/**
 		 * @param type The Qonfig type of this add-on
@@ -69,6 +70,12 @@ public class ExpressoDocument<B> extends ExModelAugmentation<ExElement> {
 			return theBodyLoadValue;
 		}
 
+		/** @return The model value ID of the shutdown action */
+		@QonfigAttributeGetter(asType = "expresso-document", value = "shutdown-as")
+		public ModelComponentId getShutdownEventId() {
+			return theShutdownEventId;
+		}
+
 		@Override
 		public void update(ExpressoQIS session, ExElement.Def<? extends ExElement> element) throws QonfigInterpretationException {
 			super.update(session, element);
@@ -89,8 +96,10 @@ public class ExpressoDocument<B> extends ExModelAugmentation<ExElement> {
 			if (elModels != null) {
 				theModelLoadValue = elModels.getElementValueModelId("onModelLoad");
 				theBodyLoadValue = elModels.getElementValueModelId("onBodyLoad");
+				String shutdownIdName = session.getAttributeText("shutdown-as");
+				theShutdownEventId = shutdownIdName == null ? null : elModels.getElementValueModelId(shutdownIdName);
 			} else
-				theModelLoadValue = theBodyLoadValue = null;
+				theModelLoadValue = theBodyLoadValue = theShutdownEventId = null;
 		}
 
 		@Override
@@ -154,8 +163,11 @@ public class ExpressoDocument<B> extends ExModelAugmentation<ExElement> {
 	private ExpressoHeadSection theHead;
 	private ModelComponentId theModelLoadValue;
 	private ModelComponentId theBodyLoadValue;
+	private ModelComponentId theShutdownEventId;
 	private SimpleObservable<java.lang.Void> theModelLoad;
 	private SimpleObservable<java.lang.Void> theBodyLoad;
+	private SimpleObservable<java.lang.Void> theShutdown;
+	private Thread theShutdownHook;
 
 	/** @param element The element that this add-on will affect */
 	protected ExpressoDocument(ExElement element) {
@@ -163,6 +175,7 @@ public class ExpressoDocument<B> extends ExModelAugmentation<ExElement> {
 
 		theModelLoad = new SimpleObservable<>();
 		theBodyLoad = new SimpleObservable<>();
+		theShutdown = new SimpleObservable<>();
 	}
 
 	/** @return The document's head section */
@@ -182,6 +195,8 @@ public class ExpressoDocument<B> extends ExModelAugmentation<ExElement> {
 		Interpreted<?, ?> myInterpreted = (Interpreted<?, ?>) interpreted;
 		theModelLoadValue = myInterpreted.getDefinition().getModelLoadValue();
 		theBodyLoadValue = myInterpreted.getDefinition().getBodyLoadValue();
+		theShutdownEventId = myInterpreted.getDefinition().getShutdownEventId();
+
 		if (myInterpreted.getHead() == null) {
 			if (theHead != null)
 				theHead.destroy();
@@ -224,6 +239,13 @@ public class ExpressoDocument<B> extends ExModelAugmentation<ExElement> {
 			ExFlexibleElementModelAddOn.satisfyElementValue(theModelLoadValue, models, theModelLoad.readOnly());
 			ExFlexibleElementModelAddOn.satisfyElementValue(theBodyLoadValue, models, theBodyLoad.readOnly());
 		}
+		if (theShutdownEventId != null) {
+			if (theShutdownHook == null) {
+				theShutdownHook = new Thread(() -> theShutdown.onNext(null), "Expresso Shutdown");
+				Runtime.getRuntime().addShutdownHook(theShutdownHook);
+			}
+			ExFlexibleElementModelAddOn.satisfyElementValue(theShutdownEventId, models, theShutdown.readOnly());
+		}
 
 		theModelLoad.onNext(null);
 		theBodyLoad.onNext(null);
@@ -235,6 +257,7 @@ public class ExpressoDocument<B> extends ExModelAugmentation<ExElement> {
 
 		copy.theModelLoad = new SimpleObservable<>();
 		copy.theBodyLoad = new SimpleObservable<>();
+		copy.theShutdown = new SimpleObservable<>();
 
 		return copy;
 	}

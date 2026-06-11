@@ -12,6 +12,9 @@ It does not include anything "useful" in the concrete, i.e. no values or transfo
 		<?DOC A name for a variable?>
 		<pattern name="identifier">[_a-zA-Z$][_a-zA-Z0-9$]*</pattern>
 
+		<?DOC A path consisting of identifiers separated by '.' characters?>
+		<pattern name="identifier-path">[_a-zA-Z$][_a-zA-Z0-9$]*(\s*\.\s*[_a-zA-Z$][_a-zA-Z0-9$]*)*</pattern>
+
 		<?DOC An expression consisting of some combination of values via operators?>
 		<external name="expression" />
 	</value-types>
