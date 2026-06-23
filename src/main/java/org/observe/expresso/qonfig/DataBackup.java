@@ -147,7 +147,7 @@ public class DataBackup extends ExElement.Abstract {
 		}
 
 		public static class Interpreted<B extends NoBackup> extends DataBackup.Interpreted<B> {
-			public Interpreted(Def<? super B> definition, ExElement.Interpreted<?> parent) {
+			Interpreted(Def<? super B> definition, ExElement.Interpreted<?> parent) {
 				super(definition, parent);
 			}
 

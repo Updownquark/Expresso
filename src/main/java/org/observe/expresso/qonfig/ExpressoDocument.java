@@ -71,7 +71,7 @@ public class ExpressoDocument<B> extends ExModelAugmentation<ExElement> {
 		}
 
 		/** @return The model value ID of the shutdown action */
-		@QonfigAttributeGetter(asType = "expresso-document", value = "shutdown-as")
+		@QonfigAttributeGetter(asType = EXPRESSO_DOCUMENT, value = "shutdown-as")
 		public ModelComponentId getShutdownEventId() {
 			return theShutdownEventId;
 		}
