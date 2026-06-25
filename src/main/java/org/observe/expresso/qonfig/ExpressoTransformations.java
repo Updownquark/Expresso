@@ -2779,11 +2779,9 @@ public class ExpressoTransformations {
 			 * @throws ModelInstantiationException If the transformed value could not be produced
 			 */
 			public SettableValue<T> get(SettableValue<S> source, ModelSetInstance models) throws ModelInstantiationException {
-				if (theLocalModels != null) {
-					models = theLocalModels.operate(models, (m, mi) -> mi.wrap(m));
-					if (theSourceAsVariable != null)
-						ExFlexibleElementModelAddOn.satisfyElementValue(theSourceAsVariable, models, source);
-				}
+				models = theLocalModels.operate(models, (m, mi) -> mi.wrap(m));
+				if (theSourceAsVariable != null)
+					ExFlexibleElementModelAddOn.satisfyElementValue(theSourceAsVariable, models, source);
 				return doGet(source, models);
 			}
 
@@ -2794,10 +2792,8 @@ public class ExpressoTransformations {
 			 * @throws ModelInstantiationException If the difference could not be determined
 			 */
 			public boolean isDifferent(ModelSetInstance sourceModels, ModelSetInstance newModels) throws ModelInstantiationException {
-				if (theLocalModels != null) {
-					sourceModels = theLocalModels.operate(sourceModels, (m, mi) -> mi.wrap(m));
-					newModels = theLocalModels.operate(newModels, (m, mi) -> mi.wrap(m));
-				}
+				sourceModels = theLocalModels.operate(sourceModels, (m, mi) -> mi.wrap(m));
+				newModels = theLocalModels.operate(newModels, (m, mi) -> mi.wrap(m));
 				return checkIsDifferent(sourceModels, newModels);
 			}
 
@@ -2967,17 +2963,19 @@ public class ExpressoTransformations {
 
 			@Override
 			protected SettableValue<T> doGet(SettableValue<S> source, ModelSetInstance models) throws ModelInstantiationException {
-				List<ObservableValue<ConditionalValue<T>>> ifs = new ArrayList<>(theIfs.size() + 1);
+				SettableValue<T> value = theValue.get(models);
+				if (theIfs.isEmpty())
+					return value;
+				ObservableValue<ConditionalValue<T>>[] ifs = new ObservableValue[theIfs.size() + 1];
 				for (int i = 0; i < theIfs.size(); i++) {
 					SettableValue<Boolean> ifCondition = theIfConditions.get(i).get(models);
 					SettableValue<T> iff = theIfs.get(i).get(source, models);
-					ifs.add(ifCondition.map(FunctionUtils.printableFn(b -> new ConditionalValue<>(Boolean.TRUE.equals(b), iff),
-						() -> "if(" + ifCondition + ", " + iff + ")", null)));
+					ifs[i] = ifCondition.map(FunctionUtils.printableFn(b -> new ConditionalValue<>(Boolean.TRUE.equals(b), iff),
+						() -> "if(" + ifCondition + ", " + iff + ")", null));
 				}
-				SettableValue<T> value = theValue.get(models);
-				ifs.add(ObservableValue.of(new ConditionalValue<>(true, value)));
+				ifs[theIfs.size()] = ObservableValue.of(new ConditionalValue<>(true, value));
 				ObservableValue<ConditionalValue<T>> firstTrue = ObservableValue.<ConditionalValue<T>> firstValue(//
-					FunctionUtils.printablePred(cv -> cv.condition, "condition", null), null, ifs.toArray(new ObservableValue[ifs.size()]));
+					FunctionUtils.printablePred(cv -> cv.condition, "condition", null), null, ifs);
 				return SettableValue
 					.flatten(firstTrue.map(FunctionUtils.printableFn(cv -> {
 						if (cv == null) {

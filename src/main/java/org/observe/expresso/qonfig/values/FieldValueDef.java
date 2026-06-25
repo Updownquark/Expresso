@@ -18,6 +18,7 @@ import org.observe.expresso.ObservableModelSet.ModelComponentId;
 import org.observe.expresso.ObservableModelSet.ModelInstantiator;
 import org.observe.expresso.ObservableModelSet.ModelSetInstance;
 import org.observe.expresso.ObservableModelSet.ModelValueInstantiator;
+import org.observe.expresso.ops.Invocation;
 import org.observe.expresso.qonfig.CompiledExpression;
 import org.observe.expresso.qonfig.DocumentMap;
 import org.observe.expresso.qonfig.ExElement;
@@ -41,9 +42,9 @@ import com.google.common.reflect.TypeToken;
 
 /** &lt;field-value> element */
 @ExElementTraceable(toolkit = ExpressoBaseV0_1.BASE,
-	qonfigType = FieldValueDef.FIELD_VALUE,
-	interpretation = FieldValueDef.Interpreted.class,
-	instance = FieldValueDef.Instantiator.class)
+qonfigType = FieldValueDef.FIELD_VALUE,
+interpretation = FieldValueDef.Interpreted.class,
+instance = FieldValueDef.Instantiator.class)
 public class FieldValueDef extends AbstractCompiledValue {
 	/** The XML name of this element */
 	public static final String FIELD_VALUE = "field-value";
@@ -170,7 +171,9 @@ public class FieldValueDef extends AbstractCompiledValue {
 
 		@Override
 		protected void doUpdate() throws ExpressoInterpretationException {
-			theSource = interpret(getDefinition().getSource(), ModelTypes.Value.anyAsV());
+			try (Transaction t = Invocation.asAction()) {
+				theSource = interpret(getDefinition().getSource(), ModelTypes.Value.anyAsV());
+			}
 
 			super.doUpdate();
 
@@ -285,17 +288,17 @@ public class FieldValueDef extends AbstractCompiledValue {
 		private final ErrorReporting theReporting;
 		private final SettableValue<T> theSource;
 		private final ObservableAction theSave;
-		private final SettableValue<T> theSourceAs;
+		private final SettableValue<T> theTargetAs;
 		private final List<ObservableAction> thePostActions;
 		private boolean isSetting;
 
-		FieldValue(ErrorReporting reporting, SettableValue<T> source, ObservableAction save, SettableValue<T> sourceAs,
+		FieldValue(ErrorReporting reporting, SettableValue<T> source, ObservableAction save, SettableValue<T> targetAs,
 			List<ObservableAction> postActions) {
 			super(source.alias(reporting.toString()), new SimpleObservable<>());
 			theReporting = reporting;
 			theSource = source;
 			theSave = save;
-			theSourceAs = sourceAs;
+			theTargetAs = targetAs;
 			thePostActions = postActions;
 		}
 
@@ -319,7 +322,7 @@ public class FieldValueDef extends AbstractCompiledValue {
 
 		@Override
 		public String isAcceptable(T value) {
-			theSourceAs.set(value, null);
+			theTargetAs.set(value, null);
 			return theSave.isEnabled().get();
 		}
 
@@ -331,14 +334,25 @@ public class FieldValueDef extends AbstractCompiledValue {
 				return value;
 			try {
 				isSetting = true;
-				long preStamp = getStamp();
-				theSourceAs.set(value);
+				theTargetAs.set(value);
 				theSave.act(getRootCausable());
-				for (ObservableAction postAction : thePostActions) {
-					if (postAction.isEnabled().get() == null)
-						postAction.act(getRootCausable());
+				boolean refresh;
+				if (thePostActions.isEmpty())
+					refresh = true;
+				else {
+					/* We may need to fire a refresh after the save action.
+					 * The only reason we wouldn't do this is if one of the post actions did it for us.
+					 * We ignore any events the save action may have caused because these may have been intermediate changes
+					 * before the final value was available to the getter.
+					 */
+					long preStamp = getStamp();
+					for (ObservableAction postAction : thePostActions) {
+						if (postAction.isEnabled().get() == null)
+							postAction.act(getRootCausable());
+					}
+					refresh = preStamp == getStamp();
 				}
-				if (preStamp == getStamp()) // Only refresh if none of the save or the actual actions caused an event
+				if (refresh)
 					((SimpleObservable<Void>) getRefresh()).onNext(null);
 			} catch (RuntimeException e) {
 				theReporting.error(e.getMessage(), e);
