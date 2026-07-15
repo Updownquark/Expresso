@@ -18,7 +18,7 @@ public class ExpressoLoggingV0_1 implements QonfigInterpretation {
 	public static final Version VERSION = new Version(0, 1, 0);
 
 	/** {@link #NAME} and {@link #VERSION} combined */
-	public static final String BASE = "Expresso-Logging 0.1";
+	public static final String LOGGING = "Expresso-Logging 0.1";
 
 	@Override
 	public Set<Class<? extends SpecialSession<?>>> getExpectedAPIs() {

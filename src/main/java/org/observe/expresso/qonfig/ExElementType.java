@@ -467,6 +467,10 @@ public class ExElementType {
 		return new SimpleValue<>(attributeName, type, defaultValue);
 	}
 
+	public static TextValue textValue(String attributeName) {
+		return new TextValue(attributeName);
+	}
+
 	public static <T, I extends ExElement.Interpreted<?>> ValueExpression<T, I> valueExpression(String attributeName, Class<T> type,
 		Supplier<? extends T> defaultValue) {
 		return valueExpression(attributeName, TypeTokens.get().of(type), defaultValue);
@@ -570,7 +574,7 @@ public class ExElementType {
 		return new ActionExpression(attributeName);
 	}
 
-	public static <E extends ExElement, I extends ExElement.Interpreted<? super E>, D extends ExElement.Def<? super E>> ExElementChild<E, I, D> child(//
+	public static <E extends ExElement, I extends ExElement.Interpreted<? extends E>, D extends ExElement.Def<? extends E>> ExElementChild<E, I, D> child(//
 		String roleName, Class<? super D> defType, //
 		ExBiFunction<? super D, ExElement.Interpreted<?>, I, ExpressoInterpretationException> interpreter,
 		ExConsumer<? super I, ExpressoInterpretationException> update, //
@@ -645,6 +649,60 @@ public class ExElementType {
 				throw new IllegalStateException(
 					"An element attribute or value (" + this + ") cannot be owned by multiple elements: " + theOwner + " and " + owner);
 			theOwner = owner;
+		}
+	}
+
+	public static class TextValue extends AbstractElementValue<String, String, String, SettableValue<String>, SettableValue<String>> {
+		private final String theAttributeName;
+
+		public TextValue(String attributeName) {
+			theAttributeName = attributeName;
+		}
+
+		@Override
+		public String getAttributeName() {
+			return theAttributeName;
+		}
+
+		@Override
+		public String compile(ExElement.Def<?> element, ExpressoQIS session) throws QonfigInterpretationException {
+			return session.getAttributeText(theAttributeName);
+		}
+
+		@Override
+		public String interpret(String definition, InterpretedTypeData type, ExElement.Interpreted<?> element)
+			throws ExpressoInterpretationException {
+			return definition;
+		}
+
+		@Override
+		public SettableValue<String> createInstanceWrapper() {
+			return SettableValue.create();
+		}
+
+		@Override
+		public SettableValue<String> flattenWrapper(SettableValue<String> wrapper) {
+			return wrapper;
+		}
+
+		@Override
+		public String instantiate(String interpreted, ExElement element) throws ModelInstantiationException {
+			return interpreted;
+		}
+
+		@Override
+		public void instantiated(String value) throws ModelInstantiationException {
+		}
+
+		@Override
+		public void wrap(SettableValue<String> wrapper, String instance, ExElement element, ModelSetInstance models)
+			throws ModelInstantiationException {
+			wrapper.set(instance);
+		}
+
+		@Override
+		public String toString() {
+			return (theAttributeName == null ? "(value)" : theAttributeName) + " (text)";
 		}
 	}
 
@@ -1525,7 +1583,7 @@ public class ExElementType {
 				theTypeData.update(this);
 			}
 
-			protected abstract AbstractElement create();
+			protected abstract E create();
 		}
 
 		private InstanceTypeData theTypeData;
@@ -1636,7 +1694,7 @@ public class ExElementType {
 			public abstract <E2 extends E> Interpreted<? super E2, ? extends AO> interpret(ExElement.Interpreted<E2> element);
 		}
 
-		public static abstract class Interpreted<E extends ExElement, AO extends AbstractAddOn<E>>
+		public static abstract class Interpreted<E extends ExElement, AO extends AbstractAddOn<? super E>>
 		extends ExAddOn.Interpreted.Abstract<E, AO> {
 			private final InterpretedTypeData theTypeData;
 
