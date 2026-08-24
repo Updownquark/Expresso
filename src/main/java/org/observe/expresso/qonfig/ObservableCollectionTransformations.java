@@ -873,7 +873,7 @@ public class ObservableCollectionTransformations {
 		implements CollectionFlowToFlowTransformInstantiator<CV, CV, T, T> {
 			@Override
 			public CV transform(CV source, ModelSetInstance models) throws ModelInstantiationException {
-				return (CV) source.reverse();
+				return (CV) source.reversed();
 			}
 
 			@Override
